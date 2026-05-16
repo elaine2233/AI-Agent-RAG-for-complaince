@@ -22,7 +22,7 @@ BACKUP_DIR = config.DB_BACKUP_DIR
 MAX_BACKUPS = config.MAX_BACKUPS
 DATA_RETENTION_DAYS = config.DATA_RETENTION_DAYS
 
-_schema_version = 3
+_schema_version = 4
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -58,6 +58,13 @@ CREATE TABLE IF NOT EXISTS review_records (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     is_deleted INTEGER NOT NULL DEFAULT 0,
     deleted_at TEXT,
+    decision TEXT NOT NULL DEFAULT 'auto_pass',
+    risk_score REAL NOT NULL DEFAULT 0.0,
+    risk_level TEXT NOT NULL DEFAULT 'low',
+    reviewer_id INTEGER,
+    review_comment TEXT,
+    model_used TEXT NOT NULL DEFAULT '',
+    prompt_version TEXT NOT NULL DEFAULT '',
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -178,6 +185,22 @@ class Database:
             except sqlite3.OperationalError:
                 pass
 
+        if current_version < 4:
+            for col, col_type, default in [
+                ("decision", "TEXT", "'auto_pass'"),
+                ("risk_score", "REAL", "0.0"),
+                ("risk_level", "TEXT", "'low'"),
+                ("reviewer_id", "INTEGER", "NULL"),
+                ("review_comment", "TEXT", "NULL"),
+                ("model_used", "TEXT", "''"),
+                ("prompt_version", "TEXT", "''"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE review_records ADD COLUMN {col} {col_type} DEFAULT {default}")
+                    logger.info(f"迁移: 添加 review_records.{col} 列")
+                except sqlite3.OperationalError:
+                    pass
+
     def _hash_password(self, password: str) -> str:
         return hashlib.pbkdf2_hmac(
             "sha256",
@@ -268,8 +291,9 @@ class Database:
                 """INSERT INTO review_records
                 (user_id, input_content, input_hash, input_length, compliant,
                  violation_type, violated_articles, confidence, reasoning,
-                 suggestions, review_mode, latency_ms, client_id, threats)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 suggestions, review_mode, latency_ms, client_id, threats,
+                 decision, risk_score, risk_level, model_used, prompt_version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     review_data.get("user_id"),
                     review_data["input_content"],
@@ -285,6 +309,11 @@ class Database:
                     review_data.get("latency_ms", 0),
                     review_data.get("client_id", "anonymous"),
                     json.dumps(review_data.get("threats", []), ensure_ascii=False),
+                    review_data.get("decision", "auto_pass"),
+                    review_data.get("risk_score", 0.0),
+                    review_data.get("risk_level", "low"),
+                    review_data.get("model_used", ""),
+                    review_data.get("prompt_version", ""),
                 ),
             )
             return cursor.lastrowid

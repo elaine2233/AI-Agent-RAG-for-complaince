@@ -93,6 +93,13 @@ class ReviewResponse(BaseModel):
     reasoning: str
     suggestions: str
     latency_ms: float
+    risk_score: float = 0.0
+    risk_level: str = "low"
+    decision: str = "auto_pass"
+    review_mode: str = ""
+    model_used: str = ""
+    prompt_version: str = ""
+    workflow_steps: list = []
 
 
 class BatchReviewResponse(BaseModel):
@@ -332,10 +339,15 @@ async def review_content(
         "confidence": result.confidence,
         "reasoning": result.reasoning,
         "suggestions": result.suggestions,
-        "review_mode": "llm" if not config.DEMO_MODE else "rule",
+        "review_mode": result.review_mode or ("llm" if not config.DEMO_MODE else "rule"),
         "latency_ms": latency_ms,
         "client_id": user.get("username", "anonymous"),
         "threats": validation.threats,
+        "decision": result.decision,
+        "risk_score": result.risk_score,
+        "risk_level": result.risk_level,
+        "model_used": result.model_used,
+        "prompt_version": result.prompt_version,
     }
 
     review_id = _ensure_db().save_review(review_data)
@@ -349,6 +361,13 @@ async def review_content(
         reasoning=result.reasoning,
         suggestions=result.suggestions,
         latency_ms=round(latency_ms, 2),
+        risk_score=result.risk_score,
+        risk_level=result.risk_level,
+        decision=result.decision,
+        review_mode=result.review_mode,
+        model_used=result.model_used,
+        prompt_version=result.prompt_version,
+        workflow_steps=result.workflow_steps or [],
     )
 
 
@@ -570,7 +589,116 @@ async def submit_feedback(
         comment=request.comment,
         user_id=user.get("id"),
     )
-    return {"feedback_id": feedback_id, "message": "反馈已提交"}
+
+    if not request.is_correct and request.comment:
+        try:
+            from src.prompt_manager import prompt_manager
+            correct_result = {
+                "compliant": "yes" if "合规" in request.comment else "no",
+                "violation_type": request.comment[:100],
+                "violated_articles": [],
+                "confidence": 1.0,
+            }
+            input_text = review.get("input_content", "")[:500]
+            if input_text:
+                prompt_manager.add_few_shot_from_feedback(
+                    input_text=input_text,
+                    correct_result=correct_result,
+                    source=f"human_feedback_user_{user.get('id')}",
+                )
+        except Exception as e:
+            logger.warning(f"Few-Shot回流失败: {e}")
+
+    return {"feedback_id": feedback_id, "message": "反馈已提交，Few-Shot样本已回流"}
+
+
+@app.get("/api/v1/review/pending", tags=["人工复核"])
+async def get_pending_reviews(
+    limit: int = Query(20, ge=1, le=100),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "reviewer"):
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    conn = _ensure_db()._get_conn()
+    rows = conn.execute(
+        "SELECT * FROM review_records WHERE decision = 'human_review' AND is_deleted = 0 ORDER BY created_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return {"pending": [dict(r) for r in rows], "total": len(rows)}
+
+
+@app.post("/api/v1/review/{review_id}/override", tags=["人工复核"])
+async def override_review(
+    review_id: int,
+    compliant: str = Query(..., pattern="^(yes|no|unknown)$"),
+    violation_type: str = Query(""),
+    comment: str = Query(""),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "reviewer"):
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    review = _ensure_db().get_review(review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="审核记录不存在")
+
+    conn = _ensure_db()._get_conn()
+    conn.execute(
+        "UPDATE review_records SET compliant = ?, violation_type = ?, decision = 'human_override', reviewer_id = ?, review_comment = ? WHERE id = ?",
+        (compliant, violation_type, user.get("id"), comment, review_id),
+    )
+    conn.commit()
+
+    try:
+        from src.prompt_manager import prompt_manager
+        input_text = review.get("input_content", "")[:500]
+        if input_text:
+            prompt_manager.add_few_shot_from_feedback(
+                input_text=input_text,
+                correct_result={
+                    "compliant": compliant,
+                    "violation_type": violation_type,
+                    "violated_articles": [],
+                    "confidence": 1.0,
+                },
+                source=f"human_override_user_{user.get('id')}",
+            )
+    except Exception as e:
+        logger.warning(f"Few-Shot回流失败: {e}")
+
+    return {"review_id": review_id, "message": "人工覆写完成，Few-Shot样本已回流"}
+
+
+@app.get("/api/v1/prompts/versions", tags=["Prompt管理"])
+async def list_prompt_versions(user: dict = Depends(get_current_user)):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可查看Prompt版本")
+    from src.prompt_manager import prompt_manager
+    return {"versions": prompt_manager.list_versions(), "stats": prompt_manager.get_stats()}
+
+
+@app.post("/api/v1/prompts/activate", tags=["Prompt管理"])
+async def activate_prompt_version(
+    version: str = Query(...),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可切换Prompt版本")
+    from src.prompt_manager import prompt_manager
+    try:
+        prompt_manager.activate_version(version)
+        return {"message": f"Prompt版本已切换到 {version}"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/v1/llm/status", tags=["模型管理"])
+async def get_llm_status(user: dict = Depends(get_current_user)):
+    if not _ensure_db().check_permission(user.get("id"), "reviewer"):
+        raise HTTPException(status_code=403, detail="权限不足")
+    from src.llm_gateway import llm_gateway
+    return llm_gateway.get_model_status()
 
 
 @app.get("/api/v1/reviews", tags=["审核"])
@@ -789,6 +917,13 @@ async def multimodal_review(
         reasoning=result.reasoning,
         suggestions=result.suggestions,
         latency_ms=round(latency_ms, 2),
+        risk_score=result.risk_score,
+        risk_level=result.risk_level,
+        decision=result.decision,
+        review_mode=result.review_mode,
+        model_used=result.model_used,
+        prompt_version=result.prompt_version,
+        workflow_steps=result.workflow_steps or [],
     )
 
 
@@ -873,6 +1008,13 @@ async def upload_and_review(
         reasoning=result.reasoning,
         suggestions=result.suggestions,
         latency_ms=round(latency_ms, 2),
+        risk_score=result.risk_score,
+        risk_level=result.risk_level,
+        decision=result.decision,
+        review_mode=result.review_mode,
+        model_used=result.model_used,
+        prompt_version=result.prompt_version,
+        workflow_steps=result.workflow_steps or [],
     )
 
 
