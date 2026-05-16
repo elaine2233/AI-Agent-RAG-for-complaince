@@ -36,6 +36,7 @@ class WorkflowState:
     reasoning_result: Optional[Dict] = None
     formatted_result: Optional[Dict] = None
     validation_result: Optional[Dict] = None
+    crosscheck_result: Optional[Dict] = None
     risk_score: float = 0.0
     risk_level: str = "low"
     decision: str = "auto_pass"

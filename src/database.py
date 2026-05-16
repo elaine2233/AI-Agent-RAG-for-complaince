@@ -22,7 +22,7 @@ BACKUP_DIR = config.DB_BACKUP_DIR
 MAX_BACKUPS = config.MAX_BACKUPS
 DATA_RETENTION_DAYS = config.DATA_RETENTION_DAYS
 
-_schema_version = 4
+_schema_version = 5
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -113,6 +113,39 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_a
 CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key);
+
+CREATE TABLE IF NOT EXISTS violation_types (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    level INTEGER NOT NULL DEFAULT 2,
+    parent_id TEXT,
+    severity REAL NOT NULL DEFAULT 0.5,
+    description TEXT NOT NULL DEFAULT '',
+    keywords TEXT NOT NULL DEFAULT '[]',
+    suggestions TEXT NOT NULL DEFAULT '',
+    is_system INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS clause_type_mappings (
+    id TEXT PRIMARY KEY,
+    violation_type_id TEXT NOT NULL,
+    doc_name TEXT NOT NULL,
+    article_number TEXT NOT NULL,
+    mapping_logic TEXT NOT NULL DEFAULT 'primary',
+    effective_date TEXT NOT NULL DEFAULT (datetime('now')),
+    expiration_date TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (violation_type_id) REFERENCES violation_types(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_violation_types_level ON violation_types(level);
+CREATE INDEX IF NOT EXISTS idx_violation_types_parent ON violation_types(parent_id);
+CREATE INDEX IF NOT EXISTS idx_violation_types_status ON violation_types(status);
+CREATE INDEX IF NOT EXISTS idx_clause_mappings_type ON clause_type_mappings(violation_type_id);
+CREATE INDEX IF NOT EXISTS idx_clause_mappings_article ON clause_type_mappings(doc_name, article_number);
 """
 
 

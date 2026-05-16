@@ -15,6 +15,7 @@ from src.llm_gateway import llm_gateway, ModelRole
 from src.risk_engine import risk_engine, RiskLevel, Decision
 from src.reranker import reranker
 from src.prompt_manager import prompt_manager, EXTRACT_SYSTEM_PROMPT, REASON_SYSTEM_PROMPT, FORMAT_SYSTEM_PROMPT
+from src.violation_registry import violation_registry
 
 try:
     from src.observability import trace_operation, PROMETHEUS_AVAILABLE, CACHE_HITS, CACHE_MISSES
@@ -42,6 +43,8 @@ class ReviewResult:
     model_used: str = ""
     prompt_version: str = ""
     workflow_steps: List[Dict] = None
+    regulation_snapshot: Dict = None
+    crosscheck_passed: bool = True
 
     def to_dict(self):
         d = asdict(self)
@@ -50,67 +53,11 @@ class ReviewResult:
         return d
 
 
-VIOLATION_RULES = [
-    {
-        "keywords": ["稳赚不赔", "保本保息", "无风险", "零风险", "绝对安全", "100%保本", "100%安全"],
-        "violation_type": "绝对化用语",
-        "severity": 0.9,
-        "articles": [
-            {"doc_name": "保险销售行为管理办法", "article_number": "二十一", "reason": "使用绝对化用语"},
-            {"doc_name": "金融产品网络营销管理办法", "article_number": "九", "reason": "使用绝对化用语进行宣传"},
-            {"doc_name": "互联网保险业务监管办法", "article_number": "十六", "reason": "使用绝对化用语"},
-        ],
-    },
-    {
-        "keywords": ["保证收益", "保证赚钱", "承诺收益", "收益确定", "确定收益", "保证利率", "保证回报"],
-        "violation_type": "收益承诺",
-        "severity": 0.9,
-        "articles": [
-            {"doc_name": "保险销售行为管理办法", "article_number": "十二", "reason": "对不确定利益承诺保证收益"},
-            {"doc_name": "保险销售行为管理办法", "article_number": "二十一", "reason": "将不确定利益表述为确定利益"},
-            {"doc_name": "金融产品网络营销管理办法", "article_number": "九", "reason": "对收益作保证性承诺"},
-        ],
-    },
-    {
-        "keywords": ["年化收益", "收益率高达", "收益高达", "回报率"],
-        "violation_type": "夸大收益",
-        "severity": 0.8,
-        "articles": [
-            {"doc_name": "保险销售行为管理办法", "article_number": "十二", "reason": "夸大保险产品收益"},
-            {"doc_name": "保险销售行为管理办法", "article_number": "二十一", "reason": "对比较收益作不实陈述"},
-            {"doc_name": "互联网保险业务监管办法", "article_number": "十六", "reason": "夸大保险产品收益"},
-        ],
-    },
-    {
-        "keywords": ["存款", "存钱", "理财", "基金", "比银行", "比存款"],
-        "violation_type": "产品混淆",
-        "severity": 0.8,
-        "articles": [
-            {"doc_name": "保险销售行为管理办法", "article_number": "十三", "reason": "将保险与其他金融产品混淆"},
-            {"doc_name": "互联网保险业务监管办法", "article_number": "十六", "reason": "以非保险产品名义销售保险"},
-            {"doc_name": "金融产品网络营销管理办法", "article_number": "二十三", "reason": "混淆保险与存款/理财/基金"},
-        ],
-    },
-    {
-        "keywords": ["明星", "影星", "网红", "主播", "代言", "倾情推荐"],
-        "violation_type": "无资质代言",
-        "severity": 0.7,
-        "articles": [
-            {"doc_name": "金融产品网络营销管理办法", "article_number": "二十", "reason": "利用公众人物代言推荐"},
-            {"doc_name": "金融产品网络营销管理办法", "article_number": "十三", "reason": "利用专业人士名义推荐"},
-        ],
-    },
-    {
-        "keywords": ["赠送", "送礼", "大礼包", "返现", "返利", "红包", "额外赠送", "旅游基金"],
-        "violation_type": "诱导销售",
-        "severity": 0.7,
-        "articles": [
-            {"doc_name": "保险销售行为管理办法", "article_number": "六", "reason": "以额外利益诱导购买"},
-            {"doc_name": "互联网保险业务监管办法", "article_number": "十六", "reason": "以赠送礼品诱导购买"},
-            {"doc_name": "金融产品网络营销管理办法", "article_number": "十四", "reason": "以返利/红包诱导转发"},
-        ],
-    },
-]
+VIOLATION_RULES_DEPRECATED = True
+
+
+def _get_violation_rules() -> List[Dict]:
+    return violation_registry.get_active_rules()
 
 
 class ReviewAgent:
@@ -125,17 +72,19 @@ class ReviewAgent:
         engine.register_step("rule_check", self._step_rule_check)
         engine.register_step("rag_retrieve", self._step_rag_retrieve)
         engine.register_step("rerank", self._step_rerank)
-        engine.register_step("llm_reason", self._step_llm_reason, condition=lambda s: s.rule_check_result is None or not s.rule_check_result.get("definitive", False))
+        engine.register_step("llm_reason", self._step_llm_reason)
         engine.register_step("format", self._step_format)
         engine.register_step("validate", self._step_validate)
+        engine.register_step("crosscheck", self._step_crosscheck)
         engine.register_step("risk_assess", self._step_risk_assess)
         return engine
 
     def _step_extract(self, state: WorkflowState):
+        rules = _get_violation_rules()
         if config.DEMO_MODE:
             claims = []
             keywords = []
-            for rule in VIOLATION_RULES:
+            for rule in rules:
                 for kw in rule["keywords"]:
                     if kw in state.original_text:
                         claims.append({"claim": kw, "type": rule["violation_type"]})
@@ -149,7 +98,7 @@ class ReviewAgent:
             resp = llm_gateway.generate(
                 system_prompt=EXTRACT_SYSTEM_PROMPT,
                 user_prompt=f"请从以下营销内容中提取关键要素：\n\n{state.original_text}",
-                role=ModelRole.LIGHTWEIGHT,
+                model_name=config.EXTRACT_MODEL,
             )
             parsed = self._parse_json(resp.content)
             if parsed:
@@ -163,7 +112,7 @@ class ReviewAgent:
             logger.warning(f"信息提取步骤失败，使用关键词降级: {e}")
             claims = []
             keywords = []
-            for rule in VIOLATION_RULES:
+            for rule in rules:
                 for kw in rule["keywords"]:
                     if kw in state.original_text:
                         claims.append({"claim": kw, "type": rule["violation_type"]})
@@ -172,11 +121,12 @@ class ReviewAgent:
             state.metadata["keywords"] = list(set(keywords))
 
     def _step_rule_check(self, state: WorkflowState):
+        rules = _get_violation_rules()
         violations = []
         violation_types = []
         matched_keywords = []
 
-        for rule in VIOLATION_RULES:
+        for rule in rules:
             for kw in rule["keywords"]:
                 if kw in state.original_text:
                     matched_keywords.append(kw)
@@ -188,11 +138,16 @@ class ReviewAgent:
                                     chunk.article_number == article_info["article_number"]):
                                 article_text = chunk.article_text
                                 break
+                        reason = article_info.get("reason", "")
+                        if not reason:
+                            vt = violation_registry.get_type(rule.get("type_id", ""))
+                            if vt:
+                                reason = vt.description
                         violations.append({
                             "doc_name": article_info["doc_name"],
                             "article_number": article_info["article_number"],
                             "article_text": article_text,
-                            "violation_reason": f"{article_info['reason']}（匹配: {kw}）",
+                            "violation_reason": f"{reason}（匹配: {kw}）" if reason else f"违规（匹配: {kw}）",
                         })
                     break
 
@@ -256,22 +211,32 @@ class ReviewAgent:
         )
         few_shot_text = prompt_manager.format_few_shots(few_shots)
 
+        rule_hint = ""
+        if state.rule_check_result and state.rule_check_result.get("hit"):
+            rule_hint = (
+                f"\n\n## 规则引擎预检结果（已命中，请在此基础上继续检查是否还有其他违规）\n"
+                f"- 已命中违规类型: {state.rule_check_result.get('violation_type', '')}\n"
+                f"- 已命中关键词: {', '.join(state.rule_check_result.get('matched_keywords', []))}\n"
+                f"- 已命中条文: {json.dumps(state.rule_check_result.get('violated_articles', []), ensure_ascii=False)}\n"
+                f"**重要**: 请在确认以上规则命中的基础上，继续检查是否存在规则未覆盖的深层/隐含违规。**不要重复输出规则已命中的违规，只输出额外发现。**\n"
+            )
+
         if active_prompt and active_prompt.user_prompt_template:
             user_prompt = active_prompt.user_prompt_template.format(
                 content=state.original_text,
                 context=context,
                 few_shots=few_shot_text,
-            )
+            ) + rule_hint
             system_prompt = active_prompt.system_prompt
         else:
-            user_prompt = f"## 待审核内容\n{state.original_text}\n\n## 相关法规\n{context}\n\n## 参考案例\n{few_shot_text}\n\n请进行合规审核，按JSON格式输出。"
+            user_prompt = f"## 待审核内容\n{state.original_text}\n\n## 相关法规\n{context}\n\n## 参考案例\n{few_shot_text}\n{rule_hint}\n请进行合规审核，按JSON格式输出。"
             system_prompt = REASON_SYSTEM_PROMPT
 
         try:
             resp = llm_gateway.generate(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                role=ModelRole.PRIMARY,
+                model_name=config.REASON_MODEL,
             )
             state.reasoning_result = self._parse_json(resp.content)
             state.model_used = resp.model
@@ -299,7 +264,39 @@ class ReviewAgent:
                 }
 
     def _step_format(self, state: WorkflowState):
-        if state.reasoning_result:
+        if state.reasoning_result and state.rule_check_result and state.rule_check_result.get("hit"):
+            llm_result = state.reasoning_result
+            rule_result = state.rule_check_result
+
+            rule_types = set(rule_result.get("violation_type", "").split("、")) if rule_result.get("violation_type") else set()
+            rule_types.discard("")
+            llm_types = set(llm_result.get("violation_type", "").split("、")) if llm_result.get("violation_type") else set()
+            llm_types.discard("")
+            merged_types = rule_types | llm_types
+
+            rule_articles = rule_result.get("violated_articles", [])
+            llm_articles = llm_result.get("violated_articles", [])
+            seen_keys = set()
+            merged_articles = []
+            for a in rule_articles + llm_articles:
+                key = f"{a.get('doc_name', '')}::{a.get('article_number', '')}"
+                if key not in seen_keys:
+                    merged_articles.append(a)
+                    seen_keys.add(key)
+
+            llm_compliant = llm_result.get("compliant", "yes")
+            result = {
+                "compliant": "no" if (rule_result.get("compliant") == "no" or llm_compliant == "no") else llm_compliant,
+                "violation_type": "、".join(merged_types) if merged_types else "",
+                "violated_articles": merged_articles,
+                "confidence": max(
+                    rule_result.get("confidence", 0.5),
+                    float(llm_result.get("confidence", 0.5)) if llm_result.get("confidence") else 0.5,
+                ),
+                "reasoning": f"规则引擎命中: {', '.join(rule_result.get('matched_keywords', []))}。{llm_result.get('reasoning', '')}",
+                "suggestions": llm_result.get("suggestions", "") or self._generate_suggestions(list(merged_types)),
+            }
+        elif state.reasoning_result:
             result = state.reasoning_result
         elif state.rule_check_result and state.rule_check_result.get("hit"):
             result = {
@@ -376,6 +373,86 @@ class ReviewAgent:
 
         state.validation_result = result
 
+    def _step_crosscheck(self, state: WorkflowState):
+        result = state.validation_result
+
+        if result.get("compliant") != "no":
+            state.crosscheck_result = {"passed": True, "reason": "合规内容无需复核"}
+            return
+
+        if config.DEMO_MODE:
+            state.crosscheck_result = {"passed": True, "reason": "Demo模式跳过LLM复核"}
+            return
+
+        violated_articles = result.get("violated_articles", [])
+        input_text = state.original_text
+        crosscheck_prompt = f"""请对以下审核结论进行交叉验证，判断结论是否合理。
+
+## 原始营销内容
+{input_text}
+
+## 审核结论
+- 合规判定: {result.get('compliant', 'unknown')}
+- 违规类型: {result.get('violation_type', '')}
+- 置信度: {result.get('confidence', 0)}
+- 推理过程: {result.get('reasoning', '')}
+
+## 引用条文
+{json.dumps(violated_articles, ensure_ascii=False, indent=2)}
+
+## 验证要求
+1. 引用条文是否与营销内容语义相关？（防止过度引用）
+2. 推理逻辑是否自洽？（防止自圆其说）
+3. 违规判定是否合理？（防止误判）
+
+严格按JSON格式输出：
+```json
+{{
+    "passed": true/false,
+    "issues": ["问题描述列表"],
+    "confidence_adjustment": -0.1到0.1的调整值,
+    "recommend_human_review": true/false
+}}
+```"""
+
+        try:
+            resp = llm_gateway.generate(
+                system_prompt="你是一位严谨的审核复核专家，只做事实性验证，不做主观判断。",
+                user_prompt=crosscheck_prompt,
+                model_name=config.CROSSCHECK_MODEL,
+            )
+            parsed = self._parse_json(resp.content)
+            if parsed:
+                passed = parsed.get("passed", True)
+                issues = parsed.get("issues", [])
+                confidence_adj = parsed.get("confidence_adjustment", 0.0)
+                recommend_hr = parsed.get("recommend_human_review", False)
+
+                if not passed and issues:
+                    result["reasoning"] += f" [复核提示: {'; '.join(issues)}]"
+
+                if confidence_adj:
+                    try:
+                        adj = float(confidence_adj)
+                        result["confidence"] = max(0.0, min(1.0, result.get("confidence", 0.5) + adj))
+                    except (ValueError, TypeError):
+                        pass
+
+                if recommend_hr:
+                    result["reasoning"] += " [复核建议转人工审核]"
+
+                state.crosscheck_result = {
+                    "passed": passed,
+                    "issues": issues,
+                    "confidence_adjustment": confidence_adj,
+                    "recommend_human_review": recommend_hr,
+                }
+            else:
+                state.crosscheck_result = {"passed": True, "reason": "复核解析失败，默认通过"}
+        except Exception as e:
+            logger.warning(f"CrossCheck步骤失败，跳过复核: {e}")
+            state.crosscheck_result = {"passed": True, "reason": f"复核失败: {str(e)}"}
+
     def _step_risk_assess(self, state: WorkflowState):
         result = state.validation_result
         rule_hit = state.rule_check_result.get("hit", False) if state.rule_check_result else False
@@ -444,7 +521,19 @@ class ReviewAgent:
             state = self._workflow.run(state)
 
         result_data = state.validation_result or {}
-        review_mode = "rule" if (state.rule_check_result and state.rule_check_result.get("definitive")) else "llm"
+        review_mode = "rule+llm" if (state.rule_check_result and state.rule_check_result.get("hit")) else "llm"
+
+        regulation_snapshot = {}
+        try:
+            for chunk in self.rag_engine.chunks:
+                if chunk.doc_name not in regulation_snapshot:
+                    regulation_snapshot[chunk.doc_name] = chunk.content_hash or ""
+        except Exception:
+            regulation_snapshot = {}
+
+        crosscheck_passed = True
+        if state.crosscheck_result:
+            crosscheck_passed = state.crosscheck_result.get("passed", True)
 
         result = ReviewResult(
             compliant=result_data.get("compliant", "unknown"),
@@ -460,6 +549,8 @@ class ReviewAgent:
             model_used=state.model_used,
             prompt_version=state.prompt_version,
             workflow_steps=[{"name": s.name, "status": s.status.value, "latency_ms": s.latency_ms} for s in state.steps],
+            regulation_snapshot=regulation_snapshot,
+            crosscheck_passed=crosscheck_passed,
         )
 
         review_cache.set(cache_key, result)
@@ -498,15 +589,7 @@ class ReviewAgent:
             return {}
 
     def _generate_suggestions(self, violation_types: List[str]) -> str:
-        suggestion_map = {
-            "绝对化用语": "删除绝对化用语，替换为合规表述",
-            "收益承诺": "不得对不确定利益作保证性承诺",
-            "夸大收益": "不得夸大产品收益",
-            "产品混淆": "明确标注为保险产品，不得与存款/理财混淆",
-            "无资质代言": "不得利用无资质公众人物代言",
-            "诱导销售": "不得以额外利益诱导购买",
-        }
-        suggestions = [suggestion_map.get(vt, "请根据违规类型修改") for vt in violation_types]
+        suggestions = [violation_registry.get_suggestion(vt) for vt in violation_types]
         return "；".join(suggestions) if suggestions else "请修改营销内容。"
 
 

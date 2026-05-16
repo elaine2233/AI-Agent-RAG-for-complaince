@@ -1,12 +1,12 @@
 import time
 import json
 import logging
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
 import config
-from src.resilience import CircuitBreaker, CircuitBreakerConfig, with_retry, RetryPolicy
+from src.resilience import CircuitBreaker, CircuitBreakerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -49,20 +49,20 @@ class LLMGateway:
             self.register_model(ModelConfig(
                 name=config.LLM_MODEL,
                 role=ModelRole.PRIMARY,
-                provider="dashscope",
+                provider="openai_compatible",
                 priority=0,
             ))
             self.register_model(ModelConfig(
                 name="qwen-turbo",
                 role=ModelRole.LIGHTWEIGHT,
-                provider="dashscope",
+                provider="openai_compatible",
                 temperature=0.1,
                 priority=10,
             ))
             self.register_model(ModelConfig(
                 name="deepseek-v3",
                 role=ModelRole.FALLBACK,
-                provider="dashscope",
+                provider="openai_compatible",
                 priority=5,
             ))
         else:
@@ -82,7 +82,7 @@ class LLMGateway:
         model_config.circuit_breaker = cb
         self._circuit_breakers[cb_name] = cb
         self._models[model_config.name] = model_config
-        logger.info(f"LLM Gateway: 注册模型 {model_config.name} (role={model_config.role.value}, priority={model_config.priority})")
+        logger.info(f"LLM Gateway: 注册模型 {model_config.name} (role={model_config.role.value}, provider={model_config.provider}, priority={model_config.priority})")
 
     def generate(
         self,
@@ -136,8 +136,8 @@ class LLMGateway:
 
         start = time.time()
 
-        if model_config.provider == "dashscope":
-            content = self._call_dashscope(model_name, system_prompt, user_prompt, temperature)
+        if model_config.provider == "openai_compatible":
+            content = self._call_openai_compatible(model_config, system_prompt, user_prompt, temperature)
         elif model_config.provider == "rule":
             content = self._call_rule_engine(system_prompt, user_prompt)
         else:
@@ -155,25 +155,27 @@ class LLMGateway:
             latency_ms=latency_ms,
         )
 
-    def _call_dashscope(self, model_name: str, system_prompt: str, user_prompt: str, temperature: float) -> str:
-        import dashscope
-        from dashscope import Generation
-        dashscope.api_key = config.DASHSCOPE_API_KEY
+    def _call_openai_compatible(self, model_config: ModelConfig, system_prompt: str, user_prompt: str, temperature: float) -> str:
+        from openai import OpenAI
 
-        resp = Generation.call(
-            model=model_name,
+        client = OpenAI(
+            api_key=config.DASHSCOPE_API_KEY,
+            base_url=config.LLM_BASE_URL,
+        )
+
+        response = client.chat.completions.create(
+            model=model_config.name,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            result_format="message",
             temperature=temperature,
             top_p=0.8,
+            max_tokens=model_config.max_tokens,
         )
-        if resp.status_code == 200:
-            return resp.output.choices[0].message.content
-        else:
-            raise RuntimeError(f"DashScope API调用失败: {resp.status_code} - {resp.message}")
+
+        content = response.choices[0].message.content
+        return content
 
     def _call_rule_engine(self, system_prompt: str, user_prompt: str) -> str:
         return json.dumps({

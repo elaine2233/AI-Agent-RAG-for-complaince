@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
 VECTOR_STORE_DIR = os.getenv("VECTOR_STORE_DIR", "./data/vector_store")
@@ -50,3 +51,10 @@ EMBEDDING_CIRCUIT_FAILURE_THRESHOLD = int(os.getenv("EMBEDDING_CIRCUIT_FAILURE_T
 EMBEDDING_CIRCUIT_RECOVERY_TIMEOUT = float(os.getenv("EMBEDDING_CIRCUIT_RECOVERY_TIMEOUT", "20.0"))
 
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "300"))
+
+RISK_AUTO_PASS_MAX = float(os.getenv("RISK_AUTO_PASS_MAX", "0.1"))
+RISK_HUMAN_REVIEW_MAX = float(os.getenv("RISK_HUMAN_REVIEW_MAX", "0.7"))
+
+EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "qwen-turbo")
+REASON_MODEL = os.getenv("REASON_MODEL", "qwen-plus")
+CROSSCHECK_MODEL = os.getenv("CROSSCHECK_MODEL", "qwen-turbo")

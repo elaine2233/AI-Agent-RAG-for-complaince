@@ -100,6 +100,8 @@ class ReviewResponse(BaseModel):
     model_used: str = ""
     prompt_version: str = ""
     workflow_steps: list = []
+    regulation_snapshot: dict = {}
+    crosscheck_passed: bool = True
 
 
 class BatchReviewResponse(BaseModel):
@@ -368,6 +370,8 @@ async def review_content(
         model_used=result.model_used,
         prompt_version=result.prompt_version,
         workflow_steps=result.workflow_steps or [],
+        regulation_snapshot=result.regulation_snapshot or {},
+        crosscheck_passed=result.crosscheck_passed,
     )
 
 
@@ -463,6 +467,15 @@ async def batch_review(
             reasoning=result.reasoning,
             suggestions=result.suggestions,
             latency_ms=round(item_latency, 2),
+            risk_score=result.risk_score,
+            risk_level=result.risk_level,
+            decision=result.decision,
+            review_mode=result.review_mode,
+            model_used=result.model_used,
+            prompt_version=result.prompt_version,
+            workflow_steps=result.workflow_steps or [],
+            regulation_snapshot=result.regulation_snapshot or {},
+            crosscheck_passed=result.crosscheck_passed,
         ))
 
     total_latency = (time.time() - start_time) * 1000
@@ -701,6 +714,178 @@ async def get_llm_status(user: dict = Depends(get_current_user)):
     return llm_gateway.get_model_status()
 
 
+@app.get("/api/v1/violation-types", tags=["违规类型"])
+async def list_violation_types(
+    level: Optional[int] = Query(None, ge=1, le=2),
+    parent_id: Optional[str] = Query(None),
+    user: dict = Depends(get_current_user),
+):
+    from src.violation_registry import violation_registry
+    types = violation_registry.list_types(level=level, parent_id=parent_id)
+    return {
+        "types": [vt.to_dict() for vt in types],
+        "stats": violation_registry.get_stats(),
+    }
+
+
+@app.get("/api/v1/violation-types/{type_id}", tags=["违规类型"])
+async def get_violation_type(
+    type_id: str,
+    user: dict = Depends(get_current_user),
+):
+    from src.violation_registry import violation_registry
+    vt = violation_registry.get_type(type_id)
+    if not vt:
+        raise HTTPException(status_code=404, detail="违规类型不存在")
+    result = vt.to_dict()
+    result["articles"] = violation_registry.get_articles_for_type(type_id)
+    return result
+
+
+@app.post("/api/v1/violation-types", tags=["违规类型"])
+async def create_violation_type(
+    name: str = Query(..., min_length=1, max_length=50),
+    level: int = Query(2, ge=1, le=2),
+    parent_id: Optional[str] = Query(None),
+    severity: float = Query(0.5, ge=0.0, le=1.0),
+    description: str = Query(""),
+    keywords: str = Query(""),
+    suggestions: str = Query(""),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可创建违规类型")
+    from src.violation_registry import violation_registry
+    try:
+        kw_list = [k.strip() for k in keywords.split(",") if k.strip()] if keywords else []
+        vt = violation_registry.add_type(
+            name=name,
+            level=level,
+            parent_id=parent_id,
+            severity=severity,
+            description=description,
+            keywords=kw_list,
+            suggestions=suggestions,
+        )
+        return {"message": "违规类型已创建", "type": vt.to_dict()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.put("/api/v1/violation-types/{type_id}", tags=["违规类型"])
+async def update_violation_type(
+    type_id: str,
+    name: Optional[str] = Query(None),
+    severity: Optional[float] = Query(None, ge=0.0, le=1.0),
+    description: Optional[str] = Query(None),
+    keywords: Optional[str] = Query(None),
+    suggestions: Optional[str] = Query(None),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可修改违规类型")
+    from src.violation_registry import violation_registry
+    kwargs = {}
+    if name is not None:
+        kwargs["name"] = name
+    if severity is not None:
+        kwargs["severity"] = severity
+    if description is not None:
+        kwargs["description"] = description
+    if keywords is not None:
+        kwargs["keywords"] = [k.strip() for k in keywords.split(",") if k.strip()]
+    if suggestions is not None:
+        kwargs["suggestions"] = suggestions
+    vt = violation_registry.update_type(type_id, **kwargs)
+    if not vt:
+        raise HTTPException(status_code=404, detail="违规类型不存在")
+    return {"message": "违规类型已更新", "type": vt.to_dict()}
+
+
+@app.delete("/api/v1/violation-types/{type_id}", tags=["违规类型"])
+async def deprecate_violation_type(
+    type_id: str,
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可废弃违规类型")
+    from src.violation_registry import violation_registry
+    success = violation_registry.deprecate_type(type_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="违规类型不存在")
+    return {"message": "违规类型已废弃", "type_id": type_id}
+
+
+@app.post("/api/v1/violation-types/{type_id}/keywords", tags=["违规类型"])
+async def add_keyword_to_type(
+    type_id: str,
+    keyword: str = Query(..., min_length=1),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可添加关键词")
+    from src.violation_registry import violation_registry
+    success = violation_registry.add_keyword(type_id, keyword)
+    if not success:
+        raise HTTPException(status_code=404, detail="违规类型不存在")
+    return {"message": f"关键词已添加: {keyword}"}
+
+
+@app.delete("/api/violation-types/{type_id}/keywords", tags=["违规类型"])
+async def remove_keyword_from_type(
+    type_id: str,
+    keyword: str = Query(..., min_length=1),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可删除关键词")
+    from src.violation_registry import violation_registry
+    success = violation_registry.remove_keyword(type_id, keyword)
+    if not success:
+        raise HTTPException(status_code=404, detail="违规类型不存在或关键词不存在")
+    return {"message": f"关键词已删除: {keyword}"}
+
+
+@app.get("/api/v1/violation-types/annotations/pending", tags=["违规类型"])
+async def get_pending_annotations(
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可查看待审批标注")
+    from src.violation_registry import violation_registry
+    pending = violation_registry.get_pending_annotations()
+    return {"annotations": [pa.to_dict() for pa in pending], "total": len(pending)}
+
+
+@app.post("/api/v1/violation-types/annotations/{annotation_id}/approve", tags=["违规类型"])
+async def approve_annotation(
+    annotation_id: str,
+    type_id: Optional[str] = Query(None),
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可审批标注")
+    from src.violation_registry import violation_registry
+    pa = violation_registry.approve_annotation(annotation_id, type_id=type_id)
+    if not pa:
+        raise HTTPException(status_code=404, detail="标注不存在或已处理")
+    return {"message": "标注已审批", "annotation": pa.to_dict()}
+
+
+@app.post("/api/v1/violation-types/annotations/{annotation_id}/reject", tags=["违规类型"])
+async def reject_annotation(
+    annotation_id: str,
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可拒绝标注")
+    from src.violation_registry import violation_registry
+    pa = violation_registry.reject_annotation(annotation_id)
+    if not pa:
+        raise HTTPException(status_code=404, detail="标注不存在或已处理")
+    return {"message": "标注已拒绝", "annotation_id": annotation_id}
+
+
 @app.get("/api/v1/reviews", tags=["审核"])
 async def list_reviews(
     limit: int = Query(50, ge=1, le=200),
@@ -817,6 +1002,15 @@ async def upload_regulation(
         os.remove(save_path)
         raise HTTPException(status_code=400, detail=f"文档解析失败: {str(e)}")
 
+    annotation_count = 0
+    try:
+        from src.violation_registry import violation_registry
+        if rag_engine and rag_engine.chunks:
+            annotations = violation_registry.annotate_chunks(rag_engine.chunks)
+            annotation_count = len(annotations)
+    except Exception as e:
+        logger.warning(f"法规条文标注失败: {e}")
+
     return {
         "message": f"法规文档已上传: {file.filename}",
         "filename": file.filename,
@@ -825,7 +1019,9 @@ async def upload_regulation(
         "sections": chunk_count,
         "tables": len(parsed.tables),
         "images": len(parsed.images),
-        "hint": "请调用 POST /api/v1/regulations/reindex 重建索引以生效",
+        "pending_annotations": annotation_count,
+        "hint": "请调用 POST /api/v1/regulations/reindex 重建索引以生效，"
+                "并通过 GET /api/v1/violation-types/annotations/pending 审批条文标注",
     }
 
 

@@ -4,6 +4,7 @@ import json
 import time
 import hashlib
 import html
+import logging
 import gradio as gr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

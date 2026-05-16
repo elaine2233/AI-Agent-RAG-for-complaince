@@ -15,18 +15,24 @@ class Reranker:
         query: str,
         documents: List[Dict],
         top_k: int = 5,
+        expand_context: bool = True,
     ) -> List[Dict]:
         if not documents:
             return []
 
         if config.DEMO_MODE:
-            return self._rule_based_rerank(query, documents, top_k)
+            result = self._rule_based_rerank(query, documents, top_k)
+        else:
+            try:
+                result = self._api_rerank(query, documents, top_k)
+            except Exception as e:
+                logger.warning(f"API重排失败，降级到规则重排: {e}")
+                result = self._rule_based_rerank(query, documents, top_k)
 
-        try:
-            return self._api_rerank(query, documents, top_k)
-        except Exception as e:
-            logger.warning(f"API重排失败，降级到规则重排: {e}")
-            return self._rule_based_rerank(query, documents, top_k)
+        if expand_context:
+            result = self._expand_adjacent_articles(result, documents)
+
+        return result
 
     def _api_rerank(self, query: str, documents: List[Dict], top_k: int) -> List[Dict]:
         try:
@@ -102,6 +108,58 @@ class Reranker:
 
         scored.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
         return scored[:top_k]
+
+    def _expand_adjacent_articles(self, top_results: List[Dict], all_documents: List[Dict]) -> List[Dict]:
+        if not top_results or not all_documents:
+            return top_results
+
+        doc_index = {}
+        for doc in all_documents:
+            doc_name = doc.get("doc_name", "")
+            article_number = doc.get("article_number", "")
+            if doc_name and article_number:
+                key = f"{doc_name}::{article_number}"
+                doc_index[key] = doc
+
+        article_number_order = {}
+        for doc in all_documents:
+            doc_name = doc.get("doc_name", "")
+            if doc_name not in article_number_order:
+                article_number_order[doc_name] = []
+            an = doc.get("article_number", "")
+            if an and an not in article_number_order[doc_name]:
+                article_number_order[doc_name].append(an)
+
+        expanded = []
+        seen_keys = set()
+        for doc in top_results:
+            doc_name = doc.get("doc_name", "")
+            article_number = doc.get("article_number", "")
+            key = f"{doc_name}::{article_number}"
+            if key not in seen_keys:
+                expanded.append(doc)
+                seen_keys.add(key)
+
+            if doc_name and article_number:
+                articles_in_doc = article_number_order.get(doc_name, [])
+                try:
+                    idx = articles_in_doc.index(article_number)
+                except ValueError:
+                    idx = -1
+
+                for offset in [-1, 1]:
+                    adj_idx = idx + offset
+                    if 0 <= adj_idx < len(articles_in_doc):
+                        adj_an = articles_in_doc[adj_idx]
+                        adj_key = f"{doc_name}::{adj_an}"
+                        if adj_key not in seen_keys and adj_key in doc_index:
+                            adj_doc = dict(doc_index[adj_key])
+                            adj_doc["rerank_score"] = doc.get("rerank_score", 0) * 0.7
+                            adj_doc["context_type"] = "adjacent"
+                            expanded.append(adj_doc)
+                            seen_keys.add(adj_key)
+
+        return expanded
 
     @staticmethod
     def _cosine_similarity(a: List[float], b: List[float]) -> float:

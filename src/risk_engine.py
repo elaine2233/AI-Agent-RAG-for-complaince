@@ -39,7 +39,7 @@ class RiskAssessment:
         }
 
 
-VIOLATION_SEVERITY = {
+_FALLBACK_SEVERITY = {
     "绝对化用语": 0.9,
     "收益承诺": 0.9,
     "夸大收益": 0.8,
@@ -55,10 +55,21 @@ VIOLATION_SEVERITY = {
 }
 
 
+def _get_severity(violation_type_name: str) -> float:
+    try:
+        from src.violation_registry import violation_registry
+        severity = violation_registry.get_severity(violation_type_name)
+        if severity != 0.5 or violation_type_name in _FALLBACK_SEVERITY:
+            return severity
+    except Exception:
+        pass
+    return _FALLBACK_SEVERITY.get(violation_type_name, 0.5)
+
+
 class RiskEngine:
     def __init__(self):
         self._thresholds = {
-            "auto_pass_max": getattr(config, "RISK_AUTO_PASS_MAX", 0.3),
+            "auto_pass_max": getattr(config, "RISK_AUTO_PASS_MAX", 0.1),
             "human_review_max": getattr(config, "RISK_HUMAN_REVIEW_MAX", 0.7),
         }
 
@@ -109,7 +120,7 @@ class RiskEngine:
 
         violation_types = [v.strip() for v in violation_type.split("、") if v.strip() and v.strip() != "无"]
         if violation_types:
-            max_severity = max(VIOLATION_SEVERITY.get(vt, 0.5) for vt in violation_types)
+            max_severity = max(_get_severity(vt) for vt in violation_types)
             score += max_severity * 0.5
 
         score += min(len(violated_articles) * 0.1, 0.3)
@@ -153,7 +164,7 @@ class RiskEngine:
 
         violation_types = [v.strip() for v in violation_type.split("、") if v.strip() and v.strip() != "无"]
         for vt in violation_types:
-            severity = VIOLATION_SEVERITY.get(vt, 0.5)
+            severity = _get_severity(vt)
             factors.append({
                 "type": "violation",
                 "violation_type": vt,
