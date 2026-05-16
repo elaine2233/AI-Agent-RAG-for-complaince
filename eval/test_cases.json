@@ -1,0 +1,72 @@
+[
+    {
+        "id": "TC001",
+        "content": "这款保险产品稳赚不赔，年化收益率高达8%，保本保息，零风险！现在购买还送价值5000元的黄金大礼包！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["绝对化用语", "收益承诺", "夸大收益", "诱导销售"],
+        "description": "典型违规：绝对化用语+收益承诺+夸大收益+诱导销售"
+    },
+    {
+        "id": "TC002",
+        "content": "本产品由XX保险公司承保，保险责任包括重大疾病保障，责任免除包括投保前已患疾病，犹豫期为15天，退保可能产生损失。请仔细阅读保险条款。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：包含完整的风险提示和产品信息"
+    },
+    {
+        "id": "TC003",
+        "content": "比银行存款利息高多了！存钱不如买保险，这款理财险收益确定，比基金还稳，闭眼买就对了！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["产品混淆", "收益承诺", "夸大收益"],
+        "description": "违规：将保险与存款/基金混淆，承诺确定收益"
+    },
+    {
+        "id": "TC004",
+        "content": "著名影星XXX倾情推荐！这款保险产品保障全面，值得信赖！跟着明星买保险准没错！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["无资质代言"],
+        "description": "违规：利用演艺人员代言推荐金融产品"
+    },
+    {
+        "id": "TC005",
+        "content": "本保险产品由XX人寿保险公司承保。投保前请仔细阅读保险条款，了解保险责任、责任免除、犹豫期及退保损失等重要内容。人身保险新型产品的保单利益不具有确定性，过往业绩不代表未来表现。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：完整的资质信息和风险提示"
+    },
+    {
+        "id": "TC006",
+        "content": "限时特惠！今天购买这款重疾险，保费立减50%，还额外赠送体检套餐和旅游基金！错过今天再也没有这个价格了！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["诱导销售"],
+        "description": "违规：以额外利益诱导购买保险产品"
+    },
+    {
+        "id": "TC007",
+        "content": "这款万能险历史年化结算利率5.2%，保证最低结算利率2.5%。过往业绩不代表未来表现，保单利益具有不确定性。产品由XX保险股份有限公司提供，详情请阅读条款。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：区分保证利率和非保证利率，包含风险提示"
+    },
+    {
+        "id": "TC008",
+        "content": "无风险投资首选！这款保险产品年化收益8%起，100%保本，绝对安全！银行存款利率才2%，买这个比存银行强百倍！赶紧扫码购买，名额有限！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["绝对化用语", "收益承诺", "产品混淆", "夸大收益"],
+        "description": "多重违规：绝对化用语+收益承诺+产品混淆+夸大收益"
+    },
+    {
+        "id": "TC009",
+        "content": "XX保险经纪有限公司为您精选优质保险产品。我们持有保险中介业务经营许可，专业团队为您提供保险咨询和投保服务。投保前请了解产品条款和风险提示。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：标明资质和机构信息"
+    },
+    {
+        "id": "TC010",
+        "content": "网红主播小美带你买保险！直播间专属福利，下单就返现金红包！这款分红险每年分红不低于保费的10%，保证赚钱！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["无资质代言", "收益承诺", "诱导销售", "夸大收益"],
+        "description": "多重违规：网红代言+收益承诺+返利诱导+夸大收益"
+    }
+]
