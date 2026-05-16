@@ -33,6 +33,8 @@ class RegulationChunk:
     parent_chapter: str = ""
     has_table: bool = False
     table_data: Optional[List[List[str]]] = None
+    has_image: bool = False
+    image_descriptions: Optional[List[str]] = None
     content_hash: str = ""
     source_format: str = ""
 
@@ -40,6 +42,8 @@ class RegulationChunk:
         d = asdict(self)
         if d["table_data"] is None:
             del d["table_data"]
+        if d["image_descriptions"] is None:
+            del d["image_descriptions"]
         return d
 
     def compute_hash(self) -> str:
@@ -162,6 +166,10 @@ class DocumentProcessor:
                 chunk.content_hash = chunk.compute_hash()
                 chunks.append(chunk)
                 idx += 1
+
+        if parsed.images:
+            chunk.has_image = True
+            chunk.image_descriptions = [img.get("ocr_text", "") for img in parsed.images if img.get("ocr_text")]
 
         return chunks
 
@@ -297,9 +305,16 @@ class DocumentProcessor:
     def _table_to_text(self, table: List[List[str]]) -> str:
         if not table:
             return ""
+        if len(table) < 2:
+            return " | ".join(str(c) for c in table[0]) if table else ""
+        header = table[0]
+        separator = ["---"] * len(header)
         lines = []
-        for row in table:
-            lines.append(" | ".join(str(c) for c in row))
+        lines.append("| " + " | ".join(str(c) for c in header) + " |")
+        lines.append("| " + " | ".join(separator) + " |")
+        for row in table[1:]:
+            padded = row + [""] * (len(header) - len(row))
+            lines.append("| " + " | ".join(str(c) for c in padded[:len(header)]) + " |")
         return "\n".join(lines)
 
     @staticmethod

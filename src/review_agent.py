@@ -16,6 +16,7 @@ from src.risk_engine import risk_engine, RiskLevel, Decision
 from src.reranker import reranker
 from src.prompt_manager import prompt_manager, EXTRACT_SYSTEM_PROMPT, REASON_SYSTEM_PROMPT, FORMAT_SYSTEM_PROMPT
 from src.violation_registry import violation_registry
+from src.database import Database
 
 try:
     from src.observability import trace_operation, PROMETHEUS_AVAILABLE, CACHE_HITS, CACHE_MISSES
@@ -45,6 +46,7 @@ class ReviewResult:
     workflow_steps: List[Dict] = None
     regulation_snapshot: Dict = None
     crosscheck_passed: bool = True
+    violation_types: List[Dict] = None
 
     def to_dict(self):
         d = asdict(self)
@@ -65,6 +67,13 @@ class ReviewAgent:
         self.rag_engine = rag_engine or RAGEngine()
         self.validator = InputValidator()
         self._workflow = self._build_workflow()
+        self.extract_model = config.EXTRACT_MODEL
+        self.reason_model = config.REASON_MODEL
+        self.crosscheck_model = config.CROSSCHECK_MODEL
+        if config.DEMO_MODE:
+            self.extract_model = "rule-engine-light"
+            self.reason_model = "rule-engine"
+            self.crosscheck_model = "rule-engine-light"
 
     def _build_workflow(self) -> WorkflowEngine:
         engine = WorkflowEngine()
@@ -98,7 +107,7 @@ class ReviewAgent:
             resp = llm_gateway.generate(
                 system_prompt=EXTRACT_SYSTEM_PROMPT,
                 user_prompt=f"请从以下营销内容中提取关键要素：\n\n{state.original_text}",
-                model_name=config.EXTRACT_MODEL,
+                model_name=self.extract_model,
             )
             parsed = self._parse_json(resp.content)
             if parsed:
@@ -236,7 +245,7 @@ class ReviewAgent:
             resp = llm_gateway.generate(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                model_name=config.REASON_MODEL,
+                model_name=self.reason_model,
             )
             state.reasoning_result = self._parse_json(resp.content)
             state.model_used = resp.model
@@ -419,7 +428,7 @@ class ReviewAgent:
             resp = llm_gateway.generate(
                 system_prompt="你是一位严谨的审核复核专家，只做事实性验证，不做主观判断。",
                 user_prompt=crosscheck_prompt,
-                model_name=config.CROSSCHECK_MODEL,
+                model_name=self.crosscheck_model,
             )
             parsed = self._parse_json(resp.content)
             if parsed:
@@ -553,6 +562,12 @@ class ReviewAgent:
             crosscheck_passed=crosscheck_passed,
         )
 
+        if result.violation_type:
+            result.violation_types = self._build_violation_types_for_save(result.violation_type)
+            deprecated_names = self._mark_deprecated_types(result.violation_type)
+            if deprecated_names:
+                result.violation_type = self._append_deprecated_marks(result.violation_type, deprecated_names)
+
         review_cache.set(cache_key, result)
 
         latency_ms = (time.time() - start_time) * 1000
@@ -574,6 +589,49 @@ class ReviewAgent:
             f"latency={latency_ms:.0f}ms"
         )
 
+        return result
+
+    def _mark_deprecated_types(self, violation_type_str: str) -> Dict[str, bool]:
+        deprecated_names = {}
+        type_names = [t.strip() for t in violation_type_str.split("、") if t.strip()]
+        for name in type_names:
+            for vt in violation_registry._types.values():
+                if vt.name == name and vt.status == "deprecated":
+                    deprecated_names[name] = True
+                    break
+        return deprecated_names
+
+    def _append_deprecated_marks(self, violation_type_str: str, deprecated_names: Dict[str, bool]) -> str:
+        type_names = [t.strip() for t in violation_type_str.split("、") if t.strip()]
+        marked = []
+        for name in type_names:
+            if deprecated_names.get(name):
+                marked.append(f"{name}[该类型已废弃]")
+            else:
+                marked.append(name)
+        return "、".join(marked)
+
+    def _build_violation_types_for_save(self, violation_type_str: str) -> List[Dict]:
+        result = []
+        type_names = [t.strip() for t in violation_type_str.split("、") if t.strip()]
+        for name in type_names:
+            matched = None
+            for vt in violation_registry._types.values():
+                if vt.name == name:
+                    matched = vt
+                    break
+            if matched:
+                result.append({
+                    "violation_type_id": matched.id,
+                    "violation_type_name": matched.name,
+                    "is_deprecated": matched.status == "deprecated",
+                })
+            else:
+                result.append({
+                    "violation_type_id": name,
+                    "violation_type_name": name,
+                    "is_deprecated": False,
+                })
         return result
 
     def _parse_json(self, text: str) -> Dict:

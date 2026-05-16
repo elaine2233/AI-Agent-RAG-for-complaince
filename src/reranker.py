@@ -2,6 +2,7 @@ import logging
 from typing import Dict, List, Optional
 
 import config
+from src.resilience import with_retry, RetryPolicy, embedding_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +15,14 @@ class Reranker:
         self,
         query: str,
         documents: List[Dict],
-        top_k: int = 5,
+        top_k: int = None,
         expand_context: bool = True,
     ) -> List[Dict]:
         if not documents:
             return []
+
+        if top_k is None:
+            top_k = config.RERANKER_TOP_K
 
         if config.DEMO_MODE:
             result = self._rule_based_rerank(query, documents, top_k)
@@ -27,6 +31,7 @@ class Reranker:
                 result = self._api_rerank(query, documents, top_k)
             except Exception as e:
                 logger.warning(f"API重排失败，降级到规则重排: {e}")
+                logger.info("Reranker降级到规则重排，生产环境应配置BM25作为中间层")
                 result = self._rule_based_rerank(query, documents, top_k)
 
         if expand_context:
@@ -34,36 +39,40 @@ class Reranker:
 
         return result
 
-    def _api_rerank(self, query: str, documents: List[Dict], top_k: int) -> List[Dict]:
-        try:
-            import dashscope
-            from dashscope import TextEmbedding
+    def _get_embeddings_with_retry(self, texts, batch_size=None):
+        import dashscope
+        from dashscope import TextEmbedding
+        dashscope.api_key = config.DASHSCOPE_API_KEY
 
-            dashscope.api_key = config.DASHSCOPE_API_KEY
+        if batch_size is None:
+            batch_size = config.EMBEDDING_BATCH_SIZE
 
-            query_emb_resp = TextEmbedding.call(
-                model=config.EMBEDDING_MODEL,
-                input=[query],
-                dimension=1024,
-            )
-            if query_emb_resp.status_code != 200:
-                raise RuntimeError(f"Query embedding失败: {query_emb_resp.message}")
-            query_emb = query_emb_resp.output["embeddings"][0]["embedding"]
-
-            doc_texts = [d.get("article_text", "") for d in documents]
-            batch_size = 25
-            doc_embs = []
-            for i in range(0, len(doc_texts), batch_size):
-                batch = doc_texts[i:i + batch_size]
+        all_embs = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            for attempt in range(config.RERANKER_RETRY_MAX):
                 resp = TextEmbedding.call(
                     model=config.EMBEDDING_MODEL,
                     input=batch,
-                    dimension=1024,
+                    dimension=config.EMBEDDING_DIMENSION,
                 )
                 if resp.status_code == 200:
-                    doc_embs.extend([e["embedding"] for e in resp.output["embeddings"]])
+                    all_embs.extend([e["embedding"] for e in resp.output["embeddings"]])
+                    break
+                elif attempt < config.RERANKER_RETRY_MAX - 1:
+                    import time
+                    time.sleep(config.RERANKER_RETRY_DELAY * (attempt + 1))
                 else:
-                    raise RuntimeError(f"Doc embedding失败: {resp.message}")
+                    raise RuntimeError(f"Embedding调用失败({config.RERANKER_RETRY_MAX}次重试): {resp.message}")
+        return all_embs
+
+    def _api_rerank(self, query: str, documents: List[Dict], top_k: int) -> List[Dict]:
+        try:
+            query_embs = self._get_embeddings_with_retry([query])
+            query_emb = query_embs[0]
+
+            doc_texts = [d.get("article_text", "") for d in documents]
+            doc_embs = self._get_embeddings_with_retry(doc_texts)
 
             scored = []
             for i, (doc, doc_emb) in enumerate(zip(documents, doc_embs)):
@@ -154,7 +163,7 @@ class Reranker:
                         adj_key = f"{doc_name}::{adj_an}"
                         if adj_key not in seen_keys and adj_key in doc_index:
                             adj_doc = dict(doc_index[adj_key])
-                            adj_doc["rerank_score"] = doc.get("rerank_score", 0) * 0.7
+                            adj_doc["rerank_score"] = doc.get("rerank_score", 0) * config.RERANKER_ADJACENT_SCORE_FACTOR
                             adj_doc["context_type"] = "adjacent"
                             expanded.append(adj_doc)
                             seen_keys.add(adj_key)

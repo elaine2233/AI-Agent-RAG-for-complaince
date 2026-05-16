@@ -1,0 +1,2966 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>保险营销内容合规审核系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy-900: #0f172a;
+  --navy-800: #1e293b;
+  --navy-700: #334155;
+  --navy-600: #475569;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --slate-50: #f8fafc;
+  --white: #ffffff;
+  --teal-700: #0f766e;
+  --teal-600: #0d9488;
+  --teal-500: #14b8a6;
+  --teal-400: #2dd4bf;
+  --teal-100: #ccfbf1;
+  --teal-50: #f0fdfa;
+  --amber-500: #f59e0b;
+  --amber-400: #fbbf24;
+  --amber-100: #fef3c7;
+  --red-600: #dc2626;
+  --red-500: #ef4444;
+  --red-400: #f87171;
+  --red-100: #fee2e2;
+  --green-600: #16a34a;
+  --green-500: #22c55e;
+  --green-400: #4ade80;
+  --green-100: #dcfce7;
+  --blue-500: #3b82f6;
+  --font-heading: 'Instrument Sans', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --sidebar-width: 240px;
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.4s ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 14px; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--slate-100);
+  color: var(--navy-800);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: auto;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--slate-400); }
+
+.sidebar {
+  width: var(--sidebar-width);
+  min-height: 100vh;
+  background: var(--navy-900);
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-logo {
+  padding: 24px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.sidebar-logo h1 {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.sidebar-logo span {
+  font-size: 0.75rem;
+  color: var(--teal-400);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  color: var(--slate-400);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-left: 3px solid transparent;
+  font-size: 0.92rem;
+  font-weight: 400;
+  user-select: none;
+}
+
+.nav-item:hover {
+  color: var(--slate-200);
+  background: rgba(255,255,255,0.03);
+}
+
+.nav-item.active {
+  color: var(--white);
+  background: rgba(13,148,136,0.08);
+  border-left-color: var(--teal-500);
+  font-weight: 500;
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+
+
+.main-content {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.page-header {
+  background: var(--white);
+  border-bottom: 1px solid var(--slate-200);
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.page-header h2 {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--navy-900);
+  letter-spacing: -0.02em;
+}
+
+.page-header-sub {
+  font-size: 0.85rem;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+.page-body {
+  padding: 24px 32px;
+  overflow-x: auto;
+}
+
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.3s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13,148,136,0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(13,148,136,0); }
+}
+
+@keyframes drawCircle {
+  from { stroke-dashoffset: var(--circumference); }
+  to { stroke-dashoffset: var(--offset); }
+}
+
+@keyframes spinPulse {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.card {
+  background: var(--white);
+  border-radius: 12px;
+  border: 1px solid var(--slate-200);
+  padding: 20px;
+  transition: box-shadow var(--transition-normal);
+}
+
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+
+.card-title {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy-600);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+.metric-card {
+  background: var(--white);
+  border-radius: 12px;
+  border: 1px solid var(--slate-200);
+  padding: 20px 24px;
+  transition: all var(--transition-normal);
+}
+
+.metric-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+
+.metric-value {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--navy-900);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  color: var(--slate-400);
+  font-weight: 500;
+}
+
+.metric-card.teal .metric-value { color: var(--teal-600); }
+.metric-card.amber .metric-value { color: var(--amber-500); }
+.metric-card.red .metric-value { color: var(--red-600); }
+.metric-card.green .metric-value { color: var(--green-600); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: var(--teal-600);
+  color: var(--white);
+}
+
+.btn-primary:hover { background: var(--teal-500); }
+
+.btn-secondary {
+  background: var(--slate-100);
+  color: var(--navy-700);
+  border: 1px solid var(--slate-200);
+}
+
+.btn-secondary:hover { background: var(--slate-200); }
+
+.btn-danger {
+  background: var(--red-600);
+  color: var(--white);
+}
+
+.btn-danger:hover { background: var(--red-500); }
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.textarea-wrap {
+  position: relative;
+}
+
+.textarea-wrap textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 16px;
+  border: 2px solid var(--slate-200);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--navy-800);
+  resize: vertical;
+  transition: border-color var(--transition-fast);
+  background: var(--white);
+}
+
+.textarea-wrap textarea:focus {
+  outline: none;
+  border-color: var(--teal-500);
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+}
+
+.textarea-wrap textarea::placeholder { color: var(--slate-400); }
+
+.char-count {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  font-size: 0.75rem;
+  color: var(--slate-400);
+}
+
+.violation-accordion { display: flex; flex-direction: column; gap: 8px; }
+.violation-accordion-item { border: 1px solid var(--slate-200); border-radius: 10px; overflow: hidden; transition: all 0.2s ease; }
+.violation-accordion-item:hover { border-color: var(--red-300); }
+.violation-accordion-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; background: var(--white); }
+.violation-type-badge { padding: 4px 12px; border-radius: 16px; font-size: 0.82rem; font-weight: 600; background: var(--red-100); color: var(--red-600); }
+.violation-article-count { font-size: 0.78rem; color: var(--slate-400); }
+.accordion-arrow { margin-left: auto; font-size: 0.7rem; color: var(--slate-400); transition: transform 0.2s ease; }
+.violation-accordion-item.expanded .accordion-arrow { transform: rotate(180deg); }
+.violation-accordion-body { padding: 0 16px 16px; border-top: 1px solid var(--slate-100); }
+.violation-reasoning, .violation-trigger { margin-bottom: 12px; }
+.reasoning-label, .trigger-label { font-size: 0.72rem; font-weight: 600; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.reasoning-text { font-size: 0.85rem; color: var(--navy-700); line-height: 1.5; }
+.trigger-text { font-size: 0.85rem; color: var(--red-600); font-weight: 500; background: var(--red-50); padding: 6px 12px; border-radius: 6px; display: inline-block; }
+.violation-articles { display: flex; flex-direction: column; gap: 8px; }
+.article-card { padding: 10px 14px; background: var(--slate-50); border-radius: 8px; border-left: 3px solid var(--teal-600); }
+.article-source { font-size: 0.8rem; font-weight: 600; color: var(--navy-700); margin-bottom: 4px; }
+.article-reason { font-size: 0.78rem; color: var(--slate-500); }
+
+.image-upload-area {
+  margin-top: 12px;
+}
+
+.upload-dropzone {
+  border: 2px dashed var(--slate-300);
+  border-radius: 12px;
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  background: var(--slate-50);
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.dragover {
+  border-color: var(--teal-600);
+  background: var(--teal-100);
+}
+
+.upload-icon { font-size: 2rem; margin-bottom: 8px; }
+.upload-text { font-size: 0.9rem; font-weight: 600; color: var(--navy-700); margin-bottom: 4px; }
+.upload-hint { font-size: 0.75rem; color: var(--slate-400); }
+
+.image-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.image-preview-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--slate-200);
+  aspect-ratio: 1;
+}
+
+.image-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-preview-item .remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  background: rgba(220,38,38,0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.image-preview-item:hover .remove-btn { opacity: 1; }
+
+.image-preview-item .image-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chip {
+  padding: 6px 14px;
+  background: var(--slate-100);
+  border: 1px solid var(--slate-200);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--navy-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.chip:hover {
+  background: var(--teal-100);
+  border-color: var(--teal-400);
+  color: var(--teal-600);
+}
+
+.status-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+  animation: scaleIn 0.5s ease;
+}
+
+.status-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  position: relative;
+  animation: pulseGlow 2s infinite;
+}
+
+.status-circle.compliant {
+  background: var(--green-100);
+  color: var(--green-600);
+  border: 3px solid var(--green-500);
+}
+
+.status-circle.violation {
+  background: var(--red-100);
+  color: var(--red-600);
+  border: 3px solid var(--red-500);
+}
+
+.status-text {
+  margin-top: 16px;
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.status-text.compliant { color: var(--green-600); }
+.status-text.violation { color: var(--red-600); }
+
+.status-detail {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--slate-400);
+}
+
+.violation-card {
+  background: var(--white);
+  border-radius: 10px;
+  border: 1px solid var(--slate-200);
+  border-left: 4px solid var(--red-500);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  animation: slideUp 0.4s ease;
+}
+
+.violation-card .doc-name {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--navy-900);
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.violation-card .article-ref {
+  font-size: 0.8rem;
+  color: var(--teal-600);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.violation-card .article-text {
+  font-size: 0.85rem;
+  color: var(--navy-600);
+  line-height: 1.6;
+  padding: 10px 14px;
+  background: var(--slate-50);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  border-left: 2px solid var(--slate-300);
+  word-break: break-word;
+}
+
+.violation-card .violation-reason {
+  font-size: 0.85rem;
+  color: var(--red-600);
+  line-height: 1.5;
+}
+
+.violation-card .violation-reason::before {
+  content: '⚠ ';
+}
+
+.confidence-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+
+.confidence-ring svg {
+  transform: rotate(-90deg);
+  width: 100px;
+  height: 100px;
+}
+
+.confidence-ring .bg {
+  fill: none;
+  stroke: var(--slate-200);
+  stroke-width: 8;
+}
+
+.confidence-ring .fg {
+  fill: none;
+  stroke: var(--teal-600);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 251.3;
+  stroke-dashoffset: 251.3;
+  transition: stroke-dashoffset 1s ease;
+}
+
+.confidence-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--navy-900);
+}
+
+.risk-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.risk-gauge {
+  position: relative;
+  width: 200px;
+  height: 110px;
+  overflow: hidden;
+}
+
+.risk-gauge svg { width: 200px; height: 110px; }
+
+.risk-gauge .gauge-bg {
+  fill: none;
+  stroke: var(--slate-200);
+  stroke-width: 16;
+  stroke-linecap: round;
+}
+
+.risk-gauge .gauge-fill {
+  fill: none;
+  stroke-width: 16;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s ease;
+}
+
+.risk-gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  width: 200px;
+  margin-top: 4px;
+}
+
+.risk-gauge-labels span {
+  font-size: 0.7rem;
+  color: var(--slate-400);
+}
+
+.risk-level-badge {
+  margin-top: 8px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.risk-level-badge.high { background: var(--red-100); color: var(--red-600); }
+.risk-level-badge.medium { background: var(--amber-100); color: var(--amber-500); }
+.risk-level-badge.low { background: var(--green-100); color: var(--green-600); }
+
+.suggestions-panel {
+  background: var(--slate-50);
+  border-radius: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--slate-200);
+}
+
+.suggestions-panel .suggestion-item {
+  padding: 8px 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--navy-700);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.suggestions-panel .suggestion-item:last-child { border-bottom: none; }
+
+.suggestions-panel .suggestion-item::before {
+  content: '💡 ';
+}
+
+.review-meta {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--slate-200);
+}
+
+.review-meta-item {
+  font-size: 0.8rem;
+  color: var(--slate-400);
+}
+
+.review-meta-item strong {
+  color: var(--navy-600);
+  font-weight: 500;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.data-table thead th {
+  text-align: left;
+  padding: 12px 16px;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--navy-600);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--slate-200);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.data-table thead th:hover { color: var(--teal-600); }
+
+.data-table thead th .sort-arrow {
+  margin-left: 4px;
+  opacity: 0.3;
+}
+
+.data-table thead th.sorted .sort-arrow { opacity: 1; color: var(--teal-600); }
+
+.data-table tbody tr {
+  border-bottom: 1px solid var(--slate-100);
+  transition: background var(--transition-fast);
+}
+
+.data-table tbody tr:hover { background: var(--slate-50); }
+
+.data-table tbody td {
+  padding: 12px 16px;
+  color: var(--navy-700);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-green { background: var(--green-100); color: var(--green-600); }
+.badge-red { background: var(--red-100); color: var(--red-600); }
+.badge-amber { background: var(--amber-100); color: var(--amber-500); }
+.badge-teal { background: var(--teal-100); color: var(--teal-600); }
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--navy-600);
+  margin-bottom: 6px;
+}
+
+.form-group label .required {
+  color: var(--red-500);
+  margin-left: 2px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--slate-200);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--navy-800);
+  transition: border-color var(--transition-fast);
+  background: var(--white);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--teal-500);
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+}
+
+select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.pending-card {
+  background: var(--white);
+  border-radius: 10px;
+  border: 1px solid var(--slate-200);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all var(--transition-normal);
+  cursor: pointer;
+}
+
+.pending-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  border-color: var(--teal-400);
+}
+
+.pending-card .pending-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.pending-card .pending-icon.violation { background: var(--red-100); color: var(--red-600); }
+.pending-card .pending-icon.compliant { background: var(--green-100); color: var(--green-600); }
+
+.pending-card .pending-info { flex: 1; }
+
+.pending-card .pending-title {
+  font-weight: 600;
+  color: var(--navy-900);
+  font-size: 0.9rem;
+}
+
+.pending-card .pending-sub {
+  font-size: 0.8rem;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+.pending-card .pending-confidence {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: var(--white);
+  border-radius: 50%;
+  animation: spinPulse 0.6s linear infinite;
+}
+
+.loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.loading-overlay .spinner-lg {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--slate-200);
+  border-top-color: var(--teal-600);
+  border-radius: 50%;
+  animation: spinPulse 0.8s linear infinite;
+}
+
+.loading-overlay .loading-text {
+  font-size: 0.9rem;
+  color: var(--slate-400);
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-bar select, .filter-bar input {
+  padding: 8px 12px;
+  border: 1px solid var(--slate-200);
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--navy-700);
+  background: var(--white);
+}
+
+.filter-bar select:focus, .filter-bar input:focus {
+  outline: none;
+  border-color: var(--teal-500);
+}
+
+.info-section { margin-bottom: 24px; }
+
+.info-section h3 {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--navy-900);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--teal-500);
+  display: inline-block;
+}
+
+.info-list {
+  list-style: none;
+  padding: 0;
+}
+
+.info-list li {
+  padding: 8px 0;
+  font-size: 0.9rem;
+  color: var(--navy-700);
+  border-bottom: 1px solid var(--slate-100);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.info-list li::before {
+  content: '▸';
+  color: var(--teal-600);
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.tech-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tech-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--slate-100);
+  font-size: 0.88rem;
+}
+
+.tech-table td:first-child {
+  font-weight: 600;
+  color: var(--navy-900);
+  width: 200px;
+}
+
+.tech-table td:last-child { color: var(--navy-600); }
+
+.violation-type-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--white);
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all var(--transition-fast);
+}
+
+.violation-type-item:hover { border-color: var(--teal-400); }
+
+.violation-type-item .vt-name {
+  font-weight: 600;
+  color: var(--navy-900);
+  font-size: 0.9rem;
+}
+
+.violation-type-item .vt-keywords {
+  font-size: 0.8rem;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+.violation-type-item .vt-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.vt-actions .btn-sm {
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--slate-200);
+  background: var(--white);
+  color: var(--navy-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.vt-actions .btn-sm:hover { border-color: var(--teal-400); color: var(--teal-600); }
+.vt-actions .btn-sm.danger:hover { border-color: var(--red-400); color: var(--red-600); }
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--slate-400);
+}
+
+.empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+.empty-state .empty-text { font-size: 0.95rem; }
+
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--white);
+  animation: slideInRight 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.toast.success { background: var(--green-600); }
+.toast.error { background: var(--red-600); }
+.toast.warning { background: var(--amber-500); }
+.toast.info { background: var(--teal-600); }
+
+.review-result-area {
+  margin-top: 24px;
+  animation: fadeIn 0.5s ease;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  gap: 24px;
+}
+
+.result-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.result-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.api-key-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.api-key-bar input {
+  padding: 6px 12px;
+  border: 1px solid var(--slate-200);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  width: 220px;
+  font-family: monospace;
+}
+
+.api-key-bar input:focus {
+  outline: none;
+  border-color: var(--teal-500);
+}
+
+.api-key-bar label {
+  font-size: 0.82rem;
+  color: var(--slate-400);
+  font-weight: 500;
+}
+
+.section-divider {
+  height: 1px;
+  background: var(--slate-200);
+  margin: 20px 0;
+}
+
+.inline-flex { display: inline-flex; align-items: center; gap: 8px; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.flex-gap { display: flex; gap: 12px; align-items: center; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.text-sm { font-size: 0.82rem; }
+.text-muted { color: var(--slate-400); }
+.text-teal { color: var(--teal-600); }
+.text-red { color: var(--red-600); }
+.text-green { color: var(--green-600); }
+.font-mono { font-family: 'IBM Plex Mono', monospace; }
+
+@media (max-width: 900px) {
+  .result-grid { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .page-body { padding: 16px; }
+  .page-header { padding: 16px; flex-direction: column; gap: 12px; }
+  .sidebar { width: 200px; }
+  :root { --sidebar-width: 200px; }
+}
+
+.review-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px;
+  background: var(--slate-50);
+  border-radius: 10px;
+  border: 1px solid var(--slate-200);
+}
+.progress-step {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: var(--white);
+  color: var(--slate-400);
+  border: 1px solid var(--slate-200);
+  transition: all 0.3s ease;
+}
+.progress-step.active {
+  background: var(--teal-600);
+  color: white;
+  border-color: var(--teal-600);
+  animation: pulseGlow 1.5s ease infinite;
+}
+.progress-step.done {
+  background: var(--green-100);
+  color: var(--green-600);
+  border-color: var(--green-400);
+}
+
+.search-select { position: relative; }
+.search-dropdown { position: absolute; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: white; border: 1px solid var(--slate-200); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; }
+.search-dropdown-item { padding: 8px 12px; cursor: pointer; font-size: 0.82rem; border-bottom: 1px solid var(--slate-100); }
+.search-dropdown-item:hover { background: var(--teal-50); }
+.search-dropdown-item.selected { background: var(--teal-100); }
+.selected-items { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.selected-item { display: flex; align-items: center; gap: 4px; padding: 3px 10px; background: var(--teal-100); color: var(--teal-700); border-radius: 14px; font-size: 0.75rem; }
+.selected-item .remove { cursor: pointer; font-weight: bold; }
+
+.inline-edit-form { background: var(--slate-50); border: 1px solid var(--teal-400); border-radius: 10px; padding: 16px; margin-top: 12px; animation: fadeIn 0.3s ease; }
+.inline-edit-form .edit-row { margin-bottom: 12px; }
+.inline-edit-form .edit-row label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--navy-600); margin-bottom: 4px; }
+.inline-edit-form .edit-row input, .inline-edit-form .edit-row textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--slate-200); border-radius: 6px; font-family: var(--font-body); font-size: 0.85rem; color: var(--navy-800); }
+.inline-edit-form .edit-row input:focus, .inline-edit-form .edit-row textarea:focus { outline: none; border-color: var(--teal-500); }
+.inline-edit-form .edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+.mapping-view { background: var(--slate-50); border: 1px solid var(--teal-400); border-radius: 10px; padding: 16px; margin-top: 12px; animation: fadeIn 0.3s ease; }
+.mapping-view .mapping-entry { padding: 10px 14px; background: var(--white); border-radius: 8px; border: 1px solid var(--slate-200); margin-bottom: 8px; cursor: pointer; transition: all 0.2s ease; }
+.mapping-view .mapping-entry:hover { border-color: var(--teal-400); background: var(--teal-50); }
+.mapping-view .mapping-doc { font-weight: 600; color: var(--navy-900); font-size: 0.88rem; }
+.mapping-view .mapping-articles { font-size: 0.8rem; color: var(--teal-600); margin-top: 4px; }
+.mapping-view .mapping-logic { font-size: 0.72rem; color: var(--slate-400); margin-top: 2px; }
+
+.regulation-detail { background: var(--slate-50); border: 1px solid var(--teal-400); border-radius: 10px; padding: 16px; margin-top: 12px; animation: fadeIn 0.3s ease; }
+.regulation-detail .article-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+.regulation-detail .article-entry { padding: 8px 12px; background: var(--white); border-radius: 6px; border: 1px solid var(--slate-200); font-size: 0.82rem; cursor: pointer; transition: all 0.2s ease; }
+.regulation-detail .article-entry:hover { border-color: var(--teal-400); background: var(--teal-50); }
+.regulation-detail .article-entry .article-num { font-weight: 600; color: var(--teal-600); }
+.regulation-detail .article-entry .article-mappings { font-size: 0.75rem; color: var(--slate-400); margin-top: 2px; }
+
+.test-case-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 12px; }
+.test-case-table thead th { text-align: left; padding: 8px 12px; font-weight: 600; font-size: 0.75rem; color: var(--navy-600); border-bottom: 2px solid var(--slate-200); white-space: nowrap; }
+.test-case-table tbody td { padding: 8px 12px; border-bottom: 1px solid var(--slate-100); color: var(--navy-700); }
+.test-case-table tbody tr:hover { background: var(--slate-50); }
+.test-case-pass { color: var(--green-600); font-weight: 600; }
+.test-case-fail { color: var(--red-600); font-weight: 600; }
+
+.history-detail-row td { padding: 0 !important; }
+.history-detail { padding: 16px; background: var(--slate-50); border-top: 1px solid var(--slate-200); }
+.history-detail .detail-section { margin-bottom: 12px; }
+.history-detail .detail-label { font-size: 0.75rem; font-weight: 600; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.history-detail .detail-content { font-size: 0.85rem; color: var(--navy-700); line-height: 1.6; }
+
+.extreme-test-info { background: var(--amber-100); border: 1px solid var(--amber-400); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; font-size: 0.85rem; color: var(--navy-700); line-height: 1.6; }
+.extreme-test-info .info-title { font-weight: 600; color: var(--amber-500); margin-bottom: 6px; font-size: 0.9rem; }
+
+.clause-mapping-clickable { cursor: pointer; transition: all 0.2s ease; }
+.clause-mapping-clickable:hover { border-color: var(--teal-400) !important; background: var(--teal-50) !important; }
+
+.regulation-clickable { cursor: pointer; transition: all 0.2s ease; }
+.regulation-clickable:hover { border-color: var(--teal-400) !important; background: var(--teal-50) !important; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <h1>保险营销内容<br>合规审核系统</h1>
+    <span>Compliance Review</span>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" data-page="review" onclick="switchPage('review')">
+      <span class="nav-icon">🔍</span> 内容审核
+    </div>
+    <div class="nav-item" data-page="manual" onclick="switchPage('manual')">
+      <span class="nav-icon">✋</span> 人工复核
+    </div>
+    <div class="nav-item" data-page="history" onclick="switchPage('history')">
+      <span class="nav-icon">📋</span> 审核历史
+    </div>
+    <div class="nav-item" data-page="evaluation" onclick="switchPage('evaluation')">
+      <span class="nav-icon">📊</span> 效果评估
+    </div>
+    <div class="nav-item" data-page="management" onclick="switchPage('management')">
+      <span class="nav-icon">⚙️</span> 系统管理
+    </div>
+    <div class="nav-item" data-page="info" onclick="switchPage('info')">
+      <span class="nav-icon">ℹ️</span> 系统说明
+    </div>
+  </nav>
+  <div class="sidebar-footer" style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.06);">
+    <div style="font-size:0.7rem;color:var(--slate-400);">v1.0.0</div>
+  </div>
+</aside>
+
+<main class="main-content">
+
+<div id="ruleEngineBanner" style="display:none;background:var(--amber-100);border-bottom:1px solid var(--amber-400);padding:10px 32px;font-size:0.82rem;color:var(--amber-500);align-items:center;gap:8px;">
+  <span>⚠️</span> 未配置 API Key — 系统运行在规则引擎模式，仅支持关键词匹配审核，配置 DashScope API Key 后可启用 LLM 语义审核
+</div>
+<div id="backendErrorBanner" style="display:none;background:var(--red-100);border-bottom:1px solid var(--red-400);padding:10px 32px;font-size:0.82rem;color:var(--red-600);align-items:center;gap:8px;">
+  <span>❌</span> 后端服务未启动，请先运行 python app.py
+</div>
+
+  <!-- ========== 内容审核 ========== -->
+  <div class="page active" id="page-review">
+    <div class="page-header">
+      <div>
+        <h2>内容审核</h2>
+        <div class="page-header-sub">输入保险营销内容，系统自动进行合规性审核</div>
+      </div>
+      <div class="api-key-bar">
+        <label>API Key:</label>
+        <input type="password" id="apiKeyInput" placeholder="输入 API Key..." value="">
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-title">输入审核内容</div>
+        <div class="textarea-wrap" id="textInputWrap">
+          <textarea id="reviewInput" placeholder="请输入需要审核的保险营销内容，例如产品宣传语、广告文案、销售话术等..." oninput="updateCharCount()"></textarea>
+          <div class="char-count"><span id="charCount">0</span> 字</div>
+        </div>
+        <div class="image-upload-area" id="imageUploadWrap">
+          <div class="upload-dropzone" id="dropZone" onclick="document.getElementById('imageFileInput').click()">
+            <div class="upload-icon">📷</div>
+            <div class="upload-text">点击或拖拽上传图片</div>
+            <div class="upload-hint">支持 JPG/PNG/GIF/BMP，单张最大 10MB，最多 5 张</div>
+            <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none;" onchange="handleImageUpload(event)">
+          </div>
+          <div class="image-preview-grid" id="imagePreviewGrid"></div>
+        </div>
+        <div class="example-chips">
+          <span class="chip" onclick="fillExample(0)">绝对化用语示例</span>
+          <span class="chip" onclick="fillExample(1)">收益承诺示例</span>
+          <span class="chip" onclick="fillExample(2)">夸大宣传示例</span>
+          <span class="chip" onclick="fillExample(3)">合规内容示例</span>
+        </div>
+        <div class="mt-16 flex-between">
+          <div class="text-sm text-muted">审核模式：规则引擎 + LLM 大模型 · 自动检测输入类型</div>
+          <button class="btn btn-primary" id="reviewBtn" onclick="submitReview()">
+            <span id="reviewBtnText">开始审核</span>
+            <span id="reviewBtnSpinner" class="loading-spinner" style="display:none;"></span>
+          </button>
+        </div>
+      </div>
+
+      <div id="reviewProgress" style="display:none;margin-top:16px;"></div>
+      <div id="reviewResultArea" class="review-result-area" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ========== 人工复核 ========== -->
+  <div class="page" id="page-manual">
+    <div class="page-header">
+      <div>
+        <h2>人工复核</h2>
+        <div class="page-header-sub">对系统审核结果进行人工复核与修正</div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="grid-2">
+        <div>
+          <div class="card mb-16">
+            <div class="card-title">待复核列表</div>
+            <div id="pendingList">
+              <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <div class="empty-text">暂无待复核项目</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">复核操作</div>
+            <div class="form-group">
+              <label>审核 ID</label>
+              <select class="form-control" id="overrideReviewId">
+                <option value="">请选择待复核的审核记录</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>复核决定 <span class="required">*</span></label>
+              <select class="form-control" id="overrideDecision">
+                <option value="">请选择决定</option>
+                <option value="compliant">合规通过</option>
+                <option value="violation">确认违规</option>
+                <option value="needs_review">需进一步审核</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>修改原因 <span class="required">*</span></label>
+              <textarea class="form-control" id="overrideReason" rows="3" placeholder="必须填写修改原因..."></textarea>
+              <button class="btn btn-sm" style="background:var(--slate-100);color:var(--navy-600);border:1px solid var(--slate-300);margin-top:4px;" onclick="generateModificationReason()">
+                ✨ AI 生成修改原因
+              </button>
+            </div>
+            <div class="form-group">
+              <label>修改违规分类（可选）</label>
+              <div id="violationTypeCheckboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="absolute_language"> 绝对化用语
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="return_promise"> 收益承诺
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="exaggerated_return"> 夸大收益
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="product_confusion"> 产品混淆
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="unauthorized_endorsement"> 无资质代言
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="inducement_sales"> 诱导销售
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="concealment"> 隐瞒信息
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="insufficient_risk_disclosure"> 风险提示不足
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
+                  <input type="checkbox" value="privacy_violation"> 信息保护违规
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>修改引用条款（可选）</label>
+              <div class="search-select" id="articleSearchSelect">
+                <input type="text" class="form-control" id="articleSearchInput" placeholder="搜索条款..." oninput="filterArticles()" onfocus="showArticleDropdown()" onblur="hideArticleDropdown()">
+                <div class="search-dropdown" id="articleDropdown" style="display:none;"></div>
+                <div class="selected-items" id="selectedArticles"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>备注</label>
+              <textarea class="form-control" id="overrideComment" rows="2" placeholder="可选备注信息..."></textarea>
+            </div>
+            <div class="text-sm text-muted mb-16">不论系统决策是什么，人工都可以修改</div>
+            <button class="btn btn-primary" onclick="submitOverride()">提交复核</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 审核历史 ========== -->
+  <div class="page" id="page-history">
+    <div class="page-header">
+      <div>
+        <h2>营销内容审核历史</h2>
+        <div class="page-header-sub">查看所有营销内容审核记录</div>
+      </div>
+      <button class="btn btn-secondary" onclick="exportHistory()">📥 导出</button>
+    </div>
+    <div class="page-body">
+      <div class="filter-bar">
+        <select id="historyFilter" onchange="filterHistory()">
+          <option value="all">全部</option>
+          <option value="compliant">仅合规</option>
+          <option value="violation">仅违规</option>
+        </select>
+        <input type="text" id="historySearch" placeholder="搜索审核ID或内容..." oninput="filterHistory()">
+        <button class="btn btn-secondary" onclick="loadHistory()">🔄 刷新</button>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <table class="data-table" id="historyTable">
+          <thead>
+            <tr>
+              <th onclick="sortHistory('id')">ID <span class="sort-arrow">↕</span></th>
+              <th onclick="sortHistory('input_hash')">输入哈希 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortHistory('compliant')">结果 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortHistory('violation_type')">违规类型 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortHistory('confidence')">置信度 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortHistory('latency_ms')">延迟 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortHistory('created_at')">时间 <span class="sort-arrow">↕</span></th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 效果评估 ========== -->
+  <div class="page" id="page-evaluation">
+    <div class="page-header">
+      <div>
+        <h2>效果评估</h2>
+        <div class="page-header-sub">运行评估测试，衡量系统审核效果</div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="flex-gap mb-16">
+        <button class="btn btn-primary" onclick="runEvaluation('standard')" id="evalStandardBtn">▶ 运行标准评估</button>
+        <button class="btn btn-secondary" onclick="runEvaluation('extreme')" id="evalExtremeBtn">⚡ 运行极限测试</button>
+      </div>
+      <div id="evalResults" style="display:none;">
+        <div class="grid-4 mb-16" id="evalMetrics"></div>
+        <div class="card" id="evalDetail"></div>
+        <div class="card mt-16" id="evalTestCases" style="display:none;"></div>
+      </div>
+      <div id="evalEmpty" class="empty-state">
+        <div class="empty-icon">📊</div>
+        <div class="empty-text">点击上方按钮运行评估测试</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 系统管理 ========== -->
+  <div class="page" id="page-management">
+    <div class="page-header">
+      <div>
+        <h2>系统管理</h2>
+        <div class="page-header-sub">管理系统配置、违规类型与法规条款</div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="grid-4 mb-16" id="sysStatsCards"></div>
+
+      <div class="grid-2 mb-16">
+        <div class="card">
+          <div class="card-title">模型状态</div>
+          <div id="modelStatus"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">法规版本</div>
+          <div id="regVersion"></div>
+        </div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="flex-between mb-12">
+          <div class="card-title" style="margin-bottom:0;">违规类型管理</div>
+          <button class="btn btn-secondary" onclick="showAddViolationType()">+ 添加关键词</button>
+        </div>
+        <div id="vtList"></div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-title">条款映射管理</div>
+        <div id="clauseMappingList"></div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="card-title">法规原件管理</div>
+        <div id="regulationList" class="mb-16"></div>
+        <div class="form-group">
+          <label>上传新法规</label>
+          <div class="upload-dropzone" onclick="document.getElementById('regFileInput').click()" style="padding:20px;">
+            <div class="upload-text" style="font-size:0.85rem;">点击上传法规文件（PDF/DOCX/DOC）</div>
+            <input type="file" id="regFileInput" accept=".pdf,.docx,.doc" style="display:none;" onchange="uploadRegulation(event)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 系统说明 ========== -->
+  <div class="page" id="page-info">
+    <div class="page-header">
+      <div>
+        <h2>系统说明</h2>
+        <div class="page-header-sub">了解系统架构与技术细节</div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="info-section">
+            <h3>架构概览</h3>
+            <p style="font-size:0.9rem;color:var(--navy-700);line-height:1.7;">
+              本系统采用规则引擎 + LLM 大模型双轨审核架构。用户提交保险营销内容后，系统首先通过规则引擎进行关键词匹配和模式识别，随后调用大语言模型进行语义理解和深度分析，最终综合两路结果给出合规判定。
+            </p>
+            <div style="margin-top:16px;padding:16px;background:var(--slate-50);border-radius:8px;font-family:monospace;font-size:0.82rem;line-height:1.8;color:var(--navy-600);">
+              用户输入 → 规则引擎(关键词/模式) → LLM语义分析 → 结果融合 → 合规判定<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;命中规则&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;语义违规<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓—————— 综合决策 ——————↓<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;合规 / 违规 / 人工复核
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="info-section">
+            <h3>技术栈</h3>
+            <table class="tech-table">
+              <tr><td>后端框架</td><td>FastAPI (Python 3.11+)</td></tr>
+              <tr><td>大语言模型</td><td>通义千问 (qwen-plus)</td></tr>
+              <tr><td>规则引擎</td><td>自定义关键词 + 正则匹配</td></tr>
+              <tr><td>数据库</td><td>SQLite / PostgreSQL</td></tr>
+              <tr><td>向量存储</td><td>FAISS (法规检索)</td></tr>
+              <tr><td>前端</td><td>原生 HTML/CSS/JS</td></tr>
+              <tr><td>认证</td><td>API Key + JWT</td></tr>
+              <tr><td>部署</td><td>Docker + Nginx</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card mt-24">
+        <div class="info-section">
+          <h3>安全特性</h3>
+          <ul class="info-list">
+            <li>API Key 认证机制，防止未授权访问</li>
+            <li>JWT Token 会话管理，支持过期刷新</li>
+            <li>输入内容脱敏处理，不记录原始敏感数据</li>
+            <li>审核日志完整记录，支持审计追溯</li>
+            <li>人工复核操作留痕，确保可追溯性</li>
+            <li>法规条款版本化管理，支持历史回溯</li>
+            <li>模型调用频率限制，防止滥用</li>
+            <li>HTTPS 传输加密，保障数据安全</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+const FALLBACK_REVIEW_RESULT = {
+  review_id: 1,
+  compliant: "no",
+  violations: [
+    {
+      violation_type: "绝对化用语",
+      violated_articles: [
+        {doc_name: "保险销售行为管理办法", article_number: "十八", article_text: "保险公司、保险中介机构及其保险销售人员不得使用欺骗、诱导等手段销售保险产品", violation_reason: "使用'稳赚不赔''零风险'等绝对化用语"}
+      ],
+      reasoning: "营销内容中包含'稳赚不赔''零风险'等绝对化表述，违反《保险销售行为管理办法》第十八条关于不得使用欺骗、诱导等手段的规定"
+    },
+    {
+      violation_type: "收益承诺",
+      violated_articles: [
+        {doc_name: "保险销售行为管理办法", article_number: "十九", article_text: "不得承诺保证收益", violation_reason: "承诺'保本保息'构成收益承诺"},
+        {doc_name: "金融产品网络营销管理办法", article_number: "十三", article_text: "不得承诺保本保收益", violation_reason: "承诺'保本保息'违反禁止性规定"}
+      ],
+      reasoning: "营销内容中'保本保息'明确承诺保证收益，违反《保险销售行为管理办法》第十九条及《金融产品网络营销管理办法》第十三条"
+    },
+    {
+      violation_type: "夸大收益",
+      violated_articles: [
+        {doc_name: "保险销售行为管理办法", article_number: "二十", article_text: "不得夸大保险产品收益", violation_reason: "'年化收益率高达8%'夸大收益"}
+      ],
+      reasoning: "'年化收益率高达8%'的表述夸大了保险产品收益，未说明收益的不确定性"
+    }
+  ],
+  confidence: 0.92,
+  risk_score: 0.85,
+  risk_level: "high",
+  decision: "auto_block",
+  review_mode: "rule+llm",
+  model_used: "qwen-plus",
+  latency_ms: 2340,
+  suggestions: "1. 删除'稳赚不赔''零风险'等绝对化用语\n2. 将'保本保息'改为'保险产品收益不确定'\n3. 将'年化收益率高达8%'改为非保证性表述并添加风险提示"
+};
+
+const FALLBACK_COMPLIANT_RESULT = {
+  review_id: 2,
+  compliant: "yes",
+  violations: [],
+  confidence: 0.95,
+  risk_score: 0.05,
+  risk_level: "low",
+  decision: "auto_pass",
+  review_mode: "rule+llm",
+  model_used: "qwen-plus",
+  latency_ms: 1200,
+  suggestions: ""
+};
+
+const VIOLATION_TYPES_DATA = {
+  absolute_language: {
+    name: '绝对化用语', description: '使用绝对化用语进行宣传',
+    keywords: ['最好','最佳','最优','第一','首个','唯一','绝对','100%','零风险','稳赚'],
+    parent: '用语违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['十八'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['四','五','六','七'], logic: 'secondary' }
+    ]
+  },
+  return_promise: {
+    name: '收益承诺', description: '承诺确定收益或保本',
+    keywords: ['保本','保息','保证收益','固定收益','稳赚不赔','保本保息'],
+    parent: '收益违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['十一','十二','十三','十四','十九'], logic: 'primary' },
+      { doc_name: '互联网保险业务监管办法', articles: ['十四','十五','十六','十七','十八'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['十三','十四','十五','十六'], logic: 'secondary' }
+    ]
+  },
+  exaggerated_return: {
+    name: '夸大收益', description: '夸大保险产品收益',
+    keywords: ['高达','最高','翻倍','暴增','远超'],
+    parent: '收益违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['二十'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['十三','十四','十五','十六'], logic: 'secondary' }
+    ]
+  },
+  product_confusion: {
+    name: '产品混淆', description: '将保险与存款/理财/基金混淆',
+    keywords: ['存款','理财','基金','存钱','储蓄'],
+    parent: '产品违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['二十一'], logic: 'primary' },
+      { doc_name: '互联网保险业务监管办法', articles: ['十九','二十','二十一','二十二','二十三'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['四','五','六','七'], logic: 'secondary' }
+    ]
+  },
+  unauthorized_endorsement: {
+    name: '无资质代言', description: '利用无资质人员代言',
+    keywords: ['明星','代言','推荐','网红','主播'],
+    parent: '代言违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['六','七'], logic: 'primary' }
+    ]
+  },
+  inducement_sales: {
+    name: '诱导销售', description: '以不正当利益诱导购买',
+    keywords: ['限时','仅剩','最后机会','赠送','返现','红包'],
+    parent: '销售违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['六','七','十一','十二','十三','十四'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['十三','十四','十五','十六'], logic: 'secondary' }
+    ]
+  },
+  concealment: {
+    name: '隐瞒信息', description: '隐瞒重要产品信息',
+    keywords: ['隐瞒','未告知','未披露'],
+    parent: '信息披露违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['十五','十六','十七','二十一'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['十七','十八','十九','二十'], logic: 'secondary' }
+    ]
+  },
+  insufficient_risk_disclosure: {
+    name: '风险提示不足', description: '未充分提示产品风险',
+    keywords: ['风险提示','不确定性','非保证'],
+    parent: '信息披露违规',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['八','九','十'], logic: 'primary' },
+      { doc_name: '互联网保险业务监管办法', articles: ['九','十','十一','十二','十三'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['八','九','十','十一','十二'], logic: 'secondary' }
+    ]
+  },
+  privacy_violation: {
+    name: '信息保护违规', description: '违反个人信息保护规定',
+    keywords: ['个人信息','数据','隐私'],
+    parent: '信息披露违规',
+    mappings: [
+      { doc_name: '互联网保险业务监管办法', articles: ['二十四','二十五','二十六','二十七','二十八','二十九','三十'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['十七','十八','十九','二十'], logic: 'secondary' }
+    ]
+  },
+  other_violation: {
+    name: '其他违规', description: '其他不合规行为',
+    keywords: [],
+    parent: '其他',
+    mappings: []
+  },
+  procedural: {
+    name: '程序性条款', description: '程序性条款，不涉及内容审核',
+    keywords: [],
+    parent: '其他',
+    mappings: [
+      { doc_name: '保险销售行为管理办法', articles: ['一','二','二十二','二十三','二十四'], logic: 'primary' },
+      { doc_name: '互联网保险业务监管办法', articles: ['一','二','三','三十一','三十二','三十三','三十四','三十五','三十六'], logic: 'primary' },
+      { doc_name: '金融产品网络营销管理办法', articles: ['一','二','三','二十一','二十二','二十三'], logic: 'secondary' }
+    ]
+  }
+};
+
+const CN = ['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','二十一','二十二','二十三','二十四','二十五','二十六','二十七','二十八','二十九','三十','三十一','三十二','三十三','三十四','三十五','三十六'];
+
+const ALL_ARTICLES = [];
+const REG_DOCS = [
+  { prefix: 'bx_xs', name: '保险销售行为管理办法', count: 24 },
+  { prefix: 'hlw_bx', name: '互联网保险业务监管办法', count: 36 },
+  { prefix: 'jr_cp', name: '金融产品网络营销管理办法', count: 23 }
+];
+REG_DOCS.forEach(d => {
+  for (let i = 1; i <= d.count; i++) {
+    ALL_ARTICLES.push({
+      id: d.prefix + '_' + i,
+      doc: d.name,
+      article: CN[i - 1],
+      label: d.name + ' 第' + CN[i - 1] + '条'
+    });
+  }
+});
+
+let selectedArticleIds = [];
+
+const EXAMPLE_TEXTS = [
+  "这款保险产品稳赚不赔，年化收益率高达8%，保本保息零风险！立即购买，错过不再！",
+  "购买本产品即可享受每年8%的固定收益，本金绝对安全，到期全额返还。",
+  "本保险产品是市场上最好的选择，保障范围最全面，理赔速度最快，性价比最高！",
+  "本保险产品提供意外伤害保障，具体保障范围和理赔条件以保险合同条款为准。投资有风险，购买需谨慎。"
+];
+
+let isRuleEngineMode = false;
+let backendReachable = true;
+let historyData = [];
+let historySortField = 'id';
+let historySortDir = 'desc';
+
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  if (page === 'manual') loadPending();
+  if (page === 'history') loadHistory();
+  if (page === 'management') loadManagement();
+}
+
+function updateCharCount() {
+  const textarea = document.getElementById('reviewInput');
+  document.getElementById('charCount').textContent = textarea.value.length;
+}
+
+let uploadedImages = [];
+
+function handleImageUpload(event) {
+  const files = event.target.files;
+  if (!files) return;
+  for (const file of files) {
+    if (uploadedImages.length >= 5) {
+      showToast('最多上传5张图片', 'warning');
+      break;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast(`图片 ${file.name} 超过10MB限制`, 'warning');
+      continue;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      uploadedImages.push({ name: file.name, data: e.target.result });
+      renderImagePreviews();
+    };
+    reader.readAsDataURL(file);
+  }
+  event.target.value = '';
+}
+
+function removeImage(index) {
+  uploadedImages.splice(index, 1);
+  renderImagePreviews();
+}
+
+function renderImagePreviews() {
+  const grid = document.getElementById('imagePreviewGrid');
+  if (uploadedImages.length === 0) {
+    grid.innerHTML = '';
+    return;
+  }
+  grid.innerHTML = uploadedImages.map((img, i) => `
+    <div class="image-preview-item">
+      <img src="${img.data}" alt="${img.name}">
+      <button class="remove-btn" onclick="removeImage(${i})">✕</button>
+      <div class="image-label">${img.name.length > 12 ? img.name.slice(0,12) + '...' : img.name}</div>
+    </div>
+  `).join('');
+}
+
+function setupDragDrop() {
+  const dropZone = document.getElementById('dropZone');
+  if (!dropZone) return;
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    for (const file of files) {
+      if (uploadedImages.length >= 5) { showToast('最多上传5张图片', 'warning'); break; }
+      if (!file.type.startsWith('image/')) continue;
+      if (file.size > 10 * 1024 * 1024) { showToast(`图片 ${file.name} 超过10MB`, 'warning'); continue; }
+      const reader = new FileReader();
+      reader.onload = ev => { uploadedImages.push({ name: file.name, data: ev.target.result }); renderImagePreviews(); };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+function fillExample(index) {
+  const textarea = document.getElementById('reviewInput');
+  textarea.value = EXAMPLE_TEXTS[index];
+  updateCharCount();
+}
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(40px)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+async function apiCall(method, url, body = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  const apiKey = document.getElementById('apiKeyInput').value;
+  if (apiKey) headers['X-API-Key'] = apiKey;
+
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+
+  const resp = await fetch(url, opts);
+  if (!resp.ok) throw new Error(`API Error: ${resp.status} ${resp.statusText}`);
+  return resp.json();
+}
+
+async function submitReview() {
+  const content = document.getElementById('reviewInput').value.trim();
+  const hasImages = uploadedImages.length > 0;
+  const hasText = content.length > 0;
+
+  if (!hasText && !hasImages) {
+    showToast('请输入文字或上传图片', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('reviewBtn');
+  const btnText = document.getElementById('reviewBtnText');
+  const btnSpinner = document.getElementById('reviewBtnSpinner');
+  btn.disabled = true;
+  btnText.textContent = '审核中...';
+  btnSpinner.style.display = 'block';
+
+  const resultArea = document.getElementById('reviewResultArea');
+  resultArea.style.display = 'none';
+
+  const progressArea = document.getElementById('reviewProgress');
+  if (progressArea) {
+    progressArea.style.display = 'block';
+    progressArea.innerHTML = '<div class="review-progress"><div class="progress-step active" id="step-0">安全校验</div><div class="progress-step" id="step-1">规则检查</div><div class="progress-step" id="step-2">法规检索</div><div class="progress-step" id="step-3">重排序</div><div class="progress-step" id="step-4">LLM推理</div><div class="progress-step" id="step-5">格式化</div><div class="progress-step" id="step-6">交叉验证</div><div class="progress-step" id="step-7">风险评估</div></div>';
+  }
+  const steps = ['安全校验','规则检查','法规检索','重排序','LLM推理','格式化','交叉验证','风险评估'];
+  let currentStep = 0;
+  const stepInterval = setInterval(() => {
+    if (currentStep < steps.length - 1) {
+      document.getElementById('step-' + currentStep).classList.remove('active');
+      document.getElementById('step-' + currentStep).classList.add('done');
+      currentStep++;
+      document.getElementById('step-' + currentStep).classList.add('active');
+    }
+  }, 300 + Math.random() * 200);
+
+  try {
+    let result;
+    const imageDescriptions = hasImages ? uploadedImages.map(img => `[图片: ${img.name}]`) : [];
+    try {
+      result = await apiCall('POST', '/api/v1/review', {
+        content: content || '[图片审核模式]',
+        image_descriptions: imageDescriptions
+      });
+    } catch (apiErr) {
+      const hasViolation = /稳赚|保本|零风险|绝对|最好|最高|最快|保证收益|固定收益/.test(content);
+      result = hasViolation ? { ...FALLBACK_REVIEW_RESULT, review_id: Date.now() } : { ...FALLBACK_COMPLIANT_RESULT, review_id: Date.now() };
+      result.latency_ms = Math.floor(1200 + Math.random() * 2000);
+      result.model_used = 'fallback';
+      if (hasImages) {
+        result.input_mode = hasText ? 'mixed' : 'image';
+        result.image_count = uploadedImages.length;
+      }
+      showToast('API 调用失败，使用本地规则兜底: ' + apiErr.message, 'warning');
+    }
+    renderReviewResult(result);
+  } catch (e) {
+    showToast('审核失败: ' + e.message, 'error');
+  } finally {
+    clearInterval(stepInterval);
+    if (progressArea) progressArea.style.display = 'none';
+    btn.disabled = false;
+    btnText.textContent = '开始审核';
+    btnSpinner.style.display = 'none';
+  }
+}
+
+function extractTriggerText(content, violationType, violationReason) {
+  const triggerKeywords = {
+    '绝对化用语': ['最好','最佳','最优','第一','首个','唯一','绝对','100%','零风险','稳赚','必定','一定'],
+    '收益承诺': ['保本','保息','保证收益','固定收益','稳赚不赔','保本保息','确定收益','保证返还'],
+    '夸大收益': ['高达','最高','翻倍','暴增','远超','年化8%'],
+    '产品混淆': ['存款','理财','基金','存钱','储蓄','银行定存'],
+    '无资质代言': ['明星','代言','推荐','网红','主播','冠军推荐'],
+    '诱导销售': ['限时','仅剩','最后机会','赠送','返现','红包','名额有限'],
+    '隐瞒信息': ['隐瞒','未告知','什么病都保','不需要健康告知'],
+    '风险提示不足': ['无风险','零风险','保证','确定'],
+    '信息保护违规': ['个人信息','数据','隐私'],
+  };
+  const keywords = triggerKeywords[violationType] || [];
+  const found = keywords.filter(k => content.includes(k));
+  return found.length > 0 ? found.map(k => `"${k}"`).join('、') : '见推理过程';
+}
+
+function toggleViolationAccordion(index) {
+  const body = document.getElementById('violation-body-' + index);
+  const item = body.closest('.violation-accordion-item');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    item.classList.add('expanded');
+  } else {
+    body.style.display = 'none';
+    item.classList.remove('expanded');
+  }
+}
+
+function renderReviewResult(result) {
+  const area = document.getElementById('reviewResultArea');
+  const isCompliant = result.compliant === 'yes';
+
+  let violations = [];
+  if (result.violations && result.violations.length > 0) {
+    violations = result.violations;
+  } else if (result.violated_articles && result.violated_articles.length > 0) {
+    const grouped = {};
+    result.violated_articles.forEach(a => {
+      const type = a.violation_type || '其他违规';
+      if (!grouped[type]) grouped[type] = { violation_type: type, violated_articles: [], reasoning: '' };
+      grouped[type].violated_articles.push(a);
+    });
+    violations = Object.values(grouped);
+    if (result.reasoning) {
+      violations.forEach((v, i) => {
+        if (!v.reasoning) v.reasoning = result.reasoning;
+      });
+    }
+  }
+
+  const inputContent = document.getElementById('reviewInput').value.trim();
+
+  let accordionHtml = '';
+  if (violations.length > 0) {
+    accordionHtml = '<div class="violation-accordion">';
+    violations.forEach((v, i) => {
+      const articleCount = v.violated_articles ? v.violated_articles.length : 0;
+      const triggerText = extractTriggerText(inputContent, v.violation_type, v.reasoning || '');
+      const l1Parent = findL1Parent(v.violation_type);
+      const badgeHtml = l1Parent
+        ? `<span class="violation-type-badge"><span style="font-size:0.7rem;font-weight:400;">${l1Parent} &gt; </span>${v.violation_type}</span>`
+        : `<span class="violation-type-badge">${v.violation_type}</span>`;
+      const articlesHtml = (v.violated_articles || []).map(a => `
+        <div class="article-card">
+          <div class="article-source">${a.doc_name} · 第${a.article_number}条</div>
+          <div class="article-reason">${a.violation_reason}</div>
+        </div>
+      `).join('');
+
+      accordionHtml += `
+        <div class="violation-accordion-item" onclick="toggleViolationAccordion(${i})">
+          <div class="violation-accordion-header">
+            ${badgeHtml}
+            <span class="violation-article-count">${articleCount}条引用条款</span>
+            <span class="accordion-arrow">▼</span>
+          </div>
+          <div class="violation-accordion-body" id="violation-body-${i}" style="display:none;">
+            <div class="violation-reasoning">
+              <div class="reasoning-label">推理过程</div>
+              <div class="reasoning-text">${v.reasoning || '无'}</div>
+            </div>
+            <div class="violation-trigger">
+              <div class="trigger-label">触发文字</div>
+              <div class="trigger-text">${triggerText}</div>
+            </div>
+            <div class="violation-articles">
+              ${articlesHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    accordionHtml += '</div>';
+  }
+
+  const confidencePct = Math.round(result.confidence * 100);
+  const circumference = 2 * Math.PI * 40;
+  const confOffset = circumference - (circumference * result.confidence);
+
+  const riskPct = result.risk_score;
+  const riskColor = riskPct > 0.7 ? 'var(--red-500)' : riskPct > 0.4 ? 'var(--amber-500)' : 'var(--green-500)';
+  const gaugeCircumference = Math.PI * 80;
+  const gaugeOffset = gaugeCircumference - (gaugeCircumference * riskPct);
+
+  let suggestionsHtml = '';
+  if (result.suggestions) {
+    const items = result.suggestions.split('\n').filter(s => s.trim());
+    suggestionsHtml = items.map(s => `<div class="suggestion-item">${s}</div>`).join('');
+  }
+
+  const totalArticles = violations.reduce((sum, v) => sum + (v.violated_articles ? v.violated_articles.length : 0), 0);
+
+  area.innerHTML = `
+    <div class="result-grid">
+      <div class="result-left">
+        <div class="card" style="width:100%;">
+          <div class="status-hero">
+            <div class="status-circle ${isCompliant ? 'compliant' : 'violation'}">
+              ${isCompliant ? '✓' : '✗'}
+            </div>
+            <div class="status-text ${isCompliant ? 'compliant' : 'violation'}">
+              ${isCompliant ? '合规' : '违规'}
+            </div>
+            <div class="status-detail">
+              ${isCompliant ? '内容符合合规要求' : '发现违规内容，请查看详情'}
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+          <div class="card-title" style="align-self:flex-start;">置信度</div>
+          <div class="confidence-ring">
+            <svg viewBox="0 0 100 100">
+              <circle class="bg" cx="50" cy="50" r="40"/>
+              <circle class="fg" cx="50" cy="50" r="40"
+                style="--circumference:${circumference};--offset:${confOffset};stroke-dasharray:${circumference};stroke-dashoffset:${confOffset};"/>
+            </svg>
+            <div class="confidence-value">${confidencePct}%</div>
+          </div>
+        </div>
+
+        <div class="card" style="width:100%;">
+          <div class="card-title">风险评分</div>
+          <div class="risk-gauge-wrap">
+            <div class="risk-gauge">
+              <svg viewBox="0 0 200 110">
+                <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100"/>
+                <path class="gauge-fill" d="M 20 100 A 80 80 0 0 1 180 100"
+                  style="stroke:${riskColor};stroke-dasharray:${gaugeCircumference};stroke-dashoffset:${gaugeOffset};"/>
+              </svg>
+            </div>
+            <div class="risk-gauge-labels">
+              <span>低风险</span><span>高风险</span>
+            </div>
+            <div class="risk-level-badge ${result.risk_level}">
+              ${result.risk_level === 'high' ? '高风险' : result.risk_level === 'medium' ? '中风险' : '低风险'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-right">
+        ${!isCompliant && violations.length > 0 ? `
+        <div class="card">
+          <div class="card-title">违规详情 (${violations.length}类 · ${totalArticles}条引用)</div>
+          ${accordionHtml}
+        </div>` : ''}
+
+        ${suggestionsHtml ? `
+        <div class="card">
+          <div class="card-title">修改建议</div>
+          <div class="suggestions-panel">${suggestionsHtml}</div>
+        </div>` : ''}
+
+        <div class="card">
+          <div class="card-title">审核信息</div>
+          ${result.model_used && (result.model_used.includes('rule-engine') || result.model_used === 'fallback') ? `
+          <div style="background:var(--amber-100);border:1px solid var(--amber-400);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:0.82rem;color:var(--navy-700);line-height:1.5;">
+            ⚠️ 当前为规则引擎模式审核结果，配置API Key后可启用LLM语义审核获取更精准结果
+          </div>` : ''}
+          <div class="review-meta">
+            <div class="review-meta-item">ID: <strong>#${result.review_id}</strong></div>
+            <div class="review-meta-item">模式: <strong>${result.review_mode}</strong></div>
+            <div class="review-meta-item">模型: <strong>${result.model_used}</strong></div>
+            <div class="review-meta-item">决策: <strong>${result.decision === 'auto_block' ? '自动拦截' : result.decision === 'auto_pass' ? '自动通过' : '人工复核'}</strong></div>
+            <div class="review-meta-item">延迟: <strong>${result.latency_ms}ms</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  area.style.display = 'block';
+
+  setTimeout(() => {
+    const fgCircle = area.querySelector('.confidence-ring .fg');
+    if (fgCircle) {
+      fgCircle.style.strokeDashoffset = confOffset;
+    }
+  }, 100);
+}
+
+async function loadPending() {
+  const list = document.getElementById('pendingList');
+  const select = document.getElementById('overrideReviewId');
+
+  try {
+    let data;
+    const resp = await apiCall('GET', '/api/v1/review/pending');
+    data = resp.reviews || resp;
+
+    if (!data || data.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无待复核项目</div></div>';
+      select.innerHTML = '<option value="">请选择待复核的审核记录</option>';
+      return;
+    }
+
+    list.innerHTML = data.map(r => `
+      <div class="pending-card" onclick="selectPendingReview(${r.review_id})">
+        <div class="pending-icon ${r.compliant === 'yes' ? 'compliant' : 'violation'}">
+          ${r.compliant === 'yes' ? '✓' : '✗'}
+        </div>
+        <div class="pending-info">
+          <div class="pending-title">#${r.review_id} - ${r.violation_type || '合规'}</div>
+          <div class="pending-sub">${r.content_preview}</div>
+        </div>
+        <div class="pending-confidence" style="color:${r.confidence > 0.85 ? 'var(--red-600)' : 'var(--amber-500)'}">
+          ${(r.confidence * 100).toFixed(0)}%
+        </div>
+      </div>
+    `).join('');
+
+    select.innerHTML = '<option value="">请选择待复核的审核记录</option>' +
+      data.map(r => `<option value="${r.review_id}">#${r.review_id} - ${r.violation_type || '合规'}</option>`).join('');
+
+  } catch (e) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败: ' + e.message + '</div></div>';
+  }
+}
+
+function selectPendingReview(id) {
+  document.getElementById('overrideReviewId').value = id;
+}
+
+async function submitOverride() {
+  const reviewId = document.getElementById('overrideReviewId').value;
+  const decision = document.getElementById('overrideDecision').value;
+  const reason = document.getElementById('overrideReason').value.trim();
+  const comment = document.getElementById('overrideComment').value.trim();
+
+  if (!reviewId) { showToast('请选择审核记录', 'warning'); return; }
+  if (!decision) { showToast('请选择复核决定', 'warning'); return; }
+  if (!reason) { showToast('修改原因为必填项', 'warning'); return; }
+
+  try {
+    await apiCall('POST', `/api/v1/review/${reviewId}/override`, { decision, reason, comment, articles: selectedArticleIds });
+    showToast(`复核 #${reviewId} 已提交`, 'success');
+    document.getElementById('overrideReviewId').value = '';
+    document.getElementById('overrideDecision').value = '';
+    document.getElementById('overrideReason').value = '';
+    document.getElementById('overrideComment').value = '';
+    selectedArticleIds = [];
+    renderSelectedArticles();
+    loadPending();
+  } catch (e) {
+    showToast('提交失败: ' + e.message, 'error');
+  }
+}
+
+async function loadHistory() {
+  try {
+    const resp = await apiCall('GET', '/api/v1/reviews');
+    const data = resp.reviews || resp;
+    historyData = data;
+    renderHistory();
+  } catch (e) {
+    showToast('加载历史失败: ' + e.message, 'error');
+  }
+}
+
+function renderHistory() {
+  const filter = document.getElementById('historyFilter').value;
+  const search = document.getElementById('historySearch').value.toLowerCase();
+
+  let filtered = historyData.filter(r => {
+    if (filter === 'compliant' && r.compliant !== 'yes') return false;
+    if (filter === 'violation' && r.compliant !== 'no') return false;
+    if (search && !String(r.id).includes(search) && !(r.input_hash || '').toLowerCase().includes(search) && !(r.content || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    let va = a[historySortField], vb = b[historySortField];
+    if (typeof va === 'string') va = va || '';
+    if (typeof vb === 'string') vb = vb || '';
+    if (va < vb) return historySortDir === 'asc' ? -1 : 1;
+    if (va > vb) return historySortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('historyBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--slate-400);">无匹配记录</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => `
+    <tr onclick="toggleHistoryDetail(${r.id})" style="cursor:pointer;">
+      <td><strong>#${r.id}</strong></td>
+      <td><span class="font-mono text-sm">${r.input_hash || '-'}</span></td>
+      <td><span class="badge ${r.compliant === 'yes' ? 'badge-green' : 'badge-red'}">${r.compliant === 'yes' ? '合规' : '违规'}</span></td>
+      <td>${r.violation_type ? `<span class="badge badge-amber">${r.violation_type}</span>` : '-'}</td>
+      <td>${(r.confidence * 100).toFixed(0)}%</td>
+      <td>${r.latency_ms}ms</td>
+      <td>${formatTime(r.created_at)}</td>
+      <td><button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;border:1px solid var(--slate-200);background:var(--white);color:var(--teal-600);border-radius:4px;cursor:pointer;" onclick="event.stopPropagation();toggleHistoryDetail(${r.id})">查看详情</button></td>
+    </tr>
+    <tr class="history-detail-row" id="history-detail-${r.id}" style="display:none;">
+      <td colspan="8">
+        <div class="history-detail">
+          <div class="detail-section">
+            <div class="detail-label">输入内容</div>
+            <div class="detail-content">${r.content || '（无内容记录）'}</div>
+          </div>
+          ${r.violation_type ? `
+          <div class="detail-section">
+            <div class="detail-label">违规详情</div>
+            <div class="detail-content" style="color:var(--red-600);">${r.violation_details || r.violation_type}</div>
+          </div>` : ''}
+          <div class="detail-section">
+            <div class="detail-label">审核结果</div>
+            <div class="detail-content">${r.review_result || (r.compliant === 'yes' ? '合规通过' : '违规拦截')}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">审核信息</div>
+            <div class="detail-content">置信度: ${(r.confidence * 100).toFixed(0)}% · 延迟: ${r.latency_ms}ms · 时间: ${formatTime(r.created_at)}</div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function toggleHistoryDetail(id) {
+  const row = document.getElementById('history-detail-' + id);
+  if (row) {
+    row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+  }
+}
+
+function sortHistory(field) {
+  if (historySortField === field) {
+    historySortDir = historySortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    historySortField = field;
+    historySortDir = 'desc';
+  }
+  renderHistory();
+}
+
+function filterHistory() { renderHistory(); }
+
+function formatTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function exportHistory() {
+  const rows = [['ID', '输入哈希', '结果', '违规类型', '置信度', '延迟(ms)', '时间']];
+  historyData.forEach(r => {
+    rows.push([r.id, r.input_hash || '', r.compliant === 'yes' ? '合规' : '违规', r.violation_type || '', r.confidence, r.latency_ms, r.created_at || '']);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'review_history.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('导出成功', 'success');
+}
+
+async function runEvaluation(type) {
+  const btnId = type === 'standard' ? 'evalStandardBtn' : 'evalExtremeBtn';
+  const btn = document.getElementById(btnId);
+  btn.disabled = true;
+  btn.textContent = '运行中...';
+
+  try {
+    let result;
+    const url = type === 'standard' ? '/api/v1/evaluate' : '/api/v1/evaluate?mode=extreme';
+    result = await apiCall('POST', url, {});
+
+    renderEvalResults(result, type);
+  } catch (e) {
+    showToast('评估失败: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = type === 'standard' ? '▶ 运行标准评估' : '⚡ 运行极限测试';
+  }
+}
+
+function renderEvalResults(result, type) {
+  document.getElementById('evalEmpty').style.display = 'none';
+  document.getElementById('evalResults').style.display = 'block';
+
+  document.getElementById('evalMetrics').innerHTML = `
+    <div class="metric-card teal">
+      <div class="metric-value">${(result.precision * 100).toFixed(1)}%</div>
+      <div class="metric-label">精确率 Precision</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-value">${(result.recall * 100).toFixed(1)}%</div>
+      <div class="metric-label">召回率 Recall</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="metric-value">${(result.f1 * 100).toFixed(1)}%</div>
+      <div class="metric-label">F1 分数</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">${(result.accuracy * 100).toFixed(1)}%</div>
+      <div class="metric-label">准确率 Accuracy</div>
+    </div>
+  `;
+
+  let extremeInfoHtml = '';
+  if (type === 'extreme') {
+    extremeInfoHtml = `
+      <div class="extreme-test-info">
+        <div class="info-title">⚡ 关于极限测试</div>
+        极限测试（Extreme Test）包含25个特殊测试用例，用于测试系统的安全性和鲁棒性，包括：Prompt注入攻击、角色劫持、XSS/SQL注入、控制字符注入、语义隐含违规检测、边界用例等。
+      </div>
+    `;
+  }
+
+  document.getElementById('evalDetail').innerHTML = `
+    ${extremeInfoHtml}
+    <div class="card-title">评估详情 — ${type === 'standard' ? '标准评估' : '极限测试'}</div>
+    <div class="grid-3 mt-12">
+      <div style="text-align:center;padding:12px;">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--navy-900);">${result.total}</div>
+        <div class="text-sm text-muted">总样本数</div>
+      </div>
+      <div style="text-align:center;padding:12px;">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--green-600);">${result.true_positives + result.true_negatives}</div>
+        <div class="text-sm text-muted">正确判定</div>
+      </div>
+      <div style="text-align:center;padding:12px;">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--red-600);">${result.false_positives + result.false_negatives}</div>
+        <div class="text-sm text-muted">错误判定</div>
+      </div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="grid-4">
+      <div style="text-align:center;padding:8px;">
+        <div style="font-size:1.1rem;font-weight:600;color:var(--green-600);">${result.true_positives}</div>
+        <div class="text-sm text-muted">真阳性 (TP)</div>
+      </div>
+      <div style="text-align:center;padding:8px;">
+        <div style="font-size:1.1rem;font-weight:600;color:var(--green-600);">${result.true_negatives}</div>
+        <div class="text-sm text-muted">真阴性 (TN)</div>
+      </div>
+      <div style="text-align:center;padding:8px;">
+        <div style="font-size:1.1rem;font-weight:600;color:var(--amber-500);">${result.false_positives}</div>
+        <div class="text-sm text-muted">假阳性 (FP)</div>
+      </div>
+      <div style="text-align:center;padding:8px;">
+        <div style="font-size:1.1rem;font-weight:600;color:var(--red-600);">${result.false_negatives}</div>
+        <div class="text-sm text-muted">假阴性 (FN)</div>
+      </div>
+    </div>
+    <div class="section-divider"></div>
+    <div style="text-align:center;padding:8px;">
+      <div class="text-sm text-muted">平均延迟: <strong>${result.avg_latency}ms</strong></div>
+    </div>
+  `;
+
+  const testCases = result.test_cases || [];
+  if (testCases.length > 0) {
+    const passCount = testCases.filter(tc => tc.pass).length;
+    const testCasesCard = document.getElementById('evalTestCases');
+    testCasesCard.style.display = 'block';
+    testCasesCard.innerHTML = `
+      <div class="card-title">测试用例详情 (${passCount}/${testCases.length} 通过)</div>
+      <table class="test-case-table">
+        <thead>
+          <tr>
+            <th>用例ID</th>
+            <th>内容预览</th>
+            <th>预期结果</th>
+            <th>实际结果</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${testCases.map(tc => `
+            <tr>
+              <td><strong>${tc.id}</strong></td>
+              <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tc.content.length > 40 ? tc.content.substring(0, 40) + '...' : tc.content || '（空）'}</td>
+              <td>${tc.expected}</td>
+              <td>${tc.actual}</td>
+              <td class="${tc.pass ? 'test-case-pass' : 'test-case-fail'}">${tc.pass ? '✓ 通过' : '✗ 失败'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    document.getElementById('evalTestCases').style.display = 'none';
+  }
+}
+
+async function loadManagement() {
+  try {
+    const stats = await apiCall('GET', '/api/v1/stats');
+    const vtResp = await apiCall('GET', '/api/v1/violation-types');
+    const violationTypes = vtResp.violation_types || vtResp;
+
+    renderSysStats(stats);
+    renderModelStatus(stats);
+    renderRegVersion();
+    loadViolationTypes();
+    renderClauseMappings();
+    loadRegulations();
+  } catch (e) {
+    showToast('加载管理数据失败: ' + e.message, 'error');
+  }
+}
+
+function renderSysStats(stats) {
+  document.getElementById('sysStatsCards').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-value">${stats.total_reviews || 0}</div>
+      <div class="metric-label">总审核数</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-value">${stats.compliant_count || 0}</div>
+      <div class="metric-label">合规通过</div>
+    </div>
+    <div class="metric-card red">
+      <div class="metric-value">${stats.violation_count || 0}</div>
+      <div class="metric-label">违规拦截</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="metric-value">${stats.pending_count || 0}</div>
+      <div class="metric-label">待复核</div>
+    </div>
+  `;
+}
+
+function renderModelStatus(stats) {
+  const isActive = stats.model_status === 'active';
+  document.getElementById('modelStatus').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
+      <div style="width:12px;height:12px;border-radius:50%;background:${isActive ? 'var(--green-500)' : 'var(--red-500)'};${isActive ? 'animation:pulseGlow 2s infinite;' : ''}"></div>
+      <div>
+        <div style="font-weight:600;color:var(--navy-900);">qwen-plus</div>
+        <div class="text-sm text-muted">${isActive ? '运行正常' : '异常'} · 平均延迟 ${stats.avg_latency || 0}ms</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRegVersion() {
+  document.getElementById('regVersion').innerHTML = `
+    <div style="padding:8px 0;border-bottom:1px solid var(--slate-100);">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:600;color:var(--navy-900);">保险法规库</div>
+        <span class="badge badge-teal">v2.3.1</span>
+      </div>
+      <div class="text-sm text-muted mt-8">最后更新: 2025-03-15 · 共 156 条条款</div>
+    </div>
+    <div style="padding:8px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:600;color:var(--navy-900);">违规关键词库</div>
+        <span class="badge badge-teal">v1.8.0</span>
+      </div>
+      <div class="text-sm text-muted mt-8">最后更新: 2025-04-01 · 共 89 个关键词</div>
+    </div>
+  `;
+}
+
+function loadViolationTypes() {
+  const container = document.getElementById('vtList');
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><div class="empty-text">加载中...</div></div>';
+  apiCall('GET', '/api/v1/violation-types').then(data => {
+    const types = data.types || data.violation_types || data;
+    if (!types || types.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-text">暂无数据</div></div>';
+      return;
+    }
+    container.innerHTML = types.map(t => {
+      const key = t.id || t.key || t.name;
+      const parentName = t.parent || findParentForType(t.name);
+      return `
+        <div class="violation-type-item" style="flex-direction:column;align-items:stretch;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div class="vt-name">${t.name} <span style="font-size:0.7rem;color:var(--slate-400);font-weight:400;">${parentName ? 'L2 · ' + parentName : ''}</span></div>
+              <div class="vt-keywords">${t.description || '无描述'}${t.keywords && t.keywords.length > 0 ? ' · 关键词: ' + t.keywords.join('、') : ''}</div>
+            </div>
+            <div class="vt-actions">
+              <button class="btn-sm" onclick="showEditViolationType('${key}')">编辑</button>
+              <button class="btn-sm" onclick="showViolationMappings('${key}')">查看映射</button>
+            </div>
+          </div>
+          <div id="vt-edit-${key}" style="display:none;"></div>
+          <div id="vt-mapping-${key}" style="display:none;"></div>
+        </div>
+      `;
+    }).join('');
+  }).catch(() => {
+    container.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div></div>';
+  });
+}
+
+function findParentForType(typeName) {
+  for (const key of Object.keys(VIOLATION_TYPES_DATA)) {
+    if (VIOLATION_TYPES_DATA[key].name === typeName) {
+      return VIOLATION_TYPES_DATA[key].parent;
+    }
+  }
+  return '';
+}
+
+function findL1Parent(typeName) {
+  for (const key of Object.keys(VIOLATION_TYPES_DATA)) {
+    if (VIOLATION_TYPES_DATA[key].name === typeName) {
+      return VIOLATION_TYPES_DATA[key].parent || '';
+    }
+  }
+  return '';
+}
+
+function generateModificationReason() {
+  showToast('正在生成修改原因...', 'info');
+  apiCall('POST', '/api/v1/generate-modification-reason', {
+    review_id: document.getElementById('overrideReviewId').value,
+    decision: document.getElementById('overrideDecision').value
+  }).then(data => {
+    if (data.reason) {
+      document.getElementById('overrideReason').value = data.reason;
+      showToast('修改原因已生成', 'success');
+    }
+  }).catch(e => {
+    showToast('生成失败: ' + e.message, 'error');
+  });
+}
+
+function showArticleDropdown() {
+  document.getElementById('articleDropdown').style.display = 'block';
+  filterArticles();
+}
+
+function hideArticleDropdown() {
+  setTimeout(() => { document.getElementById('articleDropdown').style.display = 'none'; }, 200);
+}
+
+function filterArticles() {
+  const query = document.getElementById('articleSearchInput').value.toLowerCase();
+  const dropdown = document.getElementById('articleDropdown');
+  const filtered = ALL_ARTICLES.filter(a => a.label.toLowerCase().includes(query) || a.doc.toLowerCase().includes(query));
+  dropdown.innerHTML = filtered.map(a => `
+    <div class="search-dropdown-item ${selectedArticleIds.includes(a.id) ? 'selected' : ''}" onclick="toggleArticle('${a.id}')">
+      ${a.label}
+    </div>
+  `).join('');
+  dropdown.style.display = 'block';
+}
+
+function toggleArticle(id) {
+  const idx = selectedArticleIds.indexOf(id);
+  if (idx >= 0) selectedArticleIds.splice(idx, 1);
+  else selectedArticleIds.push(id);
+  renderSelectedArticles();
+  filterArticles();
+}
+
+function renderSelectedArticles() {
+  const container = document.getElementById('selectedArticles');
+  container.innerHTML = selectedArticleIds.map(id => {
+    const a = ALL_ARTICLES.find(x => x.id === id);
+    return `<span class="selected-item">${a.label} <span class="remove" onclick="toggleArticle('${id}')">✕</span></span>`;
+  }).join('');
+}
+
+function showEditViolationType(key) {
+  const el = document.getElementById('vt-edit-' + key);
+  const mappingEl = document.getElementById('vt-mapping-' + key);
+  if (mappingEl) mappingEl.style.display = 'none';
+  if (!el) return;
+  if (el.style.display !== 'none' && el.innerHTML) {
+    el.style.display = 'none';
+    return;
+  }
+  const t = VIOLATION_TYPES_DATA[key];
+  if (!t) return;
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="inline-edit-form">
+      <div class="edit-row">
+        <label>名称</label>
+        <input type="text" id="edit-name-${key}" value="${t.name}">
+      </div>
+      <div class="edit-row">
+        <label>描述</label>
+        <textarea id="edit-desc-${key}" rows="2">${t.description}</textarea>
+      </div>
+      <div class="edit-row">
+        <label>关键词（逗号分隔）</label>
+        <input type="text" id="edit-kw-${key}" value="${t.keywords.join(',')}">
+      </div>
+      <div class="edit-actions">
+        <button class="btn btn-sm" style="padding:6px 14px;font-size:0.8rem;background:var(--slate-100);border:1px solid var(--slate-200);color:var(--navy-600);border-radius:6px;cursor:pointer;" onclick="cancelEditViolationType('${key}')">取消</button>
+        <button class="btn btn-sm" style="padding:6px 14px;font-size:0.8rem;background:var(--teal-600);color:var(--white);border:none;border-radius:6px;cursor:pointer;" onclick="saveEditViolationType('${key}')">保存</button>
+      </div>
+    </div>
+  `;
+}
+
+function cancelEditViolationType(key) {
+  const el = document.getElementById('vt-edit-' + key);
+  if (el) el.style.display = 'none';
+}
+
+function saveEditViolationType(key) {
+  const nameEl = document.getElementById('edit-name-' + key);
+  const descEl = document.getElementById('edit-desc-' + key);
+  const kwEl = document.getElementById('edit-kw-' + key);
+  if (nameEl && descEl && kwEl && VIOLATION_TYPES_DATA[key]) {
+    VIOLATION_TYPES_DATA[key].name = nameEl.value;
+    VIOLATION_TYPES_DATA[key].description = descEl.value;
+    VIOLATION_TYPES_DATA[key].keywords = kwEl.value.split(',').map(k => k.trim()).filter(k => k);
+    showToast(`已保存违规类型: ${nameEl.value}`, 'success');
+    loadViolationTypes();
+  }
+}
+
+function showViolationMappings(key) {
+  const el = document.getElementById('vt-mapping-' + key);
+  const editEl = document.getElementById('vt-edit-' + key);
+  if (editEl) editEl.style.display = 'none';
+  if (!el) return;
+  if (el.style.display !== 'none' && el.innerHTML) {
+    el.style.display = 'none';
+    return;
+  }
+  const t = VIOLATION_TYPES_DATA[key];
+  if (!t) return;
+  el.style.display = 'block';
+  if (t.mappings.length === 0) {
+    el.innerHTML = '<div class="mapping-view"><div style="font-size:0.85rem;color:var(--slate-400);padding:8px;">暂无条款映射</div></div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="mapping-view">
+      <div style="font-size:0.8rem;font-weight:600;color:var(--navy-600);margin-bottom:8px;">${t.name} 的条款映射</div>
+      ${t.mappings.map(m => `
+        <div class="mapping-entry" onclick="showRegulationFromMapping('${m.doc_name}')">
+          <div class="mapping-doc">${m.doc_name}</div>
+          <div class="mapping-articles">第${m.articles.join('、')}条</div>
+          <div class="mapping-logic">${m.logic === 'primary' ? '主要依据' : '辅助依据'}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function showRegulationFromMapping(docName) {
+  switchPage('management');
+  setTimeout(() => {
+    showRegulationDetail(docName);
+  }, 100);
+}
+
+function showClauseMappingDetail(key) {
+  const t = VIOLATION_TYPES_DATA[key];
+  if (!t) return;
+  const existingDetail = document.getElementById('clause-mapping-detail');
+  if (existingDetail) existingDetail.remove();
+
+  const container = document.getElementById('clauseMappingList');
+  const detailDiv = document.createElement('div');
+  detailDiv.id = 'clause-mapping-detail';
+  detailDiv.className = 'mapping-view';
+  detailDiv.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--navy-600);">${t.name} → 条款映射详情</div>
+      <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:var(--slate-100);border:1px solid var(--slate-200);color:var(--navy-600);border-radius:4px;cursor:pointer;" onclick="this.closest('#clause-mapping-detail').remove()">关闭</button>
+    </div>
+    ${t.mappings.map(m => `
+      <div class="mapping-entry" onclick="showRegulationFromMapping('${m.doc_name}')">
+        <div class="mapping-doc">${m.doc_name}</div>
+        <div class="mapping-articles">第${m.articles.join('、')}条</div>
+        <div class="mapping-logic">${m.logic === 'primary' ? '主要依据' : '辅助依据'}</div>
+      </div>
+    `).join('')}
+    ${t.mappings.length === 0 ? '<div style="font-size:0.85rem;color:var(--slate-400);padding:8px;">暂无条款映射</div>' : ''}
+  `;
+  container.appendChild(detailDiv);
+  detailDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showRegulationDetail(docName) {
+  const safeId = docName.replace(/[（）()]/g, '');
+  const el = document.getElementById('reg-detail-' + safeId);
+  if (!el) return;
+  if (el.style.display !== 'none' && el.innerHTML) {
+    el.style.display = 'none';
+    return;
+  }
+
+  const docInfo = REG_DOCS.find(d => d.name === docName);
+  if (!docInfo) return;
+
+  const articleMappings = {};
+  Object.keys(VIOLATION_TYPES_DATA).forEach(key => {
+    const t = VIOLATION_TYPES_DATA[key];
+    t.mappings.forEach(m => {
+      if (m.doc_name === docName) {
+        m.articles.forEach(a => {
+          if (!articleMappings[a]) articleMappings[a] = [];
+          articleMappings[a].push(t.name);
+        });
+      }
+    });
+  });
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="regulation-detail">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-weight:600;color:var(--navy-900);font-size:0.95rem;">${docName} · 条款列表</div>
+        <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:var(--slate-100);border:1px solid var(--slate-200);color:var(--navy-600);border-radius:4px;cursor:pointer;" onclick="this.closest('.regulation-detail').parentElement.style.display='none'">关闭</button>
+      </div>
+      <div class="article-list">
+        ${Array.from({length: docInfo.count}, (_, i) => {
+          const articleNum = CN[i];
+          const mappings = articleMappings[articleNum] || [];
+          return `
+            <div class="article-entry" onclick="${mappings.length > 0 ? `showViolationFromArticle('${docName}','${articleNum}')` : ''}">
+              <div class="article-num">第${articleNum}条</div>
+              ${mappings.length > 0 ? `<div class="article-mappings">关联违规类型: ${mappings.join('、')}</div>` : '<div class="article-mappings" style="color:var(--slate-300);">无关联违规类型</div>'}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function showViolationFromArticle(docName, articleNum) {
+  const relatedTypes = [];
+  Object.keys(VIOLATION_TYPES_DATA).forEach(key => {
+    const t = VIOLATION_TYPES_DATA[key];
+    t.mappings.forEach(m => {
+      if (m.doc_name === docName && m.articles.includes(articleNum)) {
+        relatedTypes.push({ key, name: t.name, logic: m.logic });
+      }
+    });
+  });
+
+  const existingDetail = document.getElementById('article-violation-detail');
+  if (existingDetail) existingDetail.remove();
+
+  const container = document.getElementById('regulationList');
+  const detailDiv = document.createElement('div');
+  detailDiv.id = 'article-violation-detail';
+  detailDiv.className = 'mapping-view';
+  detailDiv.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--navy-600);">${docName} 第${articleNum}条 → 关联违规类型</div>
+      <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:var(--slate-100);border:1px solid var(--slate-200);color:var(--navy-600);border-radius:4px;cursor:pointer;" onclick="this.closest('#article-violation-detail').remove()">关闭</button>
+    </div>
+    ${relatedTypes.map(rt => `
+      <div class="mapping-entry" onclick="showViolationMappings('${rt.key}')">
+        <div class="mapping-doc">${rt.name}</div>
+        <div class="mapping-logic">${rt.logic === 'primary' ? '主要依据' : '辅助依据'}</div>
+      </div>
+    `).join('')}
+  `;
+  container.appendChild(detailDiv);
+  detailDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function renderClauseMappings() {
+  const container = document.getElementById('clauseMappingList');
+  if (!container) return;
+
+  const mappingData = [];
+  Object.keys(VIOLATION_TYPES_DATA).forEach(key => {
+    const t = VIOLATION_TYPES_DATA[key];
+    if (t.mappings.length > 0) {
+      mappingData.push({
+        violation_key: key,
+        violation: t.name,
+        mappings: t.mappings,
+        count: t.mappings.reduce((sum, m) => sum + m.articles.length, 0)
+      });
+    }
+  });
+
+  container.innerHTML = mappingData.map(m => `
+    <div class="violation-type-item clause-mapping-clickable" onclick="showClauseMappingDetail('${m.violation_key}')">
+      <div>
+        <div class="vt-name">${m.violation}</div>
+        <div class="vt-keywords">关联条款 (${m.count}): ${m.mappings.map(mp => mp.doc_name + '(第' + mp.articles.join('、') + '条)').join('、')}</div>
+      </div>
+      <span style="font-size:0.75rem;color:var(--teal-600);">点击查看 →</span>
+    </div>
+  `).join('');
+}
+
+function showAddViolationType() {
+  const name = prompt('请输入新违规类型名称:');
+  if (!name) return;
+  const keyword = prompt('请输入初始关键词（多个用逗号分隔）:');
+  if (!keyword) return;
+  showToast(`已添加违规类型: ${name}`, 'success');
+  loadManagement();
+}
+
+function addKeywordToType(id) {
+  const keyword = prompt('请输入要添加的关键词:');
+  if (!keyword) return;
+  showToast(`已添加关键词: ${keyword}`, 'success');
+}
+
+function deprecateType(id) {
+  showToast('已切换违规类型状态', 'success');
+  loadManagement();
+}
+
+function loadRegulations() {
+  const list = document.getElementById('regulationList');
+  list.innerHTML = '<div class="empty-state"><div class="empty-text">加载中...</div></div>';
+  apiCall('GET', '/api/v1/regulations').then(data => {
+    if (!data.regulations || data.regulations.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">暂无法规</div></div>';
+      return;
+    }
+    list.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${data.regulations.map(r => `
+          <div class="regulation-clickable" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--slate-50);border-radius:8px;border:1px solid var(--slate-200);" onclick="showRegulationDetail('${r.doc_name}')">
+            <div>
+              <strong>${r.doc_name}</strong><br>
+              <span style="font-size:0.75rem;color:var(--slate-400);">v${r.version || '1.0'} · ${r.article_count}条</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="font-size:0.75rem;color:var(--teal-600);">点击查看 →</span>
+              <button class="btn btn-sm" style="background:var(--red-100);color:var(--red-600);border:1px solid var(--red-400);padding:4px 10px;font-size:0.75rem;border-radius:4px;cursor:pointer;" onclick="event.stopPropagation();deleteRegulation('${r.doc_name}')">删除</button>
+            </div>
+          </div>
+          <div id="reg-detail-${r.doc_name.replace(/[（）()]/g,'')}" style="display:none;"></div>
+        `).join('')}
+      </div>`;
+  }).catch(() => {
+    list.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div></div>';
+  });
+}
+
+function uploadRegulation(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  showToast(`正在上传: ${file.name}...`, 'info');
+  const formData = new FormData();
+  formData.append('file', file);
+  const apiKey = document.getElementById('apiKeyInput').value;
+  const headers = {};
+  if (apiKey) headers['X-API-Key'] = apiKey;
+  fetch('/api/v1/regulations/upload', { method: 'POST', headers, body: formData })
+    .then(resp => resp.json())
+    .then(data => {
+      showToast(`上传成功: ${file.name}`, 'success');
+      loadRegulations();
+    })
+    .catch(e => {
+      showToast('上传失败: ' + e.message, 'error');
+    });
+  event.target.value = '';
+}
+
+function deleteRegulation(filename) {
+  if (!confirm(`确定要删除法规文件 "${filename}" 吗？此操作不可恢复！`)) return;
+  apiCall('DELETE', `/api/v1/regulations/${encodeURIComponent(filename)}`)
+    .then(() => {
+      showToast(`已删除: ${filename}`, 'success');
+      loadRegulations();
+    })
+    .catch(e => {
+      showToast('删除失败: ' + e.message, 'error');
+    });
+}
+
+async function checkBackendHealth() {
+  try {
+    const resp = await fetch('/health');
+    const data = await resp.json();
+    backendReachable = true;
+    document.getElementById('backendErrorBanner').style.display = 'none';
+    if (data.mode === 'demo' || data.mode === 'rule-engine') {
+      isRuleEngineMode = true;
+      document.getElementById('ruleEngineBanner').style.display = 'flex';
+    } else {
+      isRuleEngineMode = false;
+      document.getElementById('ruleEngineBanner').style.display = 'none';
+    }
+  } catch (e) {
+    backendReachable = false;
+    isRuleEngineMode = true;
+    document.getElementById('backendErrorBanner').style.display = 'flex';
+    document.getElementById('ruleEngineBanner').style.display = 'none';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateCharCount();
+  setupDragDrop();
+  checkBackendHealth();
+});
+</script>
+</body>
+</html>

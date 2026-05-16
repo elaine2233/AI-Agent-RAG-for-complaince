@@ -58,3 +58,17 @@ RISK_HUMAN_REVIEW_MAX = float(os.getenv("RISK_HUMAN_REVIEW_MAX", "0.7"))
 EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "qwen-turbo")
 REASON_MODEL = os.getenv("REASON_MODEL", "qwen-plus")
 CROSSCHECK_MODEL = os.getenv("CROSSCHECK_MODEL", "qwen-turbo")
+
+LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.8"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+LLM_RETRY_MAX = int(os.getenv("LLM_RETRY_MAX", "1"))
+LLM_RETRY_DELAY = float(os.getenv("LLM_RETRY_DELAY", "1.0"))
+
+RERANKER_TOP_K = int(os.getenv("RERANKER_TOP_K", "5"))
+RERANKER_ADJACENT_SCORE_FACTOR = float(os.getenv("RERANKER_ADJACENT_SCORE_FACTOR", "0.7"))
+RERANKER_RETRY_MAX = int(os.getenv("RERANKER_RETRY_MAX", "3"))
+RERANKER_RETRY_DELAY = float(os.getenv("RERANKER_RETRY_DELAY", "1.0"))
+
+EMBEDDING_DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "1024"))
+EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "25"))

@@ -302,6 +302,91 @@ class DocxParser(DocumentParser):
         )
 
 
+class DocParser(DocumentParser):
+    def supported_formats(self) -> List[DocumentFormat]:
+        return [DocumentFormat.DOC]
+
+    def can_parse(self, source: str) -> bool:
+        return source.lower().endswith(".doc") and not source.lower().endswith(".docx")
+
+    def parse(self, source: str, **kwargs) -> ParsedDocument:
+        docx_path = self._convert_to_docx(source)
+        if docx_path:
+            docx_parser = DocxParser()
+            result = docx_parser.parse(docx_path, **kwargs)
+            result.source_format = DocumentFormat.DOC
+            result.source_path = source
+            try:
+                os.remove(docx_path)
+            except:
+                pass
+            return result
+        else:
+            logger.warning(f"无法转换.doc文件，尝试直接读取: {source}")
+            raw_text = self._fallback_read(source)
+            title = os.path.splitext(os.path.basename(source))[0]
+            sections = TxtParser()._split_sections(raw_text) if raw_text else []
+            return ParsedDocument(
+                source_path=source,
+                source_format=DocumentFormat.DOC,
+                title=title,
+                raw_text=raw_text,
+                sections=sections,
+            )
+
+    def _convert_to_docx(self, source: str) -> Optional[str]:
+        import subprocess
+        import tempfile
+        output_dir = tempfile.mkdtemp()
+        try:
+            result = subprocess.run(
+                ["libreoffice", "--headless", "--convert-to", "docx", "--outdir", output_dir, source],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                basename = os.path.splitext(os.path.basename(source))[0]
+                docx_path = os.path.join(output_dir, f"{basename}.docx")
+                if os.path.exists(docx_path):
+                    return docx_path
+        except FileNotFoundError:
+            logger.warning("LibreOffice未安装，尝试antiword")
+            return self._convert_with_antiword(source, output_dir)
+        except subprocess.TimeoutExpired:
+            logger.warning("LibreOffice转换超时")
+        except Exception as e:
+            logger.warning(f"LibreOffice转换失败: {e}")
+        return None
+
+    def _convert_with_antiword(self, source: str, output_dir: str) -> Optional[str]:
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["antiword", source],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                txt_path = os.path.join(output_dir, "converted.txt")
+                with open(txt_path, "w", encoding="utf-8") as f:
+                    f.write(result.stdout)
+                return txt_path
+        except FileNotFoundError:
+            logger.warning("antiword未安装")
+        except Exception as e:
+            logger.warning(f"antiword转换失败: {e}")
+        return None
+
+    def _fallback_read(self, source: str) -> str:
+        try:
+            with open(source, "rb") as f:
+                content = f.read()
+            text = content.decode("utf-8", errors="ignore")
+            text = re.sub(r'[^\u4e00-\u9fff\u3000-\u303f\uff00-\uffefa-zA-Z0-9\s。，、；：？！""''（）【】《》—…·\n\r-]', '', text)
+            return text.strip()
+        except Exception as e:
+            logger.error(f"无法读取.doc文件: {e}")
+            return ""
+
+
 class ImageParser(DocumentParser):
     def supported_formats(self) -> List[DocumentFormat]:
         return [DocumentFormat.IMAGE]
@@ -376,6 +461,7 @@ class DocumentParserRegistry:
         self.register(MdParser())
         self.register(PdfParser())
         self.register(DocxParser())
+        self.register(DocParser())
         self.register(ImageParser())
 
     def register(self, parser: DocumentParser):

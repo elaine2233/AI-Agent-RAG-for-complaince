@@ -28,8 +28,9 @@ class ViolationType:
     suggestions: str
     is_system: bool
     status: str
-    created_at: str
-    updated_at: str
+    source: str = "regulation"
+    created_at: str = ""
+    updated_at: str = ""
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -73,60 +74,65 @@ _DEFAULT_L1_TYPES = [
         "name": "虚假宣传",
         "level": 1,
         "parent_id": None,
-        "severity": 0.8,
+        "severity": 1.0,
         "description": "使用虚假、误导性信息进行保险营销宣传",
         "keywords": [],
         "suggestions": "删除虚假或误导性表述，确保宣传内容真实准确",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "qualification_violation",
         "name": "资质违规",
         "level": 1,
         "parent_id": None,
-        "severity": 0.7,
+        "severity": 1.0,
         "description": "涉及销售资质、代言资质等方面的违规",
         "keywords": [],
         "suggestions": "确保销售和代言人员具备相应资质",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "sales_misconduct",
         "name": "销售行为违规",
         "level": 1,
         "parent_id": None,
-        "severity": 0.7,
+        "severity": 1.0,
         "description": "销售过程中的违规行为，如诱导、强制等",
         "keywords": [],
         "suggestions": "规范销售行为，不得诱导或强制购买",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "info_disclosure",
         "name": "信息披露违规",
         "level": 1,
         "parent_id": None,
-        "severity": 0.6,
+        "severity": 1.0,
         "description": "未按规定披露产品信息、风险提示等",
         "keywords": [],
         "suggestions": "完整披露产品信息和风险提示",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "info_protection",
         "name": "信息保护违规",
         "level": 1,
         "parent_id": None,
-        "severity": 0.5,
+        "severity": 1.0,
         "description": "涉及客户个人信息保护的违规",
         "keywords": [],
         "suggestions": "遵守个人信息保护相关规定",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
 ]
 
@@ -136,141 +142,288 @@ _DEFAULT_L2_TYPES = [
         "name": "绝对化用语",
         "level": 2,
         "parent_id": "false_publicity",
-        "severity": 0.9,
+        "severity": 1.0,
         "description": "使用绝对化、确定性用语进行保险营销宣传",
         "keywords": ["稳赚不赔", "保本保息", "无风险", "零风险", "绝对安全", "100%保本", "100%安全"],
         "suggestions": "删除绝对化用语，替换为合规表述",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "return_promise",
         "name": "收益承诺",
         "level": 2,
         "parent_id": "false_publicity",
-        "severity": 0.9,
+        "severity": 1.0,
         "description": "对不确定利益作保证性承诺",
         "keywords": ["保证收益", "保证赚钱", "承诺收益", "收益确定", "确定收益", "保证利率", "保证回报"],
         "suggestions": "不得对不确定利益作保证性承诺",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "exaggerated_return",
         "name": "夸大收益",
         "level": 2,
         "parent_id": "false_publicity",
-        "severity": 0.8,
+        "severity": 1.0,
         "description": "夸大保险产品收益或回报",
         "keywords": ["年化收益", "收益率高达", "收益高达", "回报率"],
         "suggestions": "不得夸大产品收益",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "product_confusion",
         "name": "产品混淆",
         "level": 2,
         "parent_id": "false_publicity",
-        "severity": 0.8,
+        "severity": 1.0,
         "description": "将保险产品与其他金融产品混淆",
         "keywords": ["存款", "存钱", "理财", "基金", "比银行", "比存款"],
         "suggestions": "明确标注为保险产品，不得与存款/理财混淆",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "unauthorized_endorsement",
         "name": "无资质代言",
         "level": 2,
         "parent_id": "qualification_violation",
-        "severity": 0.7,
+        "severity": 1.0,
         "description": "利用无资质公众人物或专业人士代言推荐",
         "keywords": ["明星", "影星", "网红", "主播", "代言", "倾情推荐"],
         "suggestions": "不得利用无资质公众人物代言",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "inducement_sales",
         "name": "诱导销售",
         "level": 2,
         "parent_id": "sales_misconduct",
-        "severity": 0.7,
+        "severity": 1.0,
         "description": "以额外利益诱导购买保险产品",
         "keywords": ["赠送", "送礼", "大礼包", "返现", "返利", "红包", "额外赠送", "旅游基金"],
         "suggestions": "不得以额外利益诱导购买",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "concealment",
         "name": "隐瞒信息",
         "level": 2,
         "parent_id": "info_disclosure",
-        "severity": 0.6,
+        "severity": 1.0,
         "description": "隐瞒免责条款、退保损失等重要信息",
         "keywords": [],
         "suggestions": "完整披露产品条款和风险信息",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "insufficient_risk_disclosure",
         "name": "风险提示不足",
         "level": 2,
         "parent_id": "info_disclosure",
-        "severity": 0.5,
+        "severity": 1.0,
         "description": "未充分提示保险产品风险",
         "keywords": [],
         "suggestions": "充分提示产品风险和不确定性",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
     {
         "id": "privacy_violation",
         "name": "信息保护",
         "level": 2,
         "parent_id": "info_protection",
-        "severity": 0.4,
+        "severity": 1.0,
         "description": "未经授权收集、使用客户个人信息",
         "keywords": [],
         "suggestions": "遵守个人信息保护相关规定",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
+    },
+    {
+        "id": "procedural",
+        "name": "程序性条款",
+        "level": 2,
+        "parent_id": "info_disclosure",
+        "severity": 0.1,
+        "description": "法规中的程序性、管理性条款，与营销内容审核无直接关系",
+        "keywords": [],
+        "suggestions": "此条款为程序性规定，不涉及营销内容合规判定",
+        "is_system": True,
+        "status": "active",
+        "source": "regulation",
     },
     {
         "id": "other_violation",
         "name": "其他违规",
         "level": 2,
         "parent_id": "false_publicity",
-        "severity": 0.3,
+        "severity": 1.0,
         "description": "其他未分类的违规行为",
         "keywords": [],
         "suggestions": "请根据违规类型修改",
         "is_system": True,
         "status": "active",
+        "source": "regulation",
     },
 ]
 
 _DEFAULT_MAPPINGS = [
-    {"violation_type_id": "absolute_language", "doc_name": "保险销售行为管理办法", "article_number": "二十一", "mapping_logic": "primary"},
-    {"violation_type_id": "absolute_language", "doc_name": "金融产品网络营销管理办法", "article_number": "九", "mapping_logic": "primary"},
-    {"violation_type_id": "absolute_language", "doc_name": "互联网保险业务监管办法", "article_number": "十六", "mapping_logic": "primary"},
-    {"violation_type_id": "return_promise", "doc_name": "保险销售行为管理办法", "article_number": "十二", "mapping_logic": "primary"},
-    {"violation_type_id": "return_promise", "doc_name": "保险销售行为管理办法", "article_number": "二十一", "mapping_logic": "secondary"},
-    {"violation_type_id": "return_promise", "doc_name": "金融产品网络营销管理办法", "article_number": "九", "mapping_logic": "primary"},
-    {"violation_type_id": "exaggerated_return", "doc_name": "保险销售行为管理办法", "article_number": "十二", "mapping_logic": "primary"},
-    {"violation_type_id": "exaggerated_return", "doc_name": "保险销售行为管理办法", "article_number": "二十一", "mapping_logic": "secondary"},
-    {"violation_type_id": "exaggerated_return", "doc_name": "互联网保险业务监管办法", "article_number": "十六", "mapping_logic": "primary"},
-    {"violation_type_id": "product_confusion", "doc_name": "保险销售行为管理办法", "article_number": "十三", "mapping_logic": "primary"},
-    {"violation_type_id": "product_confusion", "doc_name": "互联网保险业务监管办法", "article_number": "十六", "mapping_logic": "primary"},
-    {"violation_type_id": "product_confusion", "doc_name": "金融产品网络营销管理办法", "article_number": "二十三", "mapping_logic": "primary"},
-    {"violation_type_id": "unauthorized_endorsement", "doc_name": "金融产品网络营销管理办法", "article_number": "二十", "mapping_logic": "primary"},
-    {"violation_type_id": "unauthorized_endorsement", "doc_name": "金融产品网络营销管理办法", "article_number": "十三", "mapping_logic": "secondary"},
-    {"violation_type_id": "inducement_sales", "doc_name": "保险销售行为管理办法", "article_number": "六", "mapping_logic": "primary"},
-    {"violation_type_id": "inducement_sales", "doc_name": "互联网保险业务监管办法", "article_number": "十六", "mapping_logic": "primary"},
-    {"violation_type_id": "inducement_sales", "doc_name": "金融产品网络营销管理办法", "article_number": "十四", "mapping_logic": "primary"},
+    {"violation_type_id": "procedural", "doc_name": "保险销售行为管理办法", "article_number": "一", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "保险销售行为管理办法", "article_number": "二", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "保险销售行为管理办法", "article_number": "三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "保险销售行为管理办法", "article_number": "四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "保险销售行为管理办法", "article_number": "五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "保险销售行为管理办法", "article_number": "六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "保险销售行为管理办法", "article_number": "六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "unauthorized_endorsement", "doc_name": "保险销售行为管理办法", "article_number": "六", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "保险销售行为管理办法", "article_number": "七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "保险销售行为管理办法", "article_number": "七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "unauthorized_endorsement", "doc_name": "保险销售行为管理办法", "article_number": "七", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "保险销售行为管理办法", "article_number": "十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "保险销售行为管理办法", "article_number": "十一", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "保险销售行为管理办法", "article_number": "十二", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "保险销售行为管理办法", "article_number": "十二", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "保险销售行为管理办法", "article_number": "十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "保险销售行为管理办法", "article_number": "十三", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "保险销售行为管理办法", "article_number": "十四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "保险销售行为管理办法", "article_number": "十四", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "十五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "保险销售行为管理办法", "article_number": "十五", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "十六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "保险销售行为管理办法", "article_number": "十六", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "保险销售行为管理办法", "article_number": "十七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "保险销售行为管理办法", "article_number": "十七", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "absolute_language", "doc_name": "保险销售行为管理办法", "article_number": "十八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "保险销售行为管理办法", "article_number": "十九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "exaggerated_return", "doc_name": "保险销售行为管理办法", "article_number": "二十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "product_confusion", "doc_name": "保险销售行为管理办法", "article_number": "二十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "保险销售行为管理办法", "article_number": "二十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "保险销售行为管理办法", "article_number": "二十二", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "保险销售行为管理办法", "article_number": "二十三", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "保险销售行为管理办法", "article_number": "二十四", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "一", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "二", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "三", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十二", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十二", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "互联网保险业务监管办法", "article_number": "十四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "互联网保险业务监管办法", "article_number": "十四", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "互联网保险业务监管办法", "article_number": "十五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "互联网保险业务监管办法", "article_number": "十五", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "互联网保险业务监管办法", "article_number": "十六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "互联网保险业务监管办法", "article_number": "十六", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "互联网保险业务监管办法", "article_number": "十七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "互联网保险业务监管办法", "article_number": "十七", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "互联网保险业务监管办法", "article_number": "十八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "互联网保险业务监管办法", "article_number": "十八", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "十九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "product_confusion", "doc_name": "互联网保险业务监管办法", "article_number": "十九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "二十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "product_confusion", "doc_name": "互联网保险业务监管办法", "article_number": "二十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "二十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "product_confusion", "doc_name": "互联网保险业务监管办法", "article_number": "二十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "二十二", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "product_confusion", "doc_name": "互联网保险业务监管办法", "article_number": "二十二", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "qualification_violation", "doc_name": "互联网保险业务监管办法", "article_number": "二十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "product_confusion", "doc_name": "互联网保险业务监管办法", "article_number": "二十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "互联网保险业务监管办法", "article_number": "二十四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "二十四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "互联网保险业务监管办法", "article_number": "二十五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "二十五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "互联网保险业务监管办法", "article_number": "二十六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "二十六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "互联网保险业务监管办法", "article_number": "二十七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "二十七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "互联网保险业务监管办法", "article_number": "二十八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "二十八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "互联网保险业务监管办法", "article_number": "二十九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "二十九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "互联网保险业务监管办法", "article_number": "三十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "互联网保险业务监管办法", "article_number": "三十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "三十一", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "三十二", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "三十三", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "三十四", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "三十五", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "互联网保险业务监管办法", "article_number": "三十六", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "金融产品网络营销管理办法", "article_number": "一", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "金融产品网络营销管理办法", "article_number": "二", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "金融产品网络营销管理办法", "article_number": "三", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "金融产品网络营销管理办法", "article_number": "四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "absolute_language", "doc_name": "金融产品网络营销管理办法", "article_number": "四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "金融产品网络营销管理办法", "article_number": "五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "absolute_language", "doc_name": "金融产品网络营销管理办法", "article_number": "五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "金融产品网络营销管理办法", "article_number": "六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "absolute_language", "doc_name": "金融产品网络营销管理办法", "article_number": "六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "sales_misconduct", "doc_name": "金融产品网络营销管理办法", "article_number": "七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "absolute_language", "doc_name": "金融产品网络营销管理办法", "article_number": "七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "十一", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "十二", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "insufficient_risk_disclosure", "doc_name": "金融产品网络营销管理办法", "article_number": "十二", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "金融产品网络营销管理办法", "article_number": "十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "exaggerated_return", "doc_name": "金融产品网络营销管理办法", "article_number": "十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "金融产品网络营销管理办法", "article_number": "十三", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "金融产品网络营销管理办法", "article_number": "十四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "exaggerated_return", "doc_name": "金融产品网络营销管理办法", "article_number": "十四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "金融产品网络营销管理办法", "article_number": "十四", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "金融产品网络营销管理办法", "article_number": "十五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "exaggerated_return", "doc_name": "金融产品网络营销管理办法", "article_number": "十五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "金融产品网络营销管理办法", "article_number": "十五", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "return_promise", "doc_name": "金融产品网络营销管理办法", "article_number": "十六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "exaggerated_return", "doc_name": "金融产品网络营销管理办法", "article_number": "十六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "inducement_sales", "doc_name": "金融产品网络营销管理办法", "article_number": "十六", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "金融产品网络营销管理办法", "article_number": "十七", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "金融产品网络营销管理办法", "article_number": "十七", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "金融产品网络营销管理办法", "article_number": "十八", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "金融产品网络营销管理办法", "article_number": "十八", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "金融产品网络营销管理办法", "article_number": "十九", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "金融产品网络营销管理办法", "article_number": "十九", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "info_protection", "doc_name": "金融产品网络营销管理办法", "article_number": "二十", "mapping_logic": "primary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "concealment", "doc_name": "金融产品网络营销管理办法", "article_number": "二十", "mapping_logic": "secondary", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "金融产品网络营销管理办法", "article_number": "二十一", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "金融产品网络营销管理办法", "article_number": "二十二", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
+    {"violation_type_id": "procedural", "doc_name": "金融产品网络营销管理办法", "article_number": "二十三", "mapping_logic": "not_applicable", "effective_date": "2026-01-01"},
 ]
 
 ANNOTATION_SYSTEM_PROMPT = """你是一位保险合规法规分析专家。你的任务是分析法规条文，判断其是否属于"营销内容审核"范畴，并提取行为模式。
@@ -379,6 +532,7 @@ class ViolationRegistry:
                 suggestions=type_data["suggestions"],
                 is_system=type_data["is_system"],
                 status=type_data["status"],
+                source=type_data.get("source", "regulation"),
                 created_at=now,
                 updated_at=now,
             )
@@ -391,7 +545,7 @@ class ViolationRegistry:
                 doc_name=mapping_data["doc_name"],
                 article_number=mapping_data["article_number"],
                 mapping_logic=mapping_data["mapping_logic"],
-                effective_date=now,
+                effective_date=mapping_data.get("effective_date", now),
                 expiration_date=None,
                 created_at=now,
             )
@@ -498,6 +652,9 @@ class ViolationRegistry:
         suggestions: str,
         is_system: bool = False,
     ) -> ViolationType:
+        if config.DEMO_MODE:
+            raise ValueError("Demo模式下不支持创建自定义违规类型")
+
         type_id = name.lower().replace(" ", "_")
         if any(c in type_id for c in "/\\、，"):
             type_id = str(uuid.uuid4())[:8]
@@ -560,6 +717,18 @@ class ViolationRegistry:
         for cm in self._mappings.values():
             if cm.violation_type_id == type_id and cm.expiration_date is None:
                 cm.expiration_date = datetime.now().isoformat()
+        if vt.level == 1:
+            deprecated_children = []
+            for child_id, child_vt in self._types.items():
+                if child_vt.parent_id == type_id and child_vt.status != "deprecated":
+                    child_vt.status = "deprecated"
+                    child_vt.updated_at = datetime.now().isoformat()
+                    for cm in self._mappings.values():
+                        if cm.violation_type_id == child_id and cm.expiration_date is None:
+                            cm.expiration_date = datetime.now().isoformat()
+                    deprecated_children.append(child_vt.name)
+            if deprecated_children:
+                logger.info(f"L1类型 {type_id} 废弃，级联废弃子类型: {deprecated_children}")
         self._save()
         logger.info(f"违规类型已废弃: {type_id}")
         return True
@@ -614,14 +783,21 @@ class ViolationRegistry:
             logger.info(f"违规类型 {type_id} 新增关键词: {keyword}")
         return True
 
-    def remove_keyword(self, type_id: str, keyword: str) -> bool:
+    def remove_keyword(self, type_id: str, keyword: str, force: bool = False) -> bool:
         vt = self._types.get(type_id)
         if not vt:
             return False
         if keyword in vt.keywords:
+            if len(vt.keywords) == 1 and not force:
+                raise ValueError(
+                    f"该关键词是类型 {type_id} 的最后一个关键词，删除后规则引擎将无法匹配该类型。如确认删除请使用 force=True"
+                )
+            if vt.is_system:
+                logger.warning(f"系统预定义类型 {type_id} 正在移除关键词: {keyword}")
             vt.keywords.remove(keyword)
             vt.updated_at = datetime.now().isoformat()
             self._save()
+            logger.info(f"违规类型 {type_id} 移除关键词: {keyword}, operator=...")
         return True
 
     def annotate_chunks(self, chunks: List) -> List[PendingAnnotation]:
@@ -819,6 +995,18 @@ class ViolationRegistry:
         pa.status = "rejected"
         self._save()
         return pa
+
+    def is_type_deprecated(self, type_id: str) -> bool:
+        vt = self._types.get(type_id)
+        return vt is not None and vt.status == "deprecated"
+
+    def get_deprecated_names(self, type_ids: List[str]) -> List[str]:
+        result = []
+        for tid in type_ids:
+            vt = self._types.get(tid)
+            if vt and vt.status == "deprecated":
+                result.append(vt.name)
+        return result
 
     def get_stats(self) -> Dict:
         l1_count = sum(1 for vt in self._types.values() if vt.level == 1 and vt.status == "active")

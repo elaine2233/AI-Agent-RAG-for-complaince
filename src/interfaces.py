@@ -9,6 +9,7 @@ class DocumentFormat(Enum):
     MD = "md"
     PDF = "pdf"
     DOCX = "docx"
+    DOC = "doc"
     IMAGE = "image"
     HTML = "html"
 

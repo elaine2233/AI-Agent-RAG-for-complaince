@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 import config
-from src.resilience import CircuitBreaker, CircuitBreakerConfig
+from src.resilience import CircuitBreaker, CircuitBreakerConfig, with_retry, RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,9 @@ class ModelConfig:
     role: ModelRole
     provider: str
     circuit_breaker: Optional[CircuitBreaker] = None
-    max_tokens: int = 4096
-    temperature: float = 0.1
+    max_tokens: int = None
+    temperature: float = None
+    top_p: float = None
     priority: int = 0
 
 
@@ -72,6 +73,12 @@ class LLMGateway:
                 provider="rule",
                 priority=0,
             ))
+            self.register_model(ModelConfig(
+                name="rule-engine-light",
+                role=ModelRole.LIGHTWEIGHT,
+                provider="rule",
+                priority=10,
+            ))
 
     def register_model(self, model_config: ModelConfig):
         cb_name = f"llm_{model_config.name}"
@@ -105,13 +112,13 @@ class LLMGateway:
                 continue
 
             try:
-                return self._call_model(
+                return self._call_model_with_retry(
                     model_config.name, system_prompt, user_prompt,
                     temperature or model_config.temperature,
                 )
             except Exception as e:
                 last_error = e
-                logger.warning(f"模型 {model_config.name} 调用失败: {e}")
+                logger.warning(f"模型 {model_config.name} 调用失败(含重试): {e}")
                 if cb:
                     cb.record_failure()
                 continue
@@ -155,6 +162,14 @@ class LLMGateway:
             latency_ms=latency_ms,
         )
 
+    def _call_model_with_retry(self, model_name, system_prompt, user_prompt, temperature):
+        try:
+            return self._call_model(model_name, system_prompt, user_prompt, temperature)
+        except Exception as e:
+            logger.warning(f"模型 {model_name} 首次调用失败: {e}，1秒后重试...")
+            time.sleep(1.0)
+            return self._call_model(model_name, system_prompt, user_prompt, temperature)
+
     def _call_openai_compatible(self, model_config: ModelConfig, system_prompt: str, user_prompt: str, temperature: float) -> str:
         from openai import OpenAI
 
@@ -170,8 +185,8 @@ class LLMGateway:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=temperature,
-            top_p=0.8,
-            max_tokens=model_config.max_tokens,
+            top_p=model_config.top_p if model_config.top_p is not None else config.LLM_TOP_P,
+            max_tokens=model_config.max_tokens if model_config.max_tokens is not None else config.LLM_MAX_TOKENS,
         )
 
         content = response.choices[0].message.content

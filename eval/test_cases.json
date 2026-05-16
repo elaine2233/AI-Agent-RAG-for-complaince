@@ -68,5 +68,145 @@
         "expected_compliant": "no",
         "expected_violation_types": ["无资质代言", "收益承诺", "诱导销售", "夸大收益"],
         "description": "多重违规：网红代言+收益承诺+返利诱导+夸大收益"
+    },
+    {
+        "id": "TC011",
+        "content": "这款保险没有任何风险，买了绝对不会亏，100%赚钱！最安全的理财方式，保证本金安全！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["绝对化用语", "收益承诺"],
+        "description": "违规：绝对化用语+收益承诺（纯绝对化表述）"
+    },
+    {
+        "id": "TC012",
+        "content": "本产品年化收益率4.5%，保证收益，到期返还本金及利息。比银行定期利率高3倍，零风险稳赚！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["收益承诺", "夸大收益", "绝对化用语"],
+        "description": "违规：承诺确定收益+夸大收益+绝对化用语"
+    },
+    {
+        "id": "TC013",
+        "content": "买了这款万能险，相当于在银行存了一笔定期存款，利率比银行高多了，而且随时可以取出来，跟活期存款一样方便！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["产品混淆"],
+        "description": "违规：将保险与银行存款混淆"
+    },
+    {
+        "id": "TC014",
+        "content": "奥运冠军XXX强力推荐！这款意外险保障全面，冠军的选择不会错！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["无资质代言"],
+        "description": "违规：利用体育明星代言推荐保险产品"
+    },
+    {
+        "id": "TC015",
+        "content": "仅剩最后3个名额！今天不买明天就涨价！前100名下单送iPhone15！错过再等一年！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["诱导销售"],
+        "description": "违规：制造紧迫感+赠品诱导"
+    },
+    {
+        "id": "TC016",
+        "content": "这款重疾险覆盖200种重大疾病，确诊即赔，不需要任何等待期，买了立刻生效，什么病都能赔！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["夸大收益", "隐瞒信息"],
+        "description": "违规：夸大保障范围+隐瞒等待期和免责条款"
+    },
+    {
+        "id": "TC017",
+        "content": "这款分红险每年分红不低于5%，历史分红从未低于4.8%，稳赚不赔！存1万每年至少拿500！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["收益承诺", "夸大收益"],
+        "description": "违规：承诺分红收益+夸大历史收益"
+    },
+    {
+        "id": "TC018",
+        "content": "本产品由XX人寿保险股份有限公司承保。分红险的红利是不保证的，万能险的结算利率超过最低保证利率的部分是不确定的。投保人有犹豫期权利，退保可能产生损失。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：明确说明非保证收益+犹豫期+退保损失"
+    },
+    {
+        "id": "TC019",
+        "content": "这款保险产品非常好，保障全面，价格实惠，值得购买。具体保险责任和责任免除请详见保险条款。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：正面评价但无违规表述，引导阅读条款"
+    },
+    {
+        "id": "TC020",
+        "content": "买保险就跟存钱一样，到期连本带利一起还给你，比银行利息高，还有保障！这不就是白赚的吗？",
+        "expected_compliant": "no",
+        "expected_violation_types": ["产品混淆", "收益承诺", "夸大收益"],
+        "description": "违规：将保险与存款混淆+承诺返还+夸大"
+    },
+    {
+        "id": "TC021",
+        "content": "这款保险的退保金额可能低于已交保费，犹豫期内退保可全额退还。保险责任和免责条款已在条款中列明，请仔细阅读。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：明确提示退保损失+引导阅读条款"
+    },
+    {
+        "id": "TC022",
+        "content": "专家一致推荐这款养老年金险！权威机构认证，官方指定养老金方案！买了就是赚到！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["无资质代言", "夸大收益"],
+        "description": "违规：虚构专家推荐+权威认证+夸大"
+    },
+    {
+        "id": "TC023",
+        "content": "这款保险产品保障范围广泛，但以下情况不在保障范围内：投保前已患疾病、先天性疾病、遗传性疾病。犹豫期为15天，退保可能产生损失。保单利益具有不确定性。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：明确列出免责条款+犹豫期+风险提示"
+    },
+    {
+        "id": "TC024",
+        "content": "这款保险什么病都保，买了就赔，不需要健康告知，不需要体检，有病也能买！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["夸大收益", "隐瞒信息"],
+        "description": "违规：夸大保障范围+隐瞒健康告知要求"
+    },
+    {
+        "id": "TC025",
+        "content": "本产品仅需每月99元，即可获得50万重疾保障。保险责任、责任免除、犹豫期等详见保险条款。本产品由XX保险公司承保，持有保险业务经营许可。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：标明价格+承保机构+引导阅读条款"
+    },
+    {
+        "id": "TC026",
+        "content": "这款年金险的收益率远超银行理财，保本保息，到期保证返还120%！历史年化收益8.5%！零风险稳赚！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["产品混淆", "收益承诺", "夸大收益", "绝对化用语"],
+        "description": "多重违规：产品混淆+收益承诺+夸大收益+绝对化用语"
+    },
+    {
+        "id": "TC027",
+        "content": "这款保险产品不保证收益，投资账户价值随市场波动，可能产生亏损。请充分了解产品特征和风险后再做决定。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：明确提示投资风险+不保证收益"
+    },
+    {
+        "id": "TC028",
+        "content": "现在扫码下单立减30%！前50名额外送价值2000元体检卡！限时24小时，过期恢复原价！转发朋友圈再减100！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["诱导销售"],
+        "description": "违规：限时折扣+赠品+转发优惠等多重诱导"
+    },
+    {
+        "id": "TC029",
+        "content": "知名财经大V推荐！这款增额终身寿险内部收益率高达3.5%，锁定终身利率！大V亲测有效！",
+        "expected_compliant": "no",
+        "expected_violation_types": ["无资质代言", "收益承诺", "夸大收益"],
+        "description": "违规：大V代言+承诺收益率+夸大"
+    },
+    {
+        "id": "TC030",
+        "content": "这款保险产品保障责任包括：重大疾病保险金、轻症疾病保险金、身故保险金。责任免除包括：投保人故意行为、犯罪行为等。犹豫期15天。保单利益不具有确定性。",
+        "expected_compliant": "yes",
+        "expected_violation_types": [],
+        "description": "合规内容：列明保障责任+免责+犹豫期+不确定性提示"
     }
 ]

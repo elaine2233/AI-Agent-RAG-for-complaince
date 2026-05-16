@@ -22,7 +22,7 @@ BACKUP_DIR = config.DB_BACKUP_DIR
 MAX_BACKUPS = config.MAX_BACKUPS
 DATA_RETENTION_DAYS = config.DATA_RETENTION_DAYS
 
-_schema_version = 5
+_schema_version = 7
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS violation_types (
     suggestions TEXT NOT NULL DEFAULT '',
     is_system INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active',
+    source TEXT NOT NULL DEFAULT 'regulation',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -146,6 +147,53 @@ CREATE INDEX IF NOT EXISTS idx_violation_types_parent ON violation_types(parent_
 CREATE INDEX IF NOT EXISTS idx_violation_types_status ON violation_types(status);
 CREATE INDEX IF NOT EXISTS idx_clause_mappings_type ON clause_type_mappings(violation_type_id);
 CREATE INDEX IF NOT EXISTS idx_clause_mappings_article ON clause_type_mappings(doc_name, article_number);
+
+CREATE TABLE IF NOT EXISTS review_violations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id INTEGER NOT NULL,
+    violation_type_id TEXT NOT NULL,
+    violation_type_name TEXT NOT NULL,
+    violated_articles TEXT NOT NULL DEFAULT '[]',
+    reasoning TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'system',
+    is_deprecated INTEGER NOT NULL DEFAULT 0,
+    is_modified INTEGER NOT NULL DEFAULT 0,
+    modification_detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (review_id) REFERENCES review_records(id),
+    FOREIGN KEY (violation_type_id) REFERENCES violation_types(id)
+);
+CREATE INDEX IF NOT EXISTS idx_review_violations_review_id ON review_violations(review_id);
+CREATE INDEX IF NOT EXISTS idx_review_violations_type_id ON review_violations(violation_type_id);
+
+CREATE TABLE IF NOT EXISTS violation_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id INTEGER NOT NULL,
+    violation_type_id TEXT NOT NULL,
+    feedback_type TEXT NOT NULL,
+    comment TEXT NOT NULL DEFAULT '',
+    user_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (review_id) REFERENCES review_records(id),
+    FOREIGN KEY (violation_type_id) REFERENCES violation_types(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_violation_feedback_review_id ON violation_feedback(review_id);
+
+CREATE TABLE IF NOT EXISTS review_modifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id INTEGER NOT NULL,
+    modification_type TEXT NOT NULL,
+    before_value TEXT NOT NULL DEFAULT '',
+    after_value TEXT NOT NULL DEFAULT '',
+    modification_reason TEXT NOT NULL DEFAULT '',
+    is_ai_generated INTEGER NOT NULL DEFAULT 0,
+    user_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (review_id) REFERENCES review_records(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_review_modifications_review_id ON review_modifications(review_id);
 """
 
 
@@ -198,6 +246,7 @@ class Database:
         self._run_migrations(conn)
         conn.execute(f"PRAGMA user_version = {_schema_version}")
         self._ensure_admin_user(conn)
+        self._sync_violation_types(conn)
         conn.commit()
 
     def _run_migrations(self, conn):
@@ -234,6 +283,46 @@ class Database:
                 except sqlite3.OperationalError:
                     pass
 
+        if current_version < 6:
+            try:
+                conn.execute("ALTER TABLE violation_types ADD COLUMN source TEXT NOT NULL DEFAULT 'regulation'")
+                logger.info("迁移: 添加 violation_types.source 列")
+            except sqlite3.OperationalError:
+                pass
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS review_violations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    review_id INTEGER NOT NULL,
+                    violation_type_id TEXT NOT NULL,
+                    violation_type_name TEXT NOT NULL,
+                    is_deprecated INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    FOREIGN KEY (review_id) REFERENCES review_records(id),
+                    FOREIGN KEY (violation_type_id) REFERENCES violation_types(id)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_review_violations_review_id ON review_violations(review_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_review_violations_type_id ON review_violations(violation_type_id)")
+            logger.info("迁移: 创建 review_violations 表")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS violation_feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    review_id INTEGER NOT NULL,
+                    violation_type_id TEXT NOT NULL,
+                    feedback_type TEXT NOT NULL,
+                    comment TEXT NOT NULL DEFAULT '',
+                    user_id INTEGER,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    FOREIGN KEY (review_id) REFERENCES review_records(id),
+                    FOREIGN KEY (violation_type_id) REFERENCES violation_types(id),
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_violation_feedback_review_id ON violation_feedback(review_id)")
+            logger.info("迁移: 创建 violation_feedback 表")
+
     def _hash_password(self, password: str) -> str:
         return hashlib.pbkdf2_hmac(
             "sha256",
@@ -255,6 +344,31 @@ class Database:
                 ("admin", admin_hash, "admin", api_key, now.isoformat(), expires.isoformat()),
             )
             logger.info("已创建默认管理员账户 (admin/admin123)，API Key有效期90天")
+
+    def _sync_violation_types(self, conn):
+        try:
+            from src.violation_registry import violation_registry
+            existing = {row[0] for row in conn.execute("SELECT id FROM violation_types").fetchall()}
+            for vt in violation_registry._types.values():
+                if vt.id not in existing:
+                    conn.execute(
+                        "INSERT INTO violation_types (id, name, level, parent_id, severity, description, "
+                        "keywords, suggestions, is_system, status, source, created_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (vt.id, vt.name, vt.level, vt.parent_id, vt.severity, vt.description,
+                         json.dumps(vt.keywords, ensure_ascii=False), vt.suggestions,
+                         int(vt.is_system), vt.status, vt.source, vt.created_at, vt.updated_at),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE violation_types SET name=?, level=?, parent_id=?, severity=?, description=?, "
+                        "keywords=?, suggestions=?, is_system=?, status=?, source=?, updated_at=? WHERE id=?",
+                        (vt.name, vt.level, vt.parent_id, vt.severity, vt.description,
+                         json.dumps(vt.keywords, ensure_ascii=False), vt.suggestions,
+                         int(vt.is_system), vt.status, vt.source, vt.updated_at, vt.id),
+                    )
+        except Exception as e:
+            logger.warning(f"同步违规类型到数据库失败: {e}")
 
     def close(self):
         if hasattr(self._local, 'conn') and self._local.conn:
@@ -349,7 +463,13 @@ class Database:
                     review_data.get("prompt_version", ""),
                 ),
             )
-            return cursor.lastrowid
+            review_id = cursor.lastrowid
+
+            violation_types = review_data.get("violation_types")
+            if violation_types:
+                self._save_review_violations_in_txn(conn, review_id, violation_types)
+
+            return review_id
 
     def get_review(self, review_id: int) -> Optional[Dict]:
         conn = self._get_conn()
@@ -574,3 +694,81 @@ class Database:
             return {"status": "healthy", "db_path": self.db_path}
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
+
+    def _save_review_violations_in_txn(self, conn, review_id: int, violation_types: List[Dict]):
+        for vt in violation_types:
+            conn.execute(
+                "INSERT INTO review_violations (review_id, violation_type_id, violation_type_name, is_deprecated) "
+                "VALUES (?, ?, ?, ?)",
+                (review_id, vt["violation_type_id"], vt["violation_type_name"], int(vt.get("is_deprecated", False))),
+            )
+
+    def save_review_violations(self, review_id: int, violation_types: List[Dict]):
+        with self.transaction() as conn:
+            self._save_review_violations_in_txn(conn, review_id, violation_types)
+
+    def get_review_violations(self, review_id: int) -> List[Dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT id, review_id, violation_type_id, violation_type_name, is_deprecated, created_at "
+            "FROM review_violations WHERE review_id = ?",
+            (review_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def save_violation_feedback(self, review_id: int, violation_type_id: str, feedback_type: str, comment: str = "", user_id: int = None) -> int:
+        with self.transaction() as conn:
+            cursor = conn.execute(
+                "INSERT INTO violation_feedback (review_id, violation_type_id, feedback_type, comment, user_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (review_id, violation_type_id, feedback_type, comment, user_id),
+            )
+            self._log_audit(conn, "violation_feedback", user_id, f"review_id={review_id}, type={violation_type_id}, fb={feedback_type}")
+            return cursor.lastrowid
+
+    def get_violation_feedback_stats(self) -> Dict:
+        conn = self._get_conn()
+        total = conn.execute("SELECT COUNT(*) as cnt FROM violation_feedback").fetchone()["cnt"]
+        by_type = {}
+        rows = conn.execute(
+            "SELECT feedback_type, COUNT(*) as cnt FROM violation_feedback GROUP BY feedback_type"
+        ).fetchall()
+        for row in rows:
+            by_type[row["feedback_type"]] = row["cnt"]
+
+        by_violation = {}
+        rows = conn.execute(
+            "SELECT violation_type_id, COUNT(*) as cnt FROM violation_feedback GROUP BY violation_type_id"
+        ).fetchall()
+        for row in rows:
+            by_violation[row["violation_type_id"]] = row["cnt"]
+
+        return {
+            "total_feedback": total,
+            "by_feedback_type": by_type,
+            "by_violation_type": by_violation,
+        }
+
+    def save_review_modification(self, review_id: int, modification_type: str,
+                                  before_value: str = "", after_value: str = "",
+                                  modification_reason: str = "", is_ai_generated: bool = False,
+                                  user_id: int = None) -> int:
+        with self.transaction() as conn:
+            cursor = conn.execute(
+                "INSERT INTO review_modifications "
+                "(review_id, modification_type, before_value, after_value, modification_reason, is_ai_generated, user_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (review_id, modification_type, before_value, after_value,
+                 modification_reason, 1 if is_ai_generated else 0, user_id),
+            )
+            self._log_audit(conn, "review_modification", user_id,
+                           f"review_id={review_id}, type={modification_type}")
+            return cursor.lastrowid
+
+    def get_review_modifications(self, review_id: int) -> List[Dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM review_modifications WHERE review_id = ? ORDER BY created_at",
+            (review_id,)
+        ).fetchall()
+        return [dict(row) for row in rows]

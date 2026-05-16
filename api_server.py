@@ -350,6 +350,7 @@ async def review_content(
         "risk_level": result.risk_level,
         "model_used": result.model_used,
         "prompt_version": result.prompt_version,
+        "violation_types": result.violation_types,
     }
 
     review_id = _ensure_db().save_review(review_data)
@@ -455,6 +456,7 @@ async def batch_review(
             "latency_ms": item_latency,
             "client_id": user.get("username", "anonymous"),
             "threats": validation.threats,
+            "violation_types": result.violation_types,
         }
         item_review_id = _ensure_db().save_review(review_data)
 
@@ -544,6 +546,7 @@ async def async_review_content(
             "latency_ms": 0,
             "client_id": client_id,
             "threats": [],
+            "violation_types": review_result.violation_types,
         }
         _ensure_db().save_review(review_data)
 
@@ -1100,6 +1103,7 @@ async def multimodal_review(
         "latency_ms": latency_ms,
         "client_id": user.get("username", "anonymous"),
         "threats": validation.threats,
+        "violation_types": result.violation_types,
     }
 
     review_id = _ensure_db().save_review(review_data)
@@ -1191,6 +1195,7 @@ async def upload_and_review(
         "latency_ms": latency_ms,
         "client_id": user.get("username", "anonymous"),
         "threats": validation.threats,
+        "violation_types": result.violation_types,
     }
 
     review_id = _ensure_db().save_review(review_data)
