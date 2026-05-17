@@ -1,6 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Optional
+import config
 from src.interfaces import InputProcessor, InputType, UserInput
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class ImageInputProcessor(InputProcessor):
                     {"text": "请描述这张图片的内容，特别关注是否有保险营销相关的文字、标语或宣传内容。"},
                 ],
             }]
-            resp = MultiModalConversation.call(model="qwen-vl-plus", messages=messages)
+            resp = MultiModalConversation.call(model=config.VL_MODEL, messages=messages)
             if resp.status_code == 200:
                 return resp.output.choices[0].message.content
         except Exception as e:
@@ -64,7 +65,7 @@ class ImageInputProcessor(InputProcessor):
                     {"text": "请提取图片中的所有文字，原样输出。"},
                 ],
             }]
-            resp = MultiModalConversation.call(model="qwen-vl-plus", messages=messages)
+            resp = MultiModalConversation.call(model=config.VL_MODEL, messages=messages)
             if resp.status_code == 200:
                 return resp.output.choices[0].message.content
         except Exception as e:

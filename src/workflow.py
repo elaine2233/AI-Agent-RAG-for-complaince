@@ -33,6 +33,7 @@ class WorkflowState:
     rule_check_result: Optional[Dict] = None
     retrieved_laws: List[Dict] = field(default_factory=list)
     reranked_laws: List[Dict] = field(default_factory=list)
+    expanded_relations: List[Dict] = field(default_factory=list)
     reasoning_result: Optional[Dict] = None
     formatted_result: Optional[Dict] = None
     validation_result: Optional[Dict] = None

@@ -5,6 +5,31 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
+import json as _json
+import os as _os
+from datetime import datetime as _datetime
+
+_audit_log_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "llm_audit")
+_os.makedirs(_audit_log_dir, exist_ok=True)
+
+def _write_audit_log(model_name, system_prompt, user_prompt, response_text, latency_ms, success):
+    try:
+        ts = _datetime.now().strftime("%Y%m%d")
+        log_file = _os.path.join(_audit_log_dir, f"llm_audit_{ts}.jsonl")
+        entry = {
+            "timestamp": _datetime.now().isoformat(),
+            "model": model_name,
+            "system_prompt": (system_prompt or "")[:2000],
+            "user_prompt": (user_prompt or "")[:2000],
+            "response": (response_text or "")[:2000],
+            "latency_ms": round(latency_ms, 1),
+            "success": success,
+        }
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
 import config
 from src.resilience import CircuitBreaker, CircuitBreakerConfig, with_retry, RetryPolicy
 
@@ -46,6 +71,16 @@ class LLMGateway:
         self._register_default_models()
 
     def _register_default_models(self):
+        self._models.clear()
+        self._circuit_breakers.clear()
+        if config.DEMO_MODE:
+            self.register_model(ModelConfig(
+                name="rule-engine",
+                role=ModelRole.PRIMARY,
+                provider="rule_engine",
+                priority=0,
+            ))
+            return
         if config.DASHSCOPE_API_KEY:
             self.register_model(ModelConfig(
                 name=config.LLM_MODEL,
@@ -53,18 +88,13 @@ class LLMGateway:
                 provider="openai_compatible",
                 priority=0,
             ))
+            lightweight_model = getattr(config, "LLM_LIGHTWEIGHT_MODEL", config.LLM_MODEL)
             self.register_model(ModelConfig(
-                name="qwen-turbo",
+                name=lightweight_model,
                 role=ModelRole.LIGHTWEIGHT,
                 provider="openai_compatible",
                 temperature=0.1,
                 priority=10,
-            ))
-            self.register_model(ModelConfig(
-                name="deepseek-v3",
-                role=ModelRole.FALLBACK,
-                provider="openai_compatible",
-                priority=5,
             ))
         else:
             self.register_model(ModelConfig(
@@ -99,31 +129,43 @@ class LLMGateway:
         role: ModelRole = None,
         temperature: float = None,
     ) -> LLMResponse:
-        if model_name:
-            return self._call_model(model_name, system_prompt, user_prompt, temperature)
+        _start = __import__('time').time()
+        try:
+            if model_name:
+                result = self._call_model(model_name, system_prompt, user_prompt, temperature)
+                _lat = (__import__('time').time() - _start) * 1000
+                _write_audit_log(model_name, system_prompt, user_prompt, result.content, _lat, True)
+                return result
 
-        candidates = self._get_candidates(role)
-        last_error = None
+            candidates = self._get_candidates(role)
+            last_error = None
 
-        for model_config in sorted(candidates, key=lambda m: m.priority):
-            cb = model_config.circuit_breaker
-            if cb and cb.state.value == "open":
-                logger.warning(f"模型 {model_config.name} 熔断器打开，跳过")
-                continue
+            for model_config in sorted(candidates, key=lambda m: m.priority):
+                cb = model_config.circuit_breaker
+                if cb and cb.state.value == "open":
+                    logger.warning(f"模型 {model_config.name} 熔断器打开，跳过")
+                    continue
 
-            try:
-                return self._call_model_with_retry(
-                    model_config.name, system_prompt, user_prompt,
-                    temperature or model_config.temperature,
-                )
-            except Exception as e:
-                last_error = e
-                logger.warning(f"模型 {model_config.name} 调用失败(含重试): {e}")
-                if cb:
-                    cb.record_failure()
-                continue
+                try:
+                    result = self._call_model_with_retry(
+                        model_config.name, system_prompt, user_prompt,
+                        temperature or model_config.temperature,
+                    )
+                    _lat = (__import__('time').time() - _start) * 1000
+                    _write_audit_log(model_config.name, system_prompt, user_prompt, result.content, _lat, True)
+                    return result
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"模型 {model_config.name} 调用失败(含重试): {e}")
+                    if cb:
+                        cb.record_failure()
+                    continue
 
-        raise RuntimeError(f"所有模型均不可用: {last_error}")
+            raise RuntimeError(f"所有模型均不可用: {last_error}")
+        except RuntimeError as e:
+            _lat = (__import__('time').time() - _start) * 1000
+            _write_audit_log(model_name or "unknown", system_prompt, user_prompt, str(e), _lat, False)
+            raise
 
     def _get_candidates(self, role: ModelRole = None) -> List[ModelConfig]:
         if role:
@@ -198,9 +240,23 @@ class LLMGateway:
             "violation_type": "",
             "violated_articles": [],
             "confidence": 0.5,
-            "reasoning": "Demo模式：规则引擎未命中已知违规关键词，默认判定为合规，建议人工复核确认",
-            "suggestions": "此为Demo模式自动判定，建议接入LLM进行深度语义审核",
+            "reasoning": "规则引擎未命中已知违规关键词，默认判定为合规，建议人工复核确认",
+            "suggestions": "未检测到已知违规关键词，如需深度语义审核请配置DashScope API Key后重试",
         })
+
+    def ensure_model(self, model_name: str) -> bool:
+        if model_name in self._models:
+            return True
+        if not config.DASHSCOPE_API_KEY:
+            return False
+        self.register_model(ModelConfig(
+            name=model_name,
+            role=ModelRole.PRIMARY,
+            provider="openai_compatible",
+            priority=0,
+        ))
+        logger.info(f"LLM Gateway: 动态注册模型 {model_name}")
+        return True
 
     def get_model_status(self) -> Dict:
         status = {}

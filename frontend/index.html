@@ -1205,6 +1205,96 @@ select.form-control {
 
 .regulation-clickable { cursor: pointer; transition: all 0.2s ease; }
 .regulation-clickable:hover { border-color: var(--teal-400) !important; background: var(--teal-50) !important; }
+
+.violation-review-item {
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+.violation-review-item:hover { border-color: var(--teal-400); }
+.violation-review-item.disagreed { opacity: 0.5; border-color: var(--slate-300); background: var(--slate-50); }
+.violation-review-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.violation-review-header .violation-type-badge { flex-shrink: 0; }
+.toggle-group {
+  display: inline-flex;
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-left: auto;
+}
+.toggle-btn {
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--white);
+  color: var(--navy-600);
+}
+.toggle-btn:first-child { border-right: 1px solid var(--slate-200); }
+.toggle-btn.active-agree { background: var(--green-100); color: var(--green-600); font-weight: 600; }
+.toggle-btn.active-disagree { background: var(--red-100); color: var(--red-600); font-weight: 600; }
+.violation-review-body { display: flex; flex-direction: column; gap: 12px; }
+.violation-review-body .edit-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--navy-600);
+  margin-bottom: 4px;
+}
+.violation-review-body .edit-field textarea,
+.violation-review-body .edit-field input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--slate-200);
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--navy-800);
+}
+.violation-review-body .edit-field textarea:focus,
+.violation-review-body .edit-field input:focus {
+  outline: none;
+  border-color: var(--teal-500);
+}
+.add-violation-form {
+  background: var(--teal-50);
+  border: 2px dashed var(--teal-400);
+  border-radius: 10px;
+  padding: 16px 20px;
+  animation: fadeIn 0.3s ease;
+}
+.add-violation-form .form-group { margin-bottom: 12px; }
+.system-result-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.system-result-badge.violation { background: var(--red-100); color: var(--red-600); }
+.system-result-badge.compliant { background: var(--green-100); color: var(--green-600); }
+.system-result-meta {
+  margin-top: 12px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.system-result-meta span {
+  font-size: 0.8rem;
+  color: var(--slate-400);
+}
+.system-result-meta strong {
+  color: var(--navy-600);
+}
 </style>
 </head>
 <body>
@@ -1235,7 +1325,7 @@ select.form-control {
     </div>
   </nav>
   <div class="sidebar-footer" style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.06);">
-    <div style="font-size:0.7rem;color:var(--slate-400);">v1.0.0</div>
+    <div style="font-size:0.7rem;color:var(--slate-400);">v2.0.0</div>
   </div>
 </aside>
 
@@ -1257,7 +1347,15 @@ select.form-control {
       </div>
       <div class="api-key-bar">
         <label>API Key:</label>
-        <input type="password" id="apiKeyInput" placeholder="输入 API Key..." value="">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="password" id="apiKeyInput" placeholder="输入 DashScope API Key..." style="flex:1;">
+          <button style="padding:4px 8px;font-size:0.85rem;background:var(--slate-100);border:1px solid var(--slate-200);border-radius:4px;cursor:pointer;" onclick="toggleApiKeyVisibility()" id="apiKeyEye" title="显示/隐藏API Key">👁</button>
+          <button class="btn btn-sm" id="testConnBtn" style="padding:4px 12px;font-size:0.78rem;background:var(--teal-600);color:white;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;" onclick="testConnection()">测试连接</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+          <label style="font-size:0.8rem;color:var(--slate-500);white-space:nowrap;">模型:</label>
+          <input type="text" id="modelInput" placeholder="如: qwen3.5-plus" value="qwen3.5-plus" style="flex:1;padding:4px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:0.8rem;">
+        </div>
       </div>
     </div>
     <div class="page-body">
@@ -1292,6 +1390,7 @@ select.form-control {
       </div>
 
       <div id="reviewProgress" style="display:none;margin-top:16px;"></div>
+      <div id="progressSteps" style="margin:12px 0;"></div>
       <div id="reviewResultArea" class="review-result-area" style="display:none;"></div>
     </div>
   </div>
@@ -1301,94 +1400,70 @@ select.form-control {
     <div class="page-header">
       <div>
         <h2>人工复核</h2>
-        <div class="page-header-sub">对系统审核结果进行人工复核与修正</div>
+        <div class="page-header-sub">对系统审核结果进行逐项复核与修正</div>
       </div>
     </div>
     <div class="page-body">
-      <div class="grid-2">
-        <div>
-          <div class="card mb-16">
-            <div class="card-title">待复核列表</div>
-            <div id="pendingList">
-              <div class="empty-state">
-                <div class="empty-icon">📭</div>
-                <div class="empty-text">暂无待复核项目</div>
-              </div>
+      <!-- Step 1: Pending list -->
+      <div id="manualListView">
+        <div class="card mb-16">
+          <div class="card-title">待复核列表</div>
+          <div id="pendingList">
+            <div class="empty-state">
+              <div class="empty-icon">📭</div>
+              <div class="empty-text">暂无待复核项目</div>
             </div>
           </div>
         </div>
-        <div>
+      </div>
+
+      <!-- Step 2: Detail view (hidden by default) -->
+      <div id="manualDetailView" style="display:none;">
+        <button class="btn btn-secondary mb-16" onclick="backToList()">← 返回列表</button>
+
+        <div class="grid-2 mb-16">
+          <!-- Original content -->
           <div class="card">
-            <div class="card-title">复核操作</div>
-            <div class="form-group">
-              <label>审核 ID</label>
-              <select class="form-control" id="overrideReviewId">
-                <option value="">请选择待复核的审核记录</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>复核决定 <span class="required">*</span></label>
-              <select class="form-control" id="overrideDecision">
-                <option value="">请选择决定</option>
-                <option value="compliant">合规通过</option>
-                <option value="violation">确认违规</option>
-                <option value="needs_review">需进一步审核</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>修改原因 <span class="required">*</span></label>
-              <textarea class="form-control" id="overrideReason" rows="3" placeholder="必须填写修改原因..."></textarea>
-              <button class="btn btn-sm" style="background:var(--slate-100);color:var(--navy-600);border:1px solid var(--slate-300);margin-top:4px;" onclick="generateModificationReason()">
-                ✨ AI 生成修改原因
-              </button>
-            </div>
-            <div class="form-group">
-              <label>修改违规分类（可选）</label>
-              <div id="violationTypeCheckboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="absolute_language"> 绝对化用语
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="return_promise"> 收益承诺
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="exaggerated_return"> 夸大收益
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="product_confusion"> 产品混淆
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="unauthorized_endorsement"> 无资质代言
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="inducement_sales"> 诱导销售
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="concealment"> 隐瞒信息
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="insufficient_risk_disclosure"> 风险提示不足
-                </label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;background:var(--slate-50);border-radius:16px;border:1px solid var(--slate-200);cursor:pointer;">
-                  <input type="checkbox" value="privacy_violation"> 信息保护违规
-                </label>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>修改引用条款（可选）</label>
-              <div class="search-select" id="articleSearchSelect">
-                <input type="text" class="form-control" id="articleSearchInput" placeholder="搜索条款..." oninput="filterArticles()" onfocus="showArticleDropdown()" onblur="hideArticleDropdown()">
-                <div class="search-dropdown" id="articleDropdown" style="display:none;"></div>
-                <div class="selected-items" id="selectedArticles"></div>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>备注</label>
-              <textarea class="form-control" id="overrideComment" rows="2" placeholder="可选备注信息..."></textarea>
-            </div>
-            <div class="text-sm text-muted mb-16">不论系统决策是什么，人工都可以修改</div>
-            <button class="btn btn-primary" onclick="submitOverride()">提交复核</button>
+            <div class="card-title">原始内容</div>
+            <div id="detailOriginalContent" style="font-size:0.9rem;color:var(--navy-700);line-height:1.7;padding:8px 0;white-space:pre-wrap;word-break:break-word;"></div>
           </div>
+          <!-- System result summary -->
+          <div class="card">
+            <div class="card-title">系统审核结果</div>
+            <div id="detailSystemResult"></div>
+          </div>
+        </div>
+
+        <!-- Violation types review -->
+        <div class="card mb-16">
+          <div class="flex-between mb-12">
+            <div class="card-title" style="margin-bottom:0;">违规类型逐项复核</div>
+            <button class="btn btn-secondary" onclick="addNewViolationType()">+ 添加违规类型</button>
+          </div>
+          <div id="violationReviewList"></div>
+          <div id="addViolationForm" style="display:none;"></div>
+        </div>
+
+        <!-- Final decision -->
+        <div class="card">
+          <div class="card-title">最终决定</div>
+          <div class="form-group">
+            <label>整体决定 <span class="required">*</span></label>
+            <select class="form-control" id="finalDecision">
+              <option value="">请选择决定</option>
+              <option value="yes">合规通过</option>
+              <option value="no">确认违规</option>
+              <option value="unknown">待定</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>修改原因 <span class="required">*</span></label>
+            <textarea class="form-control" id="finalReason" rows="3" placeholder="必须填写修改原因..."></textarea>
+            <button class="btn btn-sm" style="background:var(--slate-100);color:var(--navy-600);border:1px solid var(--slate-300);margin-top:4px;" onclick="generateModificationReason()">
+              ✨ AI 生成修改原因
+            </button>
+          </div>
+          <button class="btn btn-primary" onclick="submitHumanReview()">提交复核结果</button>
         </div>
       </div>
     </div>
@@ -1474,6 +1549,7 @@ select.form-control {
         <div class="card">
           <div class="card-title">模型状态</div>
           <div id="modelStatus"></div>
+          <div id="vectorStatus" style="margin-top:8px;"></div>
         </div>
         <div class="card">
           <div class="card-title">法规版本</div>
@@ -1494,16 +1570,36 @@ select.form-control {
         <div id="clauseMappingList"></div>
       </div>
 
+      <div class="card mb-16">
+        <div class="flex-between mb-12">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="card-title" style="margin-bottom:0;">条款关联关系</div>
+            <button style="width:20px;height:20px;border-radius:50%;border:1px solid var(--slate-300);background:var(--slate-50);color:var(--slate-500);font-size:0.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="showRelationHelp()" title="关联关系说明">?</button>
+          </div>
+        </div>
+        <div id="clauseRelationsList"></div>
+      </div>
+
       <div class="card mt-16">
         <div class="card-title">法规原件管理</div>
         <div id="regulationList" class="mb-16"></div>
+        <div id="regDetailPanel" style="display:none;"></div>
         <div class="form-group">
           <label>上传新法规</label>
-          <div class="upload-dropzone" onclick="document.getElementById('regFileInput').click()" style="padding:20px;">
-            <div class="upload-text" style="font-size:0.85rem;">点击上传法规文件（PDF/DOCX/DOC）</div>
-            <input type="file" id="regFileInput" accept=".pdf,.docx,.doc" style="display:none;" onchange="uploadRegulation(event)">
+          <div style="padding:20px;background:var(--slate-50);border-radius:8px;text-align:center;">
+            <div style="font-size:0.85rem;color:var(--slate-400);">⚠️ Demo环境不支持文件上传</div>
+            <div style="font-size:0.75rem;color:var(--slate-300);margin-top:4px;">生产环境支持PDF/DOCX/DOC/图片上传</div>
           </div>
         </div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="flex-between mb-12">
+          <div class="card-title" style="margin-bottom:0;">LLM 调用审计日志</div>
+          <button class="btn btn-sm" style="font-size:0.75rem;padding:4px 12px;" onclick="loadLLMAuditLogs()">刷新</button>
+        </div>
+        <div style="font-size:0.75rem;color:var(--slate-400);margin-bottom:8px;">记录每次LLM调用的模型、输入、输出和延迟，用于审计和问题排查</div>
+        <div id="llmAuditLogList" style="max-height:500px;overflow-y:auto;"></div>
       </div>
     </div>
   </div>
@@ -1538,13 +1634,13 @@ select.form-control {
             <h3>技术栈</h3>
             <table class="tech-table">
               <tr><td>后端框架</td><td>FastAPI (Python 3.11+)</td></tr>
-              <tr><td>大语言模型</td><td>通义千问 (qwen-plus)</td></tr>
+              <tr><td>大语言模型</td><td>通义千问 (qwen3.5-plus)</td></tr>
               <tr><td>规则引擎</td><td>自定义关键词 + 正则匹配</td></tr>
-              <tr><td>数据库</td><td>SQLite / PostgreSQL</td></tr>
-              <tr><td>向量存储</td><td>FAISS (法规检索)</td></tr>
+              <tr><td>数据库</td><td>SQLite</td></tr>
+              <tr><td>向量存储</td><td>ChromaDB (法规向量检索)</td></tr>
               <tr><td>前端</td><td>原生 HTML/CSS/JS</td></tr>
-              <tr><td>认证</td><td>API Key + JWT</td></tr>
-              <tr><td>部署</td><td>Docker + Nginx</td></tr>
+              <tr><td>认证</td><td>API Key</td></tr>
+              <tr><td>部署</td><td>Uvicorn</td></tr>
             </table>
           </div>
         </div>
@@ -1623,115 +1719,45 @@ const FALLBACK_COMPLIANT_RESULT = {
   suggestions: ""
 };
 
-const VIOLATION_TYPES_DATA = {
-  absolute_language: {
-    name: '绝对化用语', description: '使用绝对化用语进行宣传',
-    keywords: ['最好','最佳','最优','第一','首个','唯一','绝对','100%','零风险','稳赚'],
-    parent: '用语违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['十八'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['四','五','六','七'], logic: 'secondary' }
-    ]
-  },
-  return_promise: {
-    name: '收益承诺', description: '承诺确定收益或保本',
-    keywords: ['保本','保息','保证收益','固定收益','稳赚不赔','保本保息'],
-    parent: '收益违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['十一','十二','十三','十四','十九'], logic: 'primary' },
-      { doc_name: '互联网保险业务监管办法', articles: ['十四','十五','十六','十七','十八'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['十三','十四','十五','十六'], logic: 'secondary' }
-    ]
-  },
-  exaggerated_return: {
-    name: '夸大收益', description: '夸大保险产品收益',
-    keywords: ['高达','最高','翻倍','暴增','远超'],
-    parent: '收益违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['二十'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['十三','十四','十五','十六'], logic: 'secondary' }
-    ]
-  },
-  product_confusion: {
-    name: '产品混淆', description: '将保险与存款/理财/基金混淆',
-    keywords: ['存款','理财','基金','存钱','储蓄'],
-    parent: '产品违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['二十一'], logic: 'primary' },
-      { doc_name: '互联网保险业务监管办法', articles: ['十九','二十','二十一','二十二','二十三'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['四','五','六','七'], logic: 'secondary' }
-    ]
-  },
-  unauthorized_endorsement: {
-    name: '无资质代言', description: '利用无资质人员代言',
-    keywords: ['明星','代言','推荐','网红','主播'],
-    parent: '代言违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['六','七'], logic: 'primary' }
-    ]
-  },
-  inducement_sales: {
-    name: '诱导销售', description: '以不正当利益诱导购买',
-    keywords: ['限时','仅剩','最后机会','赠送','返现','红包'],
-    parent: '销售违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['六','七','十一','十二','十三','十四'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['十三','十四','十五','十六'], logic: 'secondary' }
-    ]
-  },
-  concealment: {
-    name: '隐瞒信息', description: '隐瞒重要产品信息',
-    keywords: ['隐瞒','未告知','未披露'],
-    parent: '信息披露违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['十五','十六','十七','二十一'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['十七','十八','十九','二十'], logic: 'secondary' }
-    ]
-  },
-  insufficient_risk_disclosure: {
-    name: '风险提示不足', description: '未充分提示产品风险',
-    keywords: ['风险提示','不确定性','非保证'],
-    parent: '信息披露违规',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['八','九','十'], logic: 'primary' },
-      { doc_name: '互联网保险业务监管办法', articles: ['九','十','十一','十二','十三'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['八','九','十','十一','十二'], logic: 'secondary' }
-    ]
-  },
-  privacy_violation: {
-    name: '信息保护违规', description: '违反个人信息保护规定',
-    keywords: ['个人信息','数据','隐私'],
-    parent: '信息披露违规',
-    mappings: [
-      { doc_name: '互联网保险业务监管办法', articles: ['二十四','二十五','二十六','二十七','二十八','二十九','三十'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['十七','十八','十九','二十'], logic: 'secondary' }
-    ]
-  },
-  other_violation: {
-    name: '其他违规', description: '其他不合规行为',
-    keywords: [],
-    parent: '其他',
-    mappings: []
-  },
-  procedural: {
-    name: '程序性条款', description: '程序性条款，不涉及内容审核',
-    keywords: [],
-    parent: '其他',
-    mappings: [
-      { doc_name: '保险销售行为管理办法', articles: ['一','二','二十二','二十三','二十四'], logic: 'primary' },
-      { doc_name: '互联网保险业务监管办法', articles: ['一','二','三','三十一','三十二','三十三','三十四','三十五','三十六'], logic: 'primary' },
-      { doc_name: '金融产品网络营销管理办法', articles: ['一','二','三','二十一','二十二','二十三'], logic: 'secondary' }
-    ]
-  }
-};
+let VIOLATION_TYPES_DATA = {};
 
-const CN = ['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','二十一','二十二','二十三','二十四','二十五','二十六','二十七','二十八','二十九','三十','三十一','三十二','三十三','三十四','三十五','三十六'];
+async function loadViolationTypesFromAPI() {
+  try {
+    const resp = await apiCall('GET', '/api/v1/violation-types');
+    const types = resp.types || [];
+    VIOLATION_TYPES_DATA = {};
+    const idToName = {};
+    types.forEach(t => { idToName[t.id] = t.name; });
+    types.forEach(t => {
+      const key = t.id;
+      const l1Name = t.level === 2 ? (idToName[t.parent_id] || t.parent_id || '其他') : t.name;
+      VIOLATION_TYPES_DATA[key] = {
+        name: t.name,
+        description: t.description || '',
+        keywords: t.keywords || [],
+        parent: l1Name,
+        level: (t.level === 2 || t.level === 'L2') ? 'L2' : 'L1',
+        l1_name: l1Name,
+        l2_name: t.name,
+        mappings: (t.clause_mappings || []).map(m => ({
+          doc_name: m.doc_name,
+          articles: m.articles || [],
+          logic: m.mapping_logic === 'primary' ? 'primary' : 'secondary'
+        }))
+      };
+    });
+  } catch (e) {
+    console.warn('加载违规类型失败，使用默认数据', e);
+  }
+}
+
+const CN = ['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','二十一','二十二','二十三','二十四','二十五','二十六','二十七','二十八','二十九','三十','三十一','三十二','三十三','三十四','三十五','三十六','三十七','三十八','三十九','四十','四十一','四十二','四十三','四十四','四十五','四十六','四十七','四十八','四十九','五十','五十一','五十二','五十三','五十四','五十五','五十六','五十七','五十八','五十九','六十','六十一','六十二','六十三','六十四','六十五','六十六','六十七','六十八','六十九','七十','七十一','七十二','七十三','七十四','七十五','七十六','七十七','七十八','七十九','八十','八十一','八十二','八十三'];
 
 const ALL_ARTICLES = [];
 const REG_DOCS = [
-  { prefix: 'bx_xs', name: '保险销售行为管理办法', count: 24 },
-  { prefix: 'hlw_bx', name: '互联网保险业务监管办法', count: 36 },
-  { prefix: 'jr_cp', name: '金融产品网络营销管理办法', count: 23 }
+  { prefix: 'bx_xs', name: '保险销售行为管理办法', count: 50 },
+  { prefix: 'hlw_bx', name: '互联网保险业务监管办法', count: 83 },
+  { prefix: 'jr_cp', name: '金融产品网络营销管理办法', count: 37 }
 ];
 REG_DOCS.forEach(d => {
   for (let i = 1; i <= d.count; i++) {
@@ -1755,9 +1781,19 @@ const EXAMPLE_TEXTS = [
 
 let isRuleEngineMode = false;
 let backendReachable = true;
+const BASE_URL = '';
 let historyData = [];
 let historySortField = 'id';
 let historySortDir = 'desc';
+let _vtSearchTimer = null;
+let _cmSearchTimer = null;
+let _crSearchTimer = null;
+let _isComposing = false;
+document.addEventListener('compositionstart', () => { _isComposing = true; });
+document.addEventListener('compositionend', (e) => { _isComposing = false; debounceVtSearch(e.target.value); debounceCmSearch(e.target.value); debounceCrSearch(e.target.value); });
+function debounceVtSearch(val) { if (_isComposing) return; clearTimeout(_vtSearchTimer); _vtSearchTimer = setTimeout(() => onVtSearch(val), 200); }
+function debounceCmSearch(val) { if (_isComposing) return; clearTimeout(_cmSearchTimer); _cmSearchTimer = setTimeout(() => onCmSearch(val), 200); }
+function debounceCrSearch(val) { if (_isComposing) return; clearTimeout(_crSearchTimer); _crSearchTimer = setTimeout(() => onCrSearch(val), 200); }
 
 function switchPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1859,16 +1895,61 @@ function showToast(message, type = 'info') {
 }
 
 async function apiCall(method, url, body = null) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', 'X-Model': document.getElementById('modelInput')?.value || 'qwen3.5-plus' };
   const apiKey = document.getElementById('apiKeyInput').value;
   if (apiKey) headers['X-API-Key'] = apiKey;
 
   const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
 
-  const resp = await fetch(url, opts);
+  const resp = await fetch(BASE_URL + url, opts);
   if (!resp.ok) throw new Error(`API Error: ${resp.status} ${resp.statusText}`);
   return resp.json();
+}
+
+const STEPS = ['Extract', 'RuleCheck', 'RAGRetrieve', 'Rerank', 'ExpandRelations', 'LLMReason', 'Format', 'Validate', 'CrossCheck', 'RiskAssess'];
+let currentStep = 0;
+let progressInterval;
+
+function startProgress() {
+  currentStep = 0;
+  const container = document.getElementById('progressSteps');
+  if (!container) return;
+  container.innerHTML = STEPS.map((step, i) =>
+    `<div id="step-${i}" style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.8rem;color:var(--slate-400);">
+      <div id="step-dot-${i}" style="width:8px;height:8px;border-radius:50%;background:var(--slate-200);"></div>
+      <span>${step}</span>
+    </div>`
+  ).join('');
+  progressInterval = setInterval(() => {
+    if (currentStep < STEPS.length - 1) {
+      document.getElementById(`step-dot-${currentStep}`).style.background = 'var(--green-500)';
+      document.getElementById(`step-${currentStep}`).style.color = 'var(--navy-700)';
+      currentStep++;
+      document.getElementById(`step-dot-${currentStep}`).style.background = 'var(--amber-500)';
+      document.getElementById(`step-${currentStep}`).style.color = 'var(--navy-700)';
+    }
+  }, 800);
+}
+
+function stopProgress(completed) {
+  clearInterval(progressInterval);
+  for (let i = 0; i < STEPS.length; i++) {
+    const dot = document.getElementById(`step-dot-${i}`);
+    const step = document.getElementById(`step-${i}`);
+    if (dot && step) {
+      if (i <= currentStep || completed) {
+        dot.style.background = completed ? 'var(--green-500)' : (i < currentStep ? 'var(--green-500)' : 'var(--amber-500)');
+        step.style.color = 'var(--navy-700)';
+      }
+    }
+  }
+  if (completed) {
+    for (let i = 0; i <= currentStep; i++) {
+      const dot = document.getElementById(`step-dot-${i}`);
+      if (dot) dot.style.background = 'var(--green-500)';
+    }
+  }
 }
 
 async function submitReview() {
@@ -1894,18 +1975,8 @@ async function submitReview() {
   const progressArea = document.getElementById('reviewProgress');
   if (progressArea) {
     progressArea.style.display = 'block';
-    progressArea.innerHTML = '<div class="review-progress"><div class="progress-step active" id="step-0">安全校验</div><div class="progress-step" id="step-1">规则检查</div><div class="progress-step" id="step-2">法规检索</div><div class="progress-step" id="step-3">重排序</div><div class="progress-step" id="step-4">LLM推理</div><div class="progress-step" id="step-5">格式化</div><div class="progress-step" id="step-6">交叉验证</div><div class="progress-step" id="step-7">风险评估</div></div>';
   }
-  const steps = ['安全校验','规则检查','法规检索','重排序','LLM推理','格式化','交叉验证','风险评估'];
-  let currentStep = 0;
-  const stepInterval = setInterval(() => {
-    if (currentStep < steps.length - 1) {
-      document.getElementById('step-' + currentStep).classList.remove('active');
-      document.getElementById('step-' + currentStep).classList.add('done');
-      currentStep++;
-      document.getElementById('step-' + currentStep).classList.add('active');
-    }
-  }, 300 + Math.random() * 200);
+  startProgress();
 
   try {
     let result;
@@ -1926,11 +1997,24 @@ async function submitReview() {
       }
       showToast('API 调用失败，使用本地规则兜底: ' + apiErr.message, 'warning');
     }
+    stopProgress(true);
     renderReviewResult(result);
+    const violatedArticles = (result.violations || []).flatMap(v => (v.violated_articles || []).map(a => ({
+      doc_name: a.doc_name || '', article_number: a.article_number || ''
+    }))).filter(v => v.doc_name && v.article_number);
+    const expandedRels = result.expanded_relations || [];
+    if (violatedArticles.length > 0 || expandedRels.length > 0) {
+      const html = renderExpandedRelations(expandedRels);
+      const container = document.getElementById('relatedClausesContainer');
+      if (container && html) container.innerHTML = html;
+      else if (container && violatedArticles.length > 0) {
+        loadRelatedClauses(violatedArticles).then(h => { if (h) container.innerHTML = h; });
+      }
+    }
   } catch (e) {
+    stopProgress(false);
     showToast('审核失败: ' + e.message, 'error');
   } finally {
-    clearInterval(stepInterval);
     if (progressArea) progressArea.style.display = 'none';
     btn.disabled = false;
     btnText.textContent = '开始审核';
@@ -2046,7 +2130,22 @@ function renderReviewResult(result) {
   let suggestionsHtml = '';
   if (result.suggestions) {
     const items = result.suggestions.split('\n').filter(s => s.trim());
-    suggestionsHtml = items.map(s => `<div class="suggestion-item">${s}</div>`).join('');
+    const matchedTexts = violations.flatMap(v => {
+      const trigger = extractTriggerText(inputContent, v.violation_type, v.reasoning || '');
+      const reasons = (v.violated_articles || []).map(a => a.violation_reason || '').filter(r => r);
+      return [{ type: v.violation_type, trigger, reasons }];
+    });
+    suggestionsHtml = items.map(s => {
+      const matched = matchedTexts.find(m => {
+        const sLower = s.toLowerCase();
+        return (m.trigger && m.trigger !== '见推理过程' && sLower.includes(m.type)) ||
+               m.reasons.some(r => sLower.includes(r.substring(1, Math.min(r.length, 6))));
+      });
+      const contextHtml = matched && matched.trigger && matched.trigger !== '见推理过程'
+        ? `<div style="font-size:0.75rem;color:var(--red-500);margin-top:2px;">涉及原文: ${matched.trigger}</div>`
+        : '';
+      return `<div class="suggestion-item">${s}${contextHtml}</div>`;
+    }).join('');
   }
 
   const totalArticles = violations.reduce((sum, v) => sum + (v.violated_articles ? v.violated_articles.length : 0), 0);
@@ -2107,6 +2206,8 @@ function renderReviewResult(result) {
           ${accordionHtml}
         </div>` : ''}
 
+        <div id="relatedClausesContainer"></div>
+
         ${suggestionsHtml ? `
         <div class="card">
           <div class="card-title">修改建议</div>
@@ -2126,6 +2227,11 @@ function renderReviewResult(result) {
             <div class="review-meta-item">决策: <strong>${result.decision === 'auto_block' ? '自动拦截' : result.decision === 'auto_pass' ? '自动通过' : '人工复核'}</strong></div>
             <div class="review-meta-item">延迟: <strong>${result.latency_ms}ms</strong></div>
           </div>
+          ${result.decision !== 'human_review' ? `
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--slate-100);">
+            <button onclick="requestHumanReview(${result.review_id})" style="padding:6px 14px;font-size:0.82rem;background:var(--navy-50);color:var(--navy-600);border:1px solid var(--navy-200);border-radius:6px;cursor:pointer;">✋ 请求人工复核</button>
+            <span style="font-size:0.75rem;color:var(--slate-400);margin-left:8px;">将此审核结果提交给人工复核员</span>
+          </div>` : ''}
         </div>
       </div>
     </div>
@@ -2141,29 +2247,98 @@ function renderReviewResult(result) {
   }, 100);
 }
 
+async function loadRelatedClauses(violatedArticles) {
+  if (!violatedArticles || violatedArticles.length === 0) return '';
+  const allRelations = [];
+  for (const va of violatedArticles) {
+    try {
+      const resp = await apiCall('GET', `/api/v1/clause-relations?doc_name=${encodeURIComponent(va.doc_name)}&article_number=${encodeURIComponent(va.article_number)}`);
+      if (resp.relations) {
+        allRelations.push(...resp.relations);
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (allRelations.length === 0) return '';
+  const uniqueRelations = [];
+  const seen = new Set();
+  for (const r of allRelations) {
+    const key = `${r.from_doc}-${r.from_article}-${r.to_doc}-${r.to_article}-${r.relation_type}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueRelations.push(r);
+    }
+  }
+  return renderExpandedRelations(uniqueRelations);
+}
+
+function renderExpandedRelations(relations) {
+  if (!relations || relations.length === 0) return '';
+  const typeLabels = {
+    'references': '→ 引用', 'exception': '⚠️ 例外', 'supplement': '➕ 补充',
+    'definition': '📖 定义', 'consequence': '⚖️ 后果', 'prerequisite': '🔗 前提',
+    'applicability': '🎯 适用', 'conflict': '⚡ 冲突'
+  };
+  const typeColors = {
+    'references': '#64748b', 'exception': '#f59e0b', 'supplement': '#8b5cf6',
+    'definition': '#10b981', 'consequence': '#ef4444', 'prerequisite': '#3b82f6',
+    'applicability': '#06b6d4', 'conflict': '#ef4444'
+  };
+  const uniqueRelations = [];
+  const seen = new Set();
+  for (const r of relations) {
+    const key = `${r.from_doc}-${r.from_article}-${r.to_doc}-${r.to_article}-${r.relation_type}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueRelations.push(r);
+    }
+  }
+  return `
+    <div style="margin-top:16px;border:1px solid var(--slate-200);border-radius:8px;overflow:hidden;">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="padding:10px 14px;background:var(--slate-50);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;font-size:0.85rem;color:var(--navy-700);">🔗 条款隐含关联 (${uniqueRelations.length})</span>
+        <span style="font-size:0.75rem;color:var(--slate-400);">点击展开 ▼</span>
+      </div>
+      <div style="display:none;padding:8px 14px;">
+        ${uniqueRelations.map(r => `
+          <div style="padding:8px 0;border-bottom:1px solid var(--slate-100);font-size:0.8rem;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <span style="background:${typeColors[r.relation_type] || '#64748b'}20;color:${typeColors[r.relation_type] || '#64748b'};padding:1px 6px;border-radius:3px;font-size:0.7rem;">${typeLabels[r.relation_type] || r.relation_type}</span>
+              <span style="color:var(--navy-600);font-weight:500;">第${r.from_article}条 → 第${r.to_article}条</span>
+              <span style="color:var(--slate-400);font-size:0.7rem;">(${r.from_doc}${r.from_doc !== r.to_doc ? ' → ' + r.to_doc : ''})</span>
+            </div>
+            ${r.target_article_text ? `<div style="color:var(--navy-700);font-size:0.75rem;line-height:1.4;padding:4px 8px;background:var(--slate-50);border-radius:4px;margin-bottom:4px;">${r.target_article_text.substring(0, 150)}${r.target_article_text.length > 150 ? '...' : ''}</div>` : ''}
+            ${r.evidence_text ? `<div style="color:var(--slate-500);font-size:0.72rem;line-height:1.3;">依据: ${r.evidence_text.substring(0, 100)}${r.evidence_text.length > 100 ? '...' : ''}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+let currentReviewDetail = null;
+let violationReviewState = {};
+let addedViolationTypes = [];
+
 async function loadPending() {
   const list = document.getElementById('pendingList');
-  const select = document.getElementById('overrideReviewId');
 
   try {
-    let data;
     const resp = await apiCall('GET', '/api/v1/review/pending');
-    data = resp.reviews || resp;
+    const data = resp.pending || resp.reviews || resp;
 
     if (!data || data.length === 0) {
       list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无待复核项目</div></div>';
-      select.innerHTML = '<option value="">请选择待复核的审核记录</option>';
       return;
     }
 
     list.innerHTML = data.map(r => `
-      <div class="pending-card" onclick="selectPendingReview(${r.review_id})">
+      <div class="pending-card" onclick="openReviewDetail(${r.id})">
         <div class="pending-icon ${r.compliant === 'yes' ? 'compliant' : 'violation'}">
           ${r.compliant === 'yes' ? '✓' : '✗'}
         </div>
         <div class="pending-info">
-          <div class="pending-title">#${r.review_id} - ${r.violation_type || '合规'}</div>
-          <div class="pending-sub">${r.content_preview}</div>
+          <div class="pending-title">#${r.id} - ${r.violation_type || '合规'}</div>
+          <div class="pending-sub">${r.input_content || '点击查看详情'}</div>
         </div>
         <div class="pending-confidence" style="color:${r.confidence > 0.85 ? 'var(--red-600)' : 'var(--amber-500)'}">
           ${(r.confidence * 100).toFixed(0)}%
@@ -2171,38 +2346,315 @@ async function loadPending() {
       </div>
     `).join('');
 
-    select.innerHTML = '<option value="">请选择待复核的审核记录</option>' +
-      data.map(r => `<option value="${r.review_id}">#${r.review_id} - ${r.violation_type || '合规'}</option>`).join('');
-
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败: ' + e.message + '</div></div>';
   }
 }
 
-function selectPendingReview(id) {
-  document.getElementById('overrideReviewId').value = id;
+async function openReviewDetail(reviewId) {
+  try {
+    const resp = await apiCall('GET', `/api/v1/reviews/${reviewId}`);
+    currentReviewDetail = resp;
+    violationReviewState = {};
+    addedViolationTypes = [];
+
+    if (resp.violations && resp.violations.length > 0) {
+      resp.violations.forEach((v, i) => {
+        const vType = v.violation_type_name || v.violation_type || '其他违规';
+        const vArticles = v.violated_articles ? (typeof v.violated_articles === 'string' ? JSON.parse(v.violated_articles) : v.violated_articles) : (resp.violated_articles || []);
+        const vReasoning = v.reasoning || resp.reasoning || '';
+        violationReviewState[`system_${i}`] = {
+          type: vType,
+          agreed: true,
+          articles: vArticles,
+          reasoning: vReasoning,
+          originalArticles: JSON.parse(JSON.stringify(vArticles)),
+          originalReasoning: vReasoning
+        };
+      });
+    } else if (resp.violation_type && resp.violated_articles) {
+      const typeNames = resp.violation_type.split('、').filter(t => t.trim());
+      const articles = resp.violated_articles || [];
+      if (typeNames.length > 0) {
+        typeNames.forEach((t, i) => {
+          violationReviewState[`system_${i}`] = {
+            type: t.trim(),
+            agreed: true,
+            articles: articles,
+            reasoning: resp.reasoning || '',
+            originalArticles: JSON.parse(JSON.stringify(articles)),
+            originalReasoning: resp.reasoning || ''
+          };
+        });
+      } else {
+        violationReviewState['system_0'] = {
+          type: resp.violation_type || '其他违规',
+          agreed: true,
+          articles: articles,
+          reasoning: resp.reasoning || '',
+          originalArticles: JSON.parse(JSON.stringify(articles)),
+          originalReasoning: resp.reasoning || ''
+        };
+      }
+    }
+
+    document.getElementById('manualListView').style.display = 'none';
+    document.getElementById('manualDetailView').style.display = 'block';
+
+    document.getElementById('detailOriginalContent').textContent = resp.input_content || resp.content || '（无内容记录）';
+
+    const isCompliant = resp.compliant === 'yes';
+    document.getElementById('detailSystemResult').innerHTML = `
+      <div style="margin-bottom:12px;">
+        <span class="system-result-badge ${isCompliant ? 'compliant' : 'violation'}">
+          ${isCompliant ? '✓ 合规' : '✗ 违规'}
+        </span>
+      </div>
+      ${!isCompliant && (resp.violations && resp.violations.length > 0) ? resp.violations.map(v => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--slate-100);">
+          <span class="violation-type-badge">${v.violation_type_name || v.violation_type || '其他违规'}</span>
+          <span style="font-size:0.78rem;color:var(--slate-400);margin-left:8px;">${(v.violated_articles ? (typeof v.violated_articles === 'string' ? JSON.parse(v.violated_articles) : v.violated_articles) : (resp.violated_articles || [])).length}条引用</span>
+        </div>
+      `).join('') : !isCompliant && resp.violation_type ? resp.violation_type.split('、').filter(t => t.trim()).map(t => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--slate-100);">
+          <span class="violation-type-badge">${t.trim()}</span>
+          <span style="font-size:0.78rem;color:var(--slate-400);margin-left:8px;">${(resp.violated_articles || []).length}条引用</span>
+        </div>
+      `).join('') : ''}
+      <div class="system-result-meta">
+        <span>置信度: <strong>${(resp.confidence * 100).toFixed(0)}%</strong></span>
+        <span>风险: <strong>${resp.risk_level || '-'}</strong></span>
+        <span>决策: <strong>${resp.decision === 'auto_block' ? '自动拦截' : resp.decision === 'auto_pass' ? '自动通过' : '人工复核'}</strong></span>
+        <span>模式: <strong>${resp.review_mode || '-'}</strong></span>
+      </div>
+    `;
+
+    renderViolationReviewList();
+
+  } catch (e) {
+    showToast('加载审核详情失败: ' + e.message, 'error');
+  }
 }
 
-async function submitOverride() {
-  const reviewId = document.getElementById('overrideReviewId').value;
-  const decision = document.getElementById('overrideDecision').value;
-  const reason = document.getElementById('overrideReason').value.trim();
-  const comment = document.getElementById('overrideComment').value.trim();
+function backToList() {
+  document.getElementById('manualListView').style.display = 'block';
+  document.getElementById('manualDetailView').style.display = 'none';
+  currentReviewDetail = null;
+  violationReviewState = {};
+  addedViolationTypes = [];
+  loadPending();
+}
 
-  if (!reviewId) { showToast('请选择审核记录', 'warning'); return; }
-  if (!decision) { showToast('请选择复核决定', 'warning'); return; }
+function renderViolationReviewList() {
+  const container = document.getElementById('violationReviewList');
+  const keys = Object.keys(violationReviewState);
+
+  if (keys.length === 0 && addedViolationTypes.length === 0) {
+    container.innerHTML = '<div style="padding:12px;color:var(--slate-400);font-size:0.88rem;">系统未发现违规类型。如需添加，请点击上方"+ 添加违规类型"按钮。</div>';
+    return;
+  }
+
+  let html = '';
+  keys.forEach((key, idx) => {
+    const state = violationReviewState[key];
+    const isAgreed = state.agreed;
+    html += `
+      <div class="violation-review-item ${isAgreed ? '' : 'disagreed'}" id="vr-${key}">
+        <div class="violation-review-header">
+          <span class="violation-type-badge">${state.type}</span>
+          <span style="font-size:0.78rem;color:var(--slate-400);">系统判定 #${idx + 1}</span>
+          <div class="toggle-group">
+            <button class="toggle-btn ${isAgreed ? 'active-agree' : ''}" onclick="toggleViolationAgree('${key}', true)">✓ 认可</button>
+            <button class="toggle-btn ${!isAgreed ? 'active-disagree' : ''}" onclick="toggleViolationAgree('${key}', false)">✗ 不认可</button>
+          </div>
+        </div>
+        ${isAgreed ? `
+        <div class="violation-review-body">
+          <div class="edit-field">
+            <label>引用条款</label>
+            <textarea id="vr-articles-${key}" rows="3" placeholder="编辑引用条款...">${state.articles.map(a => `${a.doc_name} 第${a.article_number}条: ${a.violation_reason}`).join('\n')}</textarea>
+          </div>
+          <div class="edit-field">
+            <label>推理过程</label>
+            <textarea id="vr-reasoning-${key}" rows="2" placeholder="编辑推理过程...">${state.reasoning}</textarea>
+          </div>
+        </div>` : `
+        <div style="font-size:0.85rem;color:var(--slate-400);padding:4px 0;">已标记为不认可，此违规类型将从最终结果中移除</div>`}
+      </div>
+    `;
+  });
+
+  addedViolationTypes.forEach((avt, idx) => {
+    const key = `added_${idx}`;
+    html += `
+      <div class="violation-review-item" style="border-color:var(--teal-400);background:var(--teal-50);" id="vr-${key}">
+        <div class="violation-review-header">
+          <span class="violation-type-badge" style="background:var(--teal-100);color:var(--teal-700);">+ ${avt.type}</span>
+          <span style="font-size:0.78rem;color:var(--teal-600);">人工添加</span>
+          <button class="toggle-btn active-disagree" style="margin-left:auto;padding:4px 12px;font-size:0.75rem;" onclick="removeAddedViolation(${idx})">移除</button>
+        </div>
+        <div class="violation-review-body">
+          <div class="edit-field">
+            <label>引用条款 <span class="required">*</span></label>
+            <textarea id="avt-articles-${idx}" rows="3" placeholder="输入引用条款，如：保险销售行为管理办法 第十八条: ...">${avt.articles || ''}</textarea>
+          </div>
+          <div class="edit-field">
+            <label>推理过程 <span class="required">*</span></label>
+            <textarea id="avt-reasoning-${idx}" rows="2" placeholder="输入推理过程...">${avt.reasoning || ''}</textarea>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function toggleViolationAgree(key, agree) {
+  if (violationReviewState[key]) {
+    violationReviewState[key].agreed = agree;
+    if (agree) {
+      const articlesEl = document.getElementById(`vr-articles-${key}`);
+      const reasoningEl = document.getElementById(`vr-reasoning-${key}`);
+      if (articlesEl) violationReviewState[key].articles = parseArticlesText(articlesEl.value);
+      if (reasoningEl) violationReviewState[key].reasoning = reasoningEl.value;
+    }
+    renderViolationReviewList();
+  }
+}
+
+function parseArticlesText(text) {
+  if (!text || !text.trim()) return [];
+  return text.trim().split('\n').filter(l => l.trim()).map(line => {
+    const match = line.match(/^(.+?)\s*第(.+?)条[:：]\s*(.+)$/);
+    if (match) {
+      return { doc_name: match[1].trim(), article_number: match[2].trim(), violation_reason: match[3].trim() };
+    }
+    return { doc_name: '', article_number: '', violation_reason: line.trim() };
+  });
+}
+
+function addNewViolationType() {
+  const form = document.getElementById('addViolationForm');
+  if (form.style.display !== 'none' && form.innerHTML) {
+    form.style.display = 'none';
+    return;
+  }
+  form.style.display = 'block';
+  const typeOptions = Object.entries(VIOLATION_TYPES_DATA)
+    .filter(([k, v]) => v.name !== '程序性条款' && v.name !== '其他违规')
+    .map(([k, v]) => `<option value="${v.name}">${v.name}</option>`)
+    .join('');
+  form.innerHTML = `
+    <div class="add-violation-form">
+      <div style="font-weight:600;color:var(--navy-900);margin-bottom:12px;">添加新的违规类型</div>
+      <div class="form-group">
+        <label>违规类型 <span class="required">*</span></label>
+        <select class="form-control" id="newViolationType">
+          <option value="">请选择违规类型</option>
+          ${typeOptions}
+          <option value="__custom">自定义类型...</option>
+        </select>
+      </div>
+      <div class="form-group" id="customTypeGroup" style="display:none;">
+        <label>自定义类型名称</label>
+        <input type="text" class="form-control" id="customTypeName" placeholder="输入自定义违规类型名称">
+      </div>
+      <div class="form-group">
+        <label>引用条款 <span class="required">*</span></label>
+        <textarea class="form-control" id="newViolationArticles" rows="3" placeholder="输入引用条款，如：保险销售行为管理办法 第十八条: 不得使用欺骗手段"></textarea>
+      </div>
+      <div class="form-group">
+        <label>推理过程 <span class="required">*</span></label>
+        <textarea class="form-control" id="newViolationReasoning" rows="2" placeholder="输入推理过程..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="cancelAddViolation()">取消</button>
+        <button class="btn btn-primary" onclick="confirmAddViolation()">确认添加</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('newViolationType').addEventListener('change', function() {
+    document.getElementById('customTypeGroup').style.display = this.value === '__custom' ? 'block' : 'none';
+  });
+}
+
+function cancelAddViolation() {
+  document.getElementById('addViolationForm').style.display = 'none';
+}
+
+function confirmAddViolation() {
+  const typeSelect = document.getElementById('newViolationType');
+  const articles = document.getElementById('newViolationArticles').value.trim();
+  const reasoning = document.getElementById('newViolationReasoning').value.trim();
+
+  let typeName = typeSelect.value;
+  if (typeName === '__custom') {
+    typeName = document.getElementById('customTypeName').value.trim();
+  }
+
+  if (!typeName) { showToast('请选择或输入违规类型', 'warning'); return; }
+  if (!articles) { showToast('请输入引用条款', 'warning'); return; }
+  if (!reasoning) { showToast('请输入推理过程', 'warning'); return; }
+
+  addedViolationTypes.push({ type: typeName, articles, reasoning });
+  document.getElementById('addViolationForm').style.display = 'none';
+  renderViolationReviewList();
+  showToast(`已添加违规类型: ${typeName}`, 'success');
+}
+
+function removeAddedViolation(idx) {
+  addedViolationTypes.splice(idx, 1);
+  renderViolationReviewList();
+}
+
+async function submitHumanReview() {
+  if (!currentReviewDetail) { showToast('无审核记录', 'warning'); return; }
+
+  const decision = document.getElementById('finalDecision').value;
+  const reason = document.getElementById('finalReason').value.trim();
+
+  if (!decision) { showToast('请选择最终决定', 'warning'); return; }
   if (!reason) { showToast('修改原因为必填项', 'warning'); return; }
 
+  const agreedViolations = [];
+  Object.keys(violationReviewState).forEach(key => {
+    const state = violationReviewState[key];
+    if (state.agreed) {
+      const articlesEl = document.getElementById(`vr-articles-${key}`);
+      const reasoningEl = document.getElementById(`vr-reasoning-${key}`);
+      let articles = state.articles;
+      let reasoning = state.reasoning;
+      if (articlesEl) articles = parseArticlesText(articlesEl.value);
+      if (reasoningEl) reasoning = reasoningEl.value;
+      agreedViolations.push({
+        violation_type: state.type,
+        violated_articles: articles,
+        reasoning: reasoning
+      });
+    }
+  });
+
+  addedViolationTypes.forEach((avt, idx) => {
+    const articlesEl = document.getElementById(`avt-articles-${idx}`);
+    const reasoningEl = document.getElementById(`avt-reasoning-${idx}`);
+    agreedViolations.push({
+      violation_type: avt.type,
+      violated_articles: parseArticlesText(articlesEl ? articlesEl.value : avt.articles),
+      reasoning: reasoningEl ? reasoningEl.value : avt.reasoning,
+      source: 'human_added'
+    });
+  });
+
   try {
-    await apiCall('POST', `/api/v1/review/${reviewId}/override`, { decision, reason, comment, articles: selectedArticleIds });
-    showToast(`复核 #${reviewId} 已提交`, 'success');
-    document.getElementById('overrideReviewId').value = '';
-    document.getElementById('overrideDecision').value = '';
-    document.getElementById('overrideReason').value = '';
-    document.getElementById('overrideComment').value = '';
-    selectedArticleIds = [];
-    renderSelectedArticles();
-    loadPending();
+    await apiCall('POST', `/api/v1/review/${currentReviewDetail.review_id}/override`, {
+      decision,
+      reason,
+      violations: agreedViolations,
+      removed_types: Object.keys(violationReviewState).filter(k => !violationReviewState[k].agreed).map(k => violationReviewState[k].type)
+    });
+    showToast(`复核 #${currentReviewDetail.review_id} 已提交`, 'success');
+    backToList();
   } catch (e) {
     showToast('提交失败: ' + e.message, 'error');
   }
@@ -2211,8 +2663,7 @@ async function submitOverride() {
 async function loadHistory() {
   try {
     const resp = await apiCall('GET', '/api/v1/reviews');
-    const data = resp.reviews || resp;
-    historyData = data;
+    historyData = resp.items || resp.reviews || resp;
     renderHistory();
   } catch (e) {
     showToast('加载历史失败: ' + e.message, 'error');
@@ -2261,7 +2712,7 @@ function renderHistory() {
         <div class="history-detail">
           <div class="detail-section">
             <div class="detail-label">输入内容</div>
-            <div class="detail-content">${r.content || '（无内容记录）'}</div>
+            <div class="detail-content">${r.input_content || r.content || '（无内容记录）'}</div>
           </div>
           ${r.violation_type ? `
           <div class="detail-section">
@@ -2462,10 +2913,25 @@ async function loadManagement() {
     renderRegVersion();
     loadViolationTypes();
     renderClauseMappings();
+    loadClauseRelations();
     loadRegulations();
+    loadLLMAuditLogs();
+    applyDemoMode();
   } catch (e) {
     showToast('加载管理数据失败: ' + e.message, 'error');
   }
+}
+
+function applyDemoMode() {
+  const isDemo = !document.getElementById('apiKeyInput')?.value || document.getElementById('apiKeyInput')?.value === 'demo-key-insurance-review-2024';
+  document.querySelectorAll('.edit-btn, .delete-btn, .add-btn, [onclick*="addNew"], [onclick*="delete"], [onclick*="edit"]').forEach(btn => {
+    if (isDemo) {
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+      btn.style.pointerEvents = 'none';
+      btn.title = 'Demo环境不可编辑，生产环境可编辑';
+    }
+  });
 }
 
 function renderSysStats(stats) {
@@ -2475,11 +2941,11 @@ function renderSysStats(stats) {
       <div class="metric-label">总审核数</div>
     </div>
     <div class="metric-card green">
-      <div class="metric-value">${stats.compliant_count || 0}</div>
+      <div class="metric-value">${stats.compliant_reviews || stats.compliant_count || 0}</div>
       <div class="metric-label">合规通过</div>
     </div>
     <div class="metric-card red">
-      <div class="metric-value">${stats.violation_count || 0}</div>
+      <div class="metric-value">${stats.violation_reviews || stats.violation_count || 0}</div>
       <div class="metric-label">违规拦截</div>
     </div>
     <div class="metric-card amber">
@@ -2490,16 +2956,50 @@ function renderSysStats(stats) {
 }
 
 function renderModelStatus(stats) {
-  const isActive = stats.model_status === 'active';
+  const status = stats.model_status || 'active';
+  const isDemo = status === 'demo';
+  const isActive = status === 'active';
+  const modelName = document.getElementById('modelInput')?.value || 'qwen3.5-plus';
+  const latency = stats.avg_latency || stats.avg_review_latency || 0;
+  const latencyText = latency > 0 ? latency + 'ms' : '—';
+  const statusLabel = isDemo ? 'Demo模式（规则引擎）' : (isActive ? '运行正常' : '异常');
+  const dotColor = isActive ? 'var(--green-500)' : (isDemo ? 'var(--amber-500)' : 'var(--red-500)');
+  const dotAnim = isActive ? 'animation:pulseGlow 2s infinite;' : '';
   document.getElementById('modelStatus').innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
-      <div style="width:12px;height:12px;border-radius:50%;background:${isActive ? 'var(--green-500)' : 'var(--red-500)'};${isActive ? 'animation:pulseGlow 2s infinite;' : ''}"></div>
+      <div style="width:12px;height:12px;border-radius:50%;background:${dotColor};${dotAnim}"></div>
       <div>
-        <div style="font-weight:600;color:var(--navy-900);">qwen-plus</div>
-        <div class="text-sm text-muted">${isActive ? '运行正常' : '异常'} · 平均延迟 ${stats.avg_latency || 0}ms</div>
+        <div style="font-weight:600;color:var(--navy-900);">${modelName}</div>
+        <div class="text-sm text-muted">${statusLabel} · 平均延迟 ${latencyText}</div>
       </div>
     </div>
   `;
+  const vectorEl = document.getElementById('vectorStatus');
+  if (vectorEl) {
+    apiCall('GET', '/api/v1/regulations/vectorization-status').then(vs => {
+      const isReady = vs.status === 'ready' || vs.use_vector === true;
+      const chunkCount = vs.total_chunks || vs.chunks_count || 0;
+      vectorEl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--slate-100);margin-top:8px;">
+          <div style="width:12px;height:12px;border-radius:50%;background:${isReady ? 'var(--green-500)' : 'var(--amber-500)'};${isReady ? 'animation:pulseGlow 2s infinite;' : ''}"></div>
+          <div>
+            <div style="font-weight:600;color:var(--navy-900);">向量检索</div>
+            <div class="text-sm text-muted">${isReady ? '已就绪 · 向量检索可用' : '未就绪 · 使用关键词检索模式'}${chunkCount ? ' · ' + chunkCount + '条向量' : ''}</div>
+          </div>
+        </div>
+      `;
+    }).catch(() => {
+      vectorEl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--slate-100);margin-top:8px;">
+          <div style="width:12px;height:12px;border-radius:50%;background:var(--amber-500);"></div>
+          <div>
+            <div style="font-weight:600;color:var(--navy-900);">向量检索</div>
+            <div class="text-sm text-muted">未就绪 · 使用关键词检索模式</div>
+          </div>
+        </div>
+      `;
+    });
+  }
 }
 
 function renderRegVersion() {
@@ -2531,29 +3031,94 @@ function loadViolationTypes() {
       container.innerHTML = '<div class="empty-state"><div class="empty-text">暂无数据</div></div>';
       return;
     }
-    container.innerHTML = types.map(t => {
-      const key = t.id || t.key || t.name;
-      const parentName = t.parent || findParentForType(t.name);
-      return `
-        <div class="violation-type-item" style="flex-direction:column;align-items:stretch;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div class="vt-name">${t.name} <span style="font-size:0.7rem;color:var(--slate-400);font-weight:400;">${parentName ? 'L2 · ' + parentName : ''}</span></div>
-              <div class="vt-keywords">${t.description || '无描述'}${t.keywords && t.keywords.length > 0 ? ' · 关键词: ' + t.keywords.join('、') : ''}</div>
-            </div>
-            <div class="vt-actions">
-              <button class="btn-sm" onclick="showEditViolationType('${key}')">编辑</button>
-              <button class="btn-sm" onclick="showViolationMappings('${key}')">查看映射</button>
-            </div>
-          </div>
-          <div id="vt-edit-${key}" style="display:none;"></div>
-          <div id="vt-mapping-${key}" style="display:none;"></div>
-        </div>
-      `;
-    }).join('');
+    const l1Types = types.filter(t => t.level === 1 || t.level === 'L1');
+    const l2Types = types.filter(t => t.level === 2 || t.level === 'L2');
+    const idToName = {};
+    types.forEach(t => { idToName[t.id] = t.name; });
+    const l1Children = {};
+    l1Types.forEach(l1 => { l1Children[l1.id] = []; });
+    l2Types.forEach(l2 => {
+      const parentId = l2.parent_id;
+      if (l1Children[parentId]) l1Children[parentId].push(l2);
+      else l1Children[parentId] = [l2];
+    });
+    window._vtAllTypes = types;
+    window._vtL1Types = l1Types;
+    window._vtL2Types = l2Types;
+    window._vtL1Children = l1Children;
+    window._vtIdToName = idToName;
+    renderViolationTypesList(types, l1Types, l2Types, l1Children, idToName, '');
   }).catch(() => {
     container.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div></div>';
   });
+}
+
+function renderViolationTypesList(types, l1Types, l2Types, l1Children, idToName, query) {
+  const container = document.getElementById('vtList');
+  if (!container) return;
+  const q = (query || '').toLowerCase();
+  let html = '<div style="margin-bottom:10px;display:flex;gap:8px;"><input type="text" id="vtSearchInput" placeholder="搜索违规类型名称、关键词..." value="' + q + '" oninput="debounceVtSearch(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.85rem;"><button onclick="expandAllVt()" style="padding:6px 10px;font-size:0.78rem;background:var(--slate-100);border:1px solid var(--slate-200);border-radius:4px;cursor:pointer;color:var(--navy-600);white-space:nowrap;">展开全部</button><button onclick="collapseAllVt()" style="padding:6px 10px;font-size:0.78rem;background:var(--slate-100);border:1px solid var(--slate-200);border-radius:4px;cursor:pointer;color:var(--navy-600);white-space:nowrap;">折叠全部</button></div>';
+  const filteredL1 = l1Types.filter(l1 => {
+    if (!q) return true;
+    if (l1.name.toLowerCase().includes(q) || (l1.description || '').toLowerCase().includes(q)) return true;
+    const children = l1Children[l1.id] || [];
+    return children.some(c => c.name.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q) || (c.keywords || []).some(k => k.toLowerCase().includes(q)));
+  });
+  filteredL1.forEach(l1 => {
+    const children = (l1Children[l1.id] || []).filter(c => {
+      if (!q) return true;
+      return l1.name.toLowerCase().includes(q) || (l1.description || '').toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q) || (c.keywords || []).some(k => k.toLowerCase().includes(q));
+    });
+    html += `<div style="border:1px solid var(--slate-200);border-radius:8px;margin-bottom:10px;overflow:hidden;">
+      <div style="padding:10px 14px;background:var(--slate-50);display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleL1Section('${l1.id}')">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:0.65rem;background:var(--navy-100);color:var(--navy-700);padding:1px 6px;border-radius:3px;">L1</span>
+          <span style="font-weight:600;color:var(--navy-900);">${l1.name}</span>
+          <span style="font-size:0.75rem;color:var(--slate-400);">${children.length}个子类型</span>
+        </div>
+        <span style="font-size:0.75rem;color:var(--slate-400);" id="l1-arrow-${l1.id}">▼</span>
+      </div>
+      <div id="l1-children-${l1.id}" style="${q ? '' : 'display:none;'}border-top:1px solid var(--slate-100);">`;
+    children.forEach(l2 => {
+      const kwStr = (l2.keywords || []).join('、');
+      html += `<div style="padding:8px 14px;border-bottom:1px solid var(--slate-50);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:0.65rem;background:var(--teal-100);color:var(--teal-700);padding:1px 6px;border-radius:3px;">L2</span>
+            <span style="font-weight:500;color:var(--navy-800);">${l2.name}</span>
+          </div>
+          <div style="font-size:0.75rem;color:var(--slate-400);margin-top:2px;">${l2.description || '无描述'}${kwStr ? ' · 关键词: ' + kwStr : ''}</div>
+        </div>
+        <button class="btn-sm" style="font-size:0.75rem;padding:2px 8px;background:var(--slate-100);border:1px solid var(--slate-200);border-radius:4px;cursor:pointer;color:var(--navy-600);" onclick="showViolationMappings('${l2.id}')">查看映射</button>
+      </div>`;
+    });
+    if (children.length === 0) {
+      html += '<div style="padding:8px 14px;font-size:0.8rem;color:var(--slate-400);">暂无L2子类型</div>';
+    }
+    html += '</div></div>';
+  });
+  if (filteredL1.length === 0) {
+    html += '<div class="empty-state"><div class="empty-text">无匹配结果</div></div>';
+  }
+  container.innerHTML = html;
+}
+
+function toggleL1Section(l1Id) {
+  const el = document.getElementById('l1-children-' + l1Id);
+  const arrow = document.getElementById('l1-arrow-' + l1Id);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (arrow) arrow.textContent = '▲';
+  } else {
+    el.style.display = 'none';
+    if (arrow) arrow.textContent = '▼';
+  }
+}
+
+function onVtSearch(query) {
+  if (!window._vtAllTypes) return;
+  renderViolationTypesList(window._vtAllTypes, window._vtL1Types, window._vtL2Types, window._vtL1Children, window._vtIdToName, query);
 }
 
 function findParentForType(typeName) {
@@ -2575,13 +3140,14 @@ function findL1Parent(typeName) {
 }
 
 function generateModificationReason() {
+  if (!currentReviewDetail) { showToast('请先选择审核记录', 'warning'); return; }
   showToast('正在生成修改原因...', 'info');
   apiCall('POST', '/api/v1/generate-modification-reason', {
-    review_id: document.getElementById('overrideReviewId').value,
-    decision: document.getElementById('overrideDecision').value
+    review_id: currentReviewDetail.review_id,
+    decision: document.getElementById('finalDecision').value
   }).then(data => {
     if (data.reason) {
-      document.getElementById('overrideReason').value = data.reason;
+      document.getElementById('finalReason').value = data.reason;
       showToast('修改原因已生成', 'success');
     }
   }).catch(e => {
@@ -2673,39 +3239,54 @@ function saveEditViolationType(key) {
     VIOLATION_TYPES_DATA[key].name = nameEl.value;
     VIOLATION_TYPES_DATA[key].description = descEl.value;
     VIOLATION_TYPES_DATA[key].keywords = kwEl.value.split(',').map(k => k.trim()).filter(k => k);
-    showToast(`已保存违规类型: ${nameEl.value}`, 'success');
+    showToast('Demo模式下编辑功能暂未完全实现，修改仅在当前会话有效', 'warning');
     loadViolationTypes();
   }
 }
 
 function showViolationMappings(key) {
-  const el = document.getElementById('vt-mapping-' + key);
-  const editEl = document.getElementById('vt-edit-' + key);
-  if (editEl) editEl.style.display = 'none';
-  if (!el) return;
-  if (el.style.display !== 'none' && el.innerHTML) {
-    el.style.display = 'none';
-    return;
-  }
-  const t = VIOLATION_TYPES_DATA[key];
-  if (!t) return;
-  el.style.display = 'block';
-  if (t.mappings.length === 0) {
-    el.innerHTML = '<div class="mapping-view"><div style="font-size:0.85rem;color:var(--slate-400);padding:8px;">暂无条款映射</div></div>';
-    return;
-  }
-  el.innerHTML = `
-    <div class="mapping-view">
-      <div style="font-size:0.8rem;font-weight:600;color:var(--navy-600);margin-bottom:8px;">${t.name} 的条款映射</div>
-      ${t.mappings.map(m => `
-        <div class="mapping-entry" onclick="showRegulationFromMapping('${m.doc_name}')">
-          <div class="mapping-doc">${m.doc_name}</div>
-          <div class="mapping-articles">第${m.articles.join('、')}条</div>
-          <div class="mapping-logic">${m.logic === 'primary' ? '主要依据' : '辅助依据'}</div>
-        </div>
-      `).join('')}
+  apiCall('GET', '/api/v1/clause-mappings?violation_type_id=' + encodeURIComponent(key)).then(data => {
+    const mappings = data.mappings || [];
+    if (mappings.length === 0) {
+      const t = VIOLATION_TYPES_DATA[key];
+      const name = t ? t.name : key;
+      showToast(name + ' 暂无条款映射', 'info');
+      return;
+    }
+    const t = VIOLATION_TYPES_DATA[key];
+    const name = t ? t.name : key;
+    showMappingsModal(name, mappings);
+  }).catch(() => {
+    const t = VIOLATION_TYPES_DATA[key];
+    if (t && t.mappings && t.mappings.length > 0) {
+      showMappingsModal(t.name, t.mappings.map(m => ({doc_name: m.doc_name, articles: m.articles, mapping_logic: m.logic})));
+    } else {
+      showToast('加载映射失败', 'error');
+    }
+  });
+}
+
+function showMappingsModal(typeName, mappings) {
+  const existing = document.getElementById('mappingsModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'mappingsModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `<div style="background:white;border-radius:12px;padding:24px;width:600px;max-width:90vw;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:600;font-size:1rem;color:var(--navy-800);">${typeName} · 条款映射</div>
+      <button style="padding:4px 10px;border:1px solid var(--slate-200);border-radius:6px;background:white;cursor:pointer;" onclick="document.getElementById('mappingsModal').remove()">关闭</button>
     </div>
-  `;
+    ${mappings.map(m => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--slate-100);">
+        <div style="font-weight:500;color:var(--navy-700);font-size:0.85rem;">${m.doc_name}</div>
+        <div style="font-size:0.8rem;color:var(--slate-500);margin-top:4px;">条款: 第${m.article_number || (m.articles || []).join('、')}条</div>
+        <div style="font-size:0.75rem;color:${m.mapping_logic === 'primary' ? 'var(--teal-600)' : 'var(--slate-400)'};">${m.mapping_logic === 'primary' ? '主要依据' : '辅助依据'}</div>
+      </div>
+    `).join('')}
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
 function showRegulationFromMapping(docName) {
@@ -2715,13 +3296,12 @@ function showRegulationFromMapping(docName) {
   }, 100);
 }
 
-function showClauseMappingDetail(key) {
+function showClauseMappingDetail(key, clickedElement) {
   const t = VIOLATION_TYPES_DATA[key];
   if (!t) return;
   const existingDetail = document.getElementById('clause-mapping-detail');
   if (existingDetail) existingDetail.remove();
 
-  const container = document.getElementById('clauseMappingList');
   const detailDiv = document.createElement('div');
   detailDiv.id = 'clause-mapping-detail';
   detailDiv.className = 'mapping-view';
@@ -2731,7 +3311,7 @@ function showClauseMappingDetail(key) {
       <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:var(--slate-100);border:1px solid var(--slate-200);color:var(--navy-600);border-radius:4px;cursor:pointer;" onclick="this.closest('#clause-mapping-detail').remove()">关闭</button>
     </div>
     ${t.mappings.map(m => `
-      <div class="mapping-entry" onclick="showRegulationFromMapping('${m.doc_name}')">
+      <div class="mapping-entry">
         <div class="mapping-doc">${m.doc_name}</div>
         <div class="mapping-articles">第${m.articles.join('、')}条</div>
         <div class="mapping-logic">${m.logic === 'primary' ? '主要依据' : '辅助依据'}</div>
@@ -2739,56 +3319,94 @@ function showClauseMappingDetail(key) {
     `).join('')}
     ${t.mappings.length === 0 ? '<div style="font-size:0.85rem;color:var(--slate-400);padding:8px;">暂无条款映射</div>' : ''}
   `;
-  container.appendChild(detailDiv);
+  if (clickedElement) {
+    clickedElement.after(detailDiv);
+  } else {
+    const container = document.getElementById('clauseMappingList');
+    container.appendChild(detailDiv);
+  }
   detailDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function showRegulationDetail(docName) {
-  const safeId = docName.replace(/[（）()]/g, '');
-  const el = document.getElementById('reg-detail-' + safeId);
-  if (!el) return;
-  if (el.style.display !== 'none' && el.innerHTML) {
-    el.style.display = 'none';
-    return;
-  }
-
-  const docInfo = REG_DOCS.find(d => d.name === docName);
-  if (!docInfo) return;
-
-  const articleMappings = {};
-  Object.keys(VIOLATION_TYPES_DATA).forEach(key => {
-    const t = VIOLATION_TYPES_DATA[key];
-    t.mappings.forEach(m => {
-      if (m.doc_name === docName) {
-        m.articles.forEach(a => {
-          if (!articleMappings[a]) articleMappings[a] = [];
-          articleMappings[a].push(t.name);
-        });
-      }
+async function showRegulationDetail(docName) {
+  const container = document.getElementById('regDetailPanel');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--slate-400);">加载中...</div>';
+  container.style.display = 'block';
+  
+  try {
+    let chunksResp;
+    try {
+      chunksResp = await apiCall('GET', `/api/v1/regulations/chunks?doc_name=${encodeURIComponent(docName)}`);
+    } catch(e) { chunksResp = { chunks: [] }; }
+    const chunks = chunksResp.chunks || [];
+    
+    let mappingsResp;
+    try {
+      mappingsResp = await apiCall('GET', `/api/v1/clause-mappings?doc_name=${encodeURIComponent(docName)}`);
+    } catch(e) { mappingsResp = { mappings: [] }; }
+    const mappings = mappingsResp.mappings || [];
+    
+    const byArticle = {};
+    mappings.forEach(m => {
+      if (!byArticle[m.article_number]) byArticle[m.article_number] = [];
+      byArticle[m.article_number].push(m);
     });
-  });
-
-  el.style.display = 'block';
-  el.innerHTML = `
-    <div class="regulation-detail">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <div style="font-weight:600;color:var(--navy-900);font-size:0.95rem;">${docName} · 条款列表</div>
-        <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:var(--slate-100);border:1px solid var(--slate-200);color:var(--navy-600);border-radius:4px;cursor:pointer;" onclick="this.closest('.regulation-detail').parentElement.style.display='none'">关闭</button>
-      </div>
-      <div class="article-list">
-        ${Array.from({length: docInfo.count}, (_, i) => {
-          const articleNum = CN[i];
-          const mappings = articleMappings[articleNum] || [];
-          return `
-            <div class="article-entry" onclick="${mappings.length > 0 ? `showViolationFromArticle('${docName}','${articleNum}')` : ''}">
-              <div class="article-num">第${articleNum}条</div>
-              ${mappings.length > 0 ? `<div class="article-mappings">关联违规类型: ${mappings.join('、')}</div>` : '<div class="article-mappings" style="color:var(--slate-300);">无关联违规类型</div>'}
-            </div>
-          `;
-        }).join('')}
-      </div>
+    
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-weight:600;font-size:0.95rem;color:var(--navy-800);">${docName}</div>
+      <button onclick="document.getElementById('regDetailPanel').style.display='none'" style="padding:4px 10px;border:1px solid var(--slate-200);border-radius:4px;background:white;cursor:pointer;font-size:0.8rem;">关闭</button>
     </div>
-  `;
+    <div style="font-size:0.8rem;color:var(--slate-400);margin-bottom:12px;">共 ${chunks.length} 条款 · ${Object.keys(byArticle).length} 个条款有违规映射</div>`;
+    
+    if (chunks.length === 0) {
+      html += '<div style="padding:12px;color:var(--slate-400);font-size:0.85rem;">该法规暂无条款数据</div>';
+    }
+    
+    chunks.forEach((chunk, idx) => {
+      const articleNum = chunk.article_number || '';
+      const aMappings = byArticle[articleNum] || [];
+      const text = chunk.content || '';
+      const preview = text.substring(0, 80) + (text.length > 80 ? '...' : '');
+      
+      html += `<div style="border:1px solid var(--slate-200);border-radius:6px;margin-bottom:4px;overflow:hidden;">
+        <div style="padding:8px 12px;background:var(--slate-50);display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleRegArticle('reg-art-${idx}')">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-weight:500;color:var(--navy-700);font-size:0.85rem;">第${articleNum}条</span>
+            ${aMappings.length > 0 ? `<span style="font-size:0.65rem;background:var(--teal-50);color:var(--teal-700);padding:1px 5px;border-radius:3px;">${aMappings.length}个映射</span>` : ''}
+          </div>
+          <span style="font-size:0.75rem;color:var(--slate-400);" id="reg-art-arrow-${idx}">▼</span>
+        </div>
+        <div id="reg-art-${idx}" style="display:none;border-top:1px solid var(--slate-100);padding:8px 12px;">
+          <div style="font-size:0.82rem;color:var(--navy-700);line-height:1.6;white-space:pre-wrap;word-break:break-word;">${text}</div>
+          ${aMappings.length > 0 ? `
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--slate-100);">
+            <div style="font-size:0.78rem;font-weight:500;color:var(--navy-600);margin-bottom:4px;">关联违规类型</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+              ${aMappings.map(m => `<span style="font-size:0.72rem;padding:2px 8px;border-radius:4px;background:${m.mapping_logic === 'primary' ? 'var(--teal-50)' : 'var(--slate-50)'};color:${m.mapping_logic === 'primary' ? 'var(--teal-700)' : 'var(--slate-600)'};border:1px solid ${m.mapping_logic === 'primary' ? 'var(--teal-200)' : 'var(--slate-200)'};">${m.violation_type_name || m.violation_type_id}${m.mapping_logic === 'primary' ? ' · 主要' : ' · 辅助'}</span>`).join('')}
+            </div>
+          </div>` : ''}
+        </div>
+      </div>`;
+    });
+    
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div style="padding:20px;text-align:center;color:var(--red-500);">加载失败: ${e.message}</div>`;
+  }
+}
+
+function toggleRegArticle(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id.replace('reg-art-', 'reg-art-arrow-'));
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (arrow) arrow.textContent = '▲';
+  } else {
+    el.style.display = 'none';
+    if (arrow) arrow.textContent = '▼';
+  }
 }
 
 function showViolationFromArticle(docName, articleNum) {
@@ -2828,44 +3446,343 @@ function showViolationFromArticle(docName, articleNum) {
 function renderClauseMappings() {
   const container = document.getElementById('clauseMappingList');
   if (!container) return;
-
-  const mappingData = [];
-  Object.keys(VIOLATION_TYPES_DATA).forEach(key => {
-    const t = VIOLATION_TYPES_DATA[key];
-    if (t.mappings.length > 0) {
-      mappingData.push({
-        violation_key: key,
-        violation: t.name,
-        mappings: t.mappings,
-        count: t.mappings.reduce((sum, m) => sum + m.articles.length, 0)
-      });
-    }
+  container.innerHTML = '<div class="empty-state"><div class="empty-text">加载中...</div></div>';
+  apiCall('GET', '/api/v1/clause-mappings').then(data => {
+    const mappings = data.mappings || [];
+    window._clauseMappings = mappings;
+    renderClauseMappingsList(mappings, '');
+  }).catch(() => {
+    container.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div></div>';
   });
+}
 
-  container.innerHTML = mappingData.map(m => `
-    <div class="violation-type-item clause-mapping-clickable" onclick="showClauseMappingDetail('${m.violation_key}')">
-      <div>
-        <div class="vt-name">${m.violation}</div>
-        <div class="vt-keywords">关联条款 (${m.count}): ${m.mappings.map(mp => mp.doc_name + '(第' + mp.articles.join('、') + '条)').join('、')}</div>
+function renderClauseMappingsList(mappings, query) {
+  const container = document.getElementById('clauseMappingList');
+  if (!container) return;
+  const q = (query || '').toLowerCase();
+  const filtered = mappings.filter(m => {
+    if (!q) return true;
+    return (m.violation_type_name || m.violation_type_id || '').toLowerCase().includes(q) || (m.doc_name || '').toLowerCase().includes(q) || (m.article_number || '').toLowerCase().includes(q) || (m.mapping_logic || '').toLowerCase().includes(q);
+  });
+  const byDoc = {};
+  filtered.forEach(m => {
+    if (!byDoc[m.doc_name]) byDoc[m.doc_name] = [];
+    byDoc[m.doc_name].push(m);
+  });
+  let html = '<div style="margin-bottom:10px;display:flex;gap:8px;"><input type="text" id="cmSearchInput" placeholder="搜索条款映射（法规名、条款号、违规类型...）" value="' + q + '" oninput="debounceCmSearch(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.85rem;"></div>';
+  html += `<div style="font-size:0.8rem;color:var(--slate-400);margin-bottom:8px;">共 ${filtered.length} 条映射，${Object.keys(byDoc).length} 个法规</div>`;
+  Object.entries(byDoc).forEach(([docName, docMappings]) => {
+    const byArticle = {};
+    docMappings.forEach(m => {
+      const key = m.article_number;
+      if (!byArticle[key]) byArticle[key] = { article_number: key, mappings: [] };
+      byArticle[key].mappings.push(m);
+    });
+    html += `<div style="border:1px solid var(--slate-200);border-radius:8px;margin-bottom:10px;overflow:hidden;">
+      <div style="padding:10px 14px;background:var(--slate-50);font-weight:600;color:var(--navy-800);font-size:0.85rem;">${docName}</div>`;
+    Object.entries(byArticle).forEach(([articleNum, articleData]) => {
+      html += `<div style="padding:8px 14px;border-top:1px solid var(--slate-50);">
+        <div style="font-weight:500;color:var(--navy-700);font-size:0.85rem;margin-bottom:4px;">第${articleNum}条</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">`;
+      articleData.mappings.forEach(m => {
+        const isPrimary = m.mapping_logic === 'primary';
+        html += `<span style="font-size:0.75rem;padding:2px 8px;border-radius:4px;background:${isPrimary ? 'var(--teal-50)' : 'var(--slate-50)'};color:${isPrimary ? 'var(--teal-700)' : 'var(--slate-600)'};border:1px solid ${isPrimary ? 'var(--teal-200)' : 'var(--slate-200)'};">${m.violation_type_name || m.violation_type_id}${isPrimary ? ' · 主要' : ' · 辅助'}</span>`;
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+  });
+  if (Object.keys(byDoc).length === 0) {
+    html += '<div class="empty-state"><div class="empty-text">无匹配结果</div></div>';
+  }
+  container.innerHTML = html;
+}
+
+function onCmSearch(query) {
+  if (!window._clauseMappings) return;
+  renderClauseMappingsList(window._clauseMappings, query);
+}
+
+async function loadClauseRelations() {
+  const container = document.getElementById('clauseRelationsList');
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><div class="empty-text">加载中...</div></div>';
+  try {
+    const resp = await apiCall('GET', '/api/v1/clause-relations');
+    const relations = resp.relations || [];
+    window._clauseRelations = relations;
+    renderClauseRelationsList(relations, '');
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div></div>';
+  }
+}
+
+function renderClauseRelationsList(relations, query) {
+  const container = document.getElementById('clauseRelationsList');
+  if (!container) return;
+  const q = (query || '').toLowerCase();
+  const typeLabels = {
+    'references': '引用', 'exception': '例外', 'supplement': '补充',
+    'definition': '定义', 'consequence': '后果', 'prerequisite': '前提',
+    'applicability': '适用', 'conflict': '冲突'
+  };
+  const typeColors = {
+    'references': '#64748b', 'exception': '#f59e0b', 'supplement': '#8b5cf6',
+    'definition': '#10b981', 'consequence': '#ef4444', 'prerequisite': '#3b82f6',
+    'applicability': '#06b6d4', 'conflict': '#ef4444'
+  };
+  const filtered = relations.filter(r => {
+    if (!q) return true;
+    return (r.from_doc || '').toLowerCase().includes(q) || (r.to_doc || '').toLowerCase().includes(q) || (r.from_article || '').toLowerCase().includes(q) || (r.to_article || '').toLowerCase().includes(q) || (typeLabels[r.relation_type] || r.relation_type || '').toLowerCase().includes(q) || (r.evidence_text || '').toLowerCase().includes(q);
+  });
+  const grouped = {};
+  filtered.forEach(r => {
+    const key = r.from_doc + '·第' + r.from_article + '条';
+    if (!grouped[key]) grouped[key] = { from_doc: r.from_doc, from_article: r.from_article, relations: [] };
+    grouped[key].relations.push(r);
+  });
+  let html = '<div style="margin-bottom:10px;display:flex;gap:8px;"><input type="text" id="crSearchInput" placeholder="搜索条款关联（法规名、条款号、关联类型...）" value="' + q + '" oninput="debounceCrSearch(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.85rem;"><button onclick="expandAllCr()" style="padding:6px 10px;font-size:0.78rem;background:var(--slate-100);border:1px solid var(--slate-200);border-radius:4px;cursor:pointer;color:var(--navy-600);white-space:nowrap;">展开全部</button><button onclick="collapseAllCr()" style="padding:6px 10px;font-size:0.78rem;background:var(--slate-100);border:1px solid var(--slate-200);border-radius:4px;cursor:pointer;color:var(--navy-600);white-space:nowrap;">折叠全部</button></div>';
+  html += `<div style="font-size:0.8rem;color:var(--slate-400);margin-bottom:8px;">共 ${filtered.length} 条关联关系，${Object.keys(grouped).length} 个源条款</div>`;
+  Object.entries(grouped).forEach(([key, group]) => {
+    html += `<div style="border:1px solid var(--slate-200);border-radius:8px;margin-bottom:8px;overflow:hidden;">
+      <div style="padding:10px 14px;background:var(--slate-50);display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleCrDetail('${key.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')}')">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-weight:600;color:var(--navy-800);font-size:0.85rem;">${group.from_doc} · 第${group.from_article}条</span>
+          <span style="font-size:0.75rem;color:var(--slate-400);">${group.relations.length}条关联</span>
+        </div>
+        <span style="font-size:0.75rem;color:var(--slate-400);" id="cr-arrow-${key.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')}">▼</span>
       </div>
-      <span style="font-size:0.75rem;color:var(--teal-600);">点击查看 →</span>
+      <div id="cr-detail-${key.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')}" style="display:none;border-top:1px solid var(--slate-100);">`;
+    group.relations.forEach(r => {
+      const color = typeColors[r.relation_type] || '#64748b';
+      const label = typeLabels[r.relation_type] || r.relation_type;
+      html += `<div style="padding:8px 14px;border-bottom:1px solid var(--slate-50);cursor:pointer;" onclick="showRelationDetailModal(${JSON.stringify(r).replace(/"/g, '&quot;')})">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <span style="background:${color}20;color:${color};padding:1px 6px;border-radius:3px;font-size:0.7rem;">${label}</span>
+          <span style="color:var(--navy-600);font-weight:500;font-size:0.82rem;">→ ${r.to_doc} · 第${r.to_article}条</span>
+          ${r.from_doc !== r.to_doc ? '<span style="font-size:0.65rem;background:var(--amber-100);color:var(--amber-700);padding:1px 4px;border-radius:2px;">跨文档</span>' : ''}
+        </div>
+        ${r.evidence_text ? `<div style="color:var(--slate-500);font-size:0.75rem;line-height:1.4;">${r.evidence_text.substring(0, 80)}${r.evidence_text.length > 80 ? '...' : ''}</div>` : ''}
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+  if (Object.keys(grouped).length === 0) {
+    html += '<div class="empty-state"><div class="empty-text">无匹配结果</div></div>';
+  }
+  container.innerHTML = html;
+}
+
+function toggleCrDetail(key) {
+  const el = document.getElementById('cr-detail-' + key);
+  const arrow = document.getElementById('cr-arrow-' + key);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (arrow) arrow.textContent = '▲';
+  } else {
+    el.style.display = 'none';
+    if (arrow) arrow.textContent = '▼';
+  }
+}
+
+function onCrSearch(query) {
+  if (!window._clauseRelations) return;
+  renderClauseRelationsList(window._clauseRelations, query);
+}
+
+function showRelationDetailModal(r) {
+  const typeLabels = {
+    'references': '引用', 'exception': '例外', 'supplement': '补充',
+    'definition': '定义', 'consequence': '后果', 'prerequisite': '前提',
+    'applicability': '适用', 'conflict': '冲突'
+  };
+  const typeColors = {
+    'references': '#64748b', 'exception': '#f59e0b', 'supplement': '#8b5cf6',
+    'definition': '#10b981', 'consequence': '#ef4444', 'prerequisite': '#3b82f6',
+    'applicability': '#06b6d4', 'conflict': '#ef4444'
+  };
+  const typeDescs = {
+    'references': '源条款引用了目标条款的内容或规定',
+    'exception': '目标条款是源条款的例外情况',
+    'supplement': '目标条款对源条款进行了补充说明',
+    'definition': '目标条款定义了源条款中使用的概念或术语',
+    'consequence': '违反源条款会导致目标条款规定的后果',
+    'prerequisite': '满足目标条款是适用源条款的前提条件',
+    'applicability': '目标条款规定了源条款的适用范围',
+    'conflict': '源条款与目标条款存在冲突或矛盾'
+  };
+  const color = typeColors[r.relation_type] || '#64748b';
+  const label = typeLabels[r.relation_type] || r.relation_type;
+  const desc = typeDescs[r.relation_type] || '';
+  const existing = document.getElementById('relationDetailModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'relationDetailModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `<div style="background:white;border-radius:12px;padding:24px;width:560px;max-width:90vw;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:600;font-size:1rem;color:var(--navy-800);">条款关联详情</div>
+      <button style="padding:4px 10px;border:1px solid var(--slate-200);border-radius:6px;background:white;cursor:pointer;" onclick="document.getElementById('relationDetailModal').remove()">关闭</button>
     </div>
-  `).join('');
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:var(--slate-50);border-radius:8px;">
+      <div style="text-align:center;flex:1;">
+        <div style="font-size:0.75rem;color:var(--slate-400);">源条款</div>
+        <div style="font-weight:600;color:var(--navy-800);font-size:0.9rem;">${r.from_doc}</div>
+        <div style="color:var(--navy-600);">第${r.from_article}条</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <span style="background:${color}20;color:${color};padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:500;">${label}</span>
+        <span style="font-size:1.2rem;color:${color};">→</span>
+      </div>
+      <div style="text-align:center;flex:1;">
+        <div style="font-size:0.75rem;color:var(--slate-400);">目标条款</div>
+        <div style="font-weight:600;color:var(--navy-800);font-size:0.9rem;">${r.to_doc}</div>
+        <div style="color:var(--navy-600);">第${r.to_article}条</div>
+      </div>
+    </div>
+    ${desc ? `<div style="margin-bottom:12px;padding:8px 12px;background:${color}10;border-left:3px solid ${color};border-radius:0 6px 6px 0;font-size:0.82rem;color:var(--navy-700);"><strong>关联含义:</strong> ${desc}</div>` : ''}
+    ${r.evidence_text ? `<div style="margin-bottom:12px;"><div style="font-size:0.8rem;font-weight:600;color:var(--navy-600);margin-bottom:4px;">依据文本</div><div style="font-size:0.82rem;color:var(--navy-700);line-height:1.6;padding:8px 12px;background:var(--slate-50);border-radius:6px;">${r.evidence_text}</div></div>` : ''}
+    <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--slate-400);">
+      <span>置信度: ${r.confidence || '-'}</span>
+      <span>来源: ${r.source === 'manual' ? '人工标注' : r.source === 'regex' ? '正则提取' : r.source || '-'}</span>
+      ${r.from_doc !== r.to_doc ? '<span style="color:var(--amber-600);">跨文档关联</span>' : ''}
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+function loadLLMAuditLogs() {
+  const container = document.getElementById('llmAuditLogList');
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--slate-400);font-size:0.85rem;">加载中...</div>';
+  apiCall('GET', '/api/v1/llm-audit-logs?limit=50').then(data => {
+    const logs = data.logs || [];
+    if (logs.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--slate-400);font-size:0.85rem;">暂无LLM调用记录（Demo模式下无LLM调用，提供API Key后审核时将自动记录）</div>';
+      return;
+    }
+    container.innerHTML = `
+      <div style="font-size:0.75rem;color:var(--slate-500);margin-bottom:8px;">共 ${data.total} 条记录（显示最近 ${logs.length} 条）</div>
+      ${logs.map((log, i) => `
+        <div style="border:1px solid var(--slate-200);border-radius:8px;padding:12px;margin-bottom:8px;background:${log.success ? 'white' : '#fef2f2'};">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div style="font-weight:600;font-size:0.8rem;color:var(--navy-700);">${log.model || '-'}</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="font-size:0.7rem;padding:2px 6px;border-radius:4px;background:${log.success ? 'var(--teal-50)' : '#fee2e2'};color:${log.success ? 'var(--teal-700)' : '#dc2626'};">${log.success ? '成功' : '失败'}</span>
+              <span style="font-size:0.7rem;color:var(--slate-400);">${log.latency_ms ? log.latency_ms + 'ms' : '-'}</span>
+            </div>
+          </div>
+          <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:4px;">${log.timestamp || '-'}</div>
+          <details style="margin-top:4px;">
+            <summary style="font-size:0.75rem;color:var(--navy-500);cursor:pointer;">查看详情</summary>
+            <div style="margin-top:6px;font-size:0.7rem;color:var(--slate-600);">
+              <div style="margin-bottom:4px;"><strong>System Prompt:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${(log.system_prompt || '-').substring(0, 500)}</pre></div>
+              <div style="margin-bottom:4px;"><strong>User Prompt:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${(log.user_prompt || '-').substring(0, 500)}</pre></div>
+              <div><strong>Response:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${(log.response || '-').substring(0, 500)}</pre></div>
+            </div>
+          </details>
+        </div>
+      `).join('')}
+    `;
+  }).catch(() => {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:#dc2626;font-size:0.85rem;">加载审计日志失败</div>';
+  });
+}
+
+function showRelationHelp() {
+  const existing = document.getElementById('relationHelpModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'relationHelpModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `<div style="background:white;border-radius:12px;padding:24px;width:560px;max-width:90vw;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:600;font-size:1rem;color:var(--navy-800);">📖 条款关联关系说明</div>
+      <button style="padding:4px 10px;border:1px solid var(--slate-200);border-radius:6px;background:white;cursor:pointer;" onclick="document.getElementById('relationHelpModal').remove()">关闭</button>
+    </div>
+    <div style="font-size:0.85rem;color:var(--navy-700);line-height:1.8;">
+      <p style="margin-bottom:12px;">条款关联关系描述了不同法规条款之间的逻辑联系。理解这些关联有助于更全面地评估营销内容的合规性——一条营销内容可能直接违反某条款，而该条款又通过关联关系牵涉其他条款的要求。</p>
+      <div style="font-weight:600;margin-bottom:8px;">关联类型说明：</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#64748b20;color:#64748b;padding:1px 6px;border-radius:3px;font-size:0.75rem;">引用</span><span>源条款引用了目标条款的内容或规定</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#f59e0b20;color:#f59e0b;padding:1px 6px;border-radius:3px;font-size:0.75rem;">例外</span><span>目标条款是源条款的例外情况</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#8b5cf620;color:#8b5cf6;padding:1px 6px;border-radius:3px;font-size:0.75rem;">补充</span><span>目标条款对源条款进行了补充说明</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#10b98120;color:#10b981;padding:1px 6px;border-radius:3px;font-size:0.75rem;">定义</span><span>目标条款定义了源条款中使用的概念或术语</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#ef444420;color:#ef4444;padding:1px 6px;border-radius:3px;font-size:0.75rem;">后果</span><span>违反源条款会导致目标条款规定的后果</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#3b82f620;color:#3b82f6;padding:1px 6px;border-radius:3px;font-size:0.75rem;">前提</span><span>满足目标条款是适用源条款的前提条件</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#06b6d420;color:#06b6d4;padding:1px 6px;border-radius:3px;font-size:0.75rem;">适用</span><span>目标条款规定了源条款的适用范围</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="background:#ef444420;color:#ef4444;padding:1px 6px;border-radius:3px;font-size:0.75rem;">冲突</span><span>源条款与目标条款存在冲突或矛盾</span></div>
+      </div>
+      <div style="font-weight:600;margin-bottom:8px;">如何使用：</div>
+      <ul style="padding-left:20px;margin:0;">
+        <li>点击源条款可展开查看其所有关联的目标条款</li>
+        <li>点击具体关联条目可查看详细的关联说明</li>
+        <li>使用搜索框可按法规名、条款号、关联类型筛选</li>
+        <li>审核时，系统会自动扩展违规条款的关联条款，提供更全面的合规分析</li>
+      </ul>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
 function showAddViolationType() {
-  const name = prompt('请输入新违规类型名称:');
+  const modal = document.createElement('div');
+  modal.id = 'addVtModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:12px;padding:24px;width:400px;max-width:90vw;">
+      <div style="font-weight:600;font-size:1rem;margin-bottom:16px;color:var(--navy-800);">添加违规类型</div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:0.85rem;color:var(--slate-600);display:block;margin-bottom:4px;">类型名称</label>
+        <input id="addVtName" type="text" style="width:100%;padding:8px 12px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.9rem;" placeholder="如：forced_bundling">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:0.85rem;color:var(--slate-600);display:block;margin-bottom:4px;">初始关键词（逗号分隔）</label>
+        <input id="addVtKeywords" type="text" style="width:100%;padding:8px 12px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.9rem;" placeholder="如：默认勾选,自动添加">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('addVtModal').remove()" style="padding:8px 16px;border:1px solid var(--slate-200);border-radius:6px;background:white;cursor:pointer;">取消</button>
+        <button onclick="confirmAddViolationType()" style="padding:8px 16px;border:none;border-radius:6px;background:var(--teal-600);color:white;cursor:pointer;">确认</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function confirmAddViolationType() {
+  const name = document.getElementById('addVtName')?.value?.trim();
+  const keyword = document.getElementById('addVtKeywords')?.value?.trim();
+  document.getElementById('addVtModal')?.remove();
   if (!name) return;
-  const keyword = prompt('请输入初始关键词（多个用逗号分隔）:');
-  if (!keyword) return;
-  showToast(`已添加违规类型: ${name}`, 'success');
-  loadManagement();
+  showToast(`Demo模式下添加功能暂未完全实现: ${name}`, 'warning');
 }
 
 function addKeywordToType(id) {
-  const keyword = prompt('请输入要添加的关键词:');
+  const modal = document.createElement('div');
+  modal.id = 'addKwModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:12px;padding:24px;width:360px;max-width:90vw;">
+      <div style="font-weight:600;font-size:1rem;margin-bottom:16px;color:var(--navy-800);">添加关键词</div>
+      <div style="margin-bottom:16px;">
+        <input id="addKwInput" type="text" style="width:100%;padding:8px 12px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.9rem;" placeholder="输入关键词">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('addKwModal').remove()" style="padding:8px 16px;border:1px solid var(--slate-200);border-radius:6px;background:white;cursor:pointer;">取消</button>
+        <button onclick="confirmAddKeyword('${id}')" style="padding:8px 16px;border:none;border-radius:6px;background:var(--teal-600);color:white;cursor:pointer;">确认</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function confirmAddKeyword(id) {
+  const keyword = document.getElementById('addKwInput')?.value?.trim();
+  document.getElementById('addKwModal')?.remove();
   if (!keyword) return;
-  showToast(`已添加关键词: ${keyword}`, 'success');
+  showToast(`Demo模式下添加关键词功能暂未完全实现: ${keyword}`, 'warning');
 }
 
 function deprecateType(id) {
@@ -2877,13 +3794,13 @@ function loadRegulations() {
   const list = document.getElementById('regulationList');
   list.innerHTML = '<div class="empty-state"><div class="empty-text">加载中...</div></div>';
   apiCall('GET', '/api/v1/regulations').then(data => {
-    if (!data.regulations || data.regulations.length === 0) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-text">暂无法规</div></div>';
-      return;
+    let regs = data.regulations || [];
+    if (regs.length === 0) {
+      regs = REG_DOCS.map(d => ({doc_name: d.name, version: '1.0', article_count: d.count}));
     }
     list.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:8px;">
-        ${data.regulations.map(r => `
+        ${regs.map(r => `
           <div class="regulation-clickable" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--slate-50);border-radius:8px;border:1px solid var(--slate-200);" onclick="showRegulationDetail('${r.doc_name}')">
             <div>
               <strong>${r.doc_name}</strong><br>
@@ -2898,7 +3815,22 @@ function loadRegulations() {
         `).join('')}
       </div>`;
   }).catch(() => {
-    list.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div></div>';
+    const regs = REG_DOCS.map(d => ({doc_name: d.name, version: '1.0', article_count: d.count}));
+    list.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${regs.map(r => `
+          <div class="regulation-clickable" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--slate-50);border-radius:8px;border:1px solid var(--slate-200);" onclick="showRegulationDetail('${r.doc_name}')">
+            <div>
+              <strong>${r.doc_name}</strong><br>
+              <span style="font-size:0.75rem;color:var(--slate-400);">v${r.version || '1.0'} · ${r.article_count}条</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="font-size:0.75rem;color:var(--teal-600);">点击查看 →</span>
+            </div>
+          </div>
+          <div id="reg-detail-${r.doc_name.replace(/[（）()]/g,'')}" style="display:none;"></div>
+        `).join('')}
+      </div>`;
   });
 }
 
@@ -2911,7 +3843,7 @@ function uploadRegulation(event) {
   const apiKey = document.getElementById('apiKeyInput').value;
   const headers = {};
   if (apiKey) headers['X-API-Key'] = apiKey;
-  fetch('/api/v1/regulations/upload', { method: 'POST', headers, body: formData })
+  fetch(BASE_URL + '/api/v1/regulations/upload', { method: 'POST', headers, body: formData })
     .then(resp => resp.json())
     .then(data => {
       showToast(`上传成功: ${file.name}`, 'success');
@@ -2937,11 +3869,14 @@ function deleteRegulation(filename) {
 
 async function checkBackendHealth() {
   try {
-    const resp = await fetch('/health');
+    const resp = await fetch(BASE_URL + '/health');
     const data = await resp.json();
     backendReachable = true;
     document.getElementById('backendErrorBanner').style.display = 'none';
-    if (data.mode === 'demo' || data.mode === 'rule-engine') {
+    const components = data.components || {};
+    const ragStatus = components.rag_engine ? components.rag_engine.status : 'unknown';
+    const useVector = components.rag_engine ? components.rag_engine.use_vector : false;
+    if (!useVector || ragStatus === 'not_initialized') {
       isRuleEngineMode = true;
       document.getElementById('ruleEngineBanner').style.display = 'flex';
     } else {
@@ -2956,10 +3891,84 @@ async function checkBackendHealth() {
   }
 }
 
+async function testConnection() {
+  const btn = document.getElementById('testConnBtn');
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  if (!apiKey || apiKey === 'demo-key-insurance-review-2024') {
+    showToast('请输入有效的DashScope API Key', 'warning');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '测试中...';
+  try {
+    const resp = await apiCall('POST', '/api/v1/test-connection');
+    if (resp.success) {
+      showToast('✅ ' + resp.message, 'success');
+      localStorage.setItem('dashscope_api_key', apiKey);
+    } else {
+      showToast('❌ ' + resp.message, 'error');
+    }
+  } catch (e) {
+    showToast('❌ 连接失败: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '测试连接';
+  }
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('apiKeyInput');
+  const btn = document.getElementById('apiKeyEye');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🔒';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+async function requestHumanReview(reviewId) {
+  try {
+    const resp = await apiCall('POST', `/api/v1/review/${reviewId}/request-human-review`);
+    showToast('✅ 已提交人工复核', 'success');
+  } catch (e) {
+    showToast('❌ 提交失败: ' + e.message, 'error');
+  }
+}
+
+function expandAllVt() {
+  document.querySelectorAll('[id^="l1-children-"]').forEach(el => el.style.display = 'block');
+  document.querySelectorAll('[id^="l1-arrow-"]').forEach(el => el.textContent = '▲');
+}
+function collapseAllVt() {
+  document.querySelectorAll('[id^="l1-children-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('[id^="l1-arrow-"]').forEach(el => el.textContent = '▼');
+}
+function expandAllCr() {
+  document.querySelectorAll('[id^="cr-detail-"]').forEach(el => el.style.display = 'block');
+  document.querySelectorAll('[id^="cr-arrow-"]').forEach(el => el.textContent = '▲');
+}
+function collapseAllCr() {
+  document.querySelectorAll('[id^="cr-detail-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('[id^="cr-arrow-"]').forEach(el => el.textContent = '▼');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   updateCharCount();
   setupDragDrop();
+  const savedKey = localStorage.getItem('dashscope_api_key');
+  if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+  const savedModel = localStorage.getItem('llm_model');
+  if (savedModel) document.getElementById('modelInput').value = savedModel;
+  document.getElementById('apiKeyInput').addEventListener('change', function() {
+    localStorage.setItem('dashscope_api_key', this.value);
+  });
+  document.getElementById('modelInput').addEventListener('change', function() {
+    localStorage.setItem('llm_model', this.value);
+  });
   checkBackendHealth();
+  loadViolationTypesFromAPI();
 });
 </script>
 </body>

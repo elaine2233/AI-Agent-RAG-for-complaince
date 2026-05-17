@@ -22,7 +22,7 @@ BACKUP_DIR = config.DB_BACKUP_DIR
 MAX_BACKUPS = config.MAX_BACKUPS
 DATA_RETENTION_DAYS = config.DATA_RETENTION_DAYS
 
-_schema_version = 7
+_schema_version = 8
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -247,6 +247,10 @@ class Database:
         conn.execute(f"PRAGMA user_version = {_schema_version}")
         self._ensure_admin_user(conn)
         self._sync_violation_types(conn)
+        self._ensure_regulation_versions()
+        self._sync_clause_mappings()
+        conn.execute("DELETE FROM clause_relations WHERE to_article IS NULL OR to_article = '' OR trim(to_article) = ''")
+        conn.execute("DELETE FROM clause_relations WHERE from_doc = to_doc AND from_article = to_article")
         conn.commit()
 
     def _run_migrations(self, conn):
@@ -323,6 +327,34 @@ class Database:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_violation_feedback_review_id ON violation_feedback(review_id)")
             logger.info("迁移: 创建 violation_feedback 表")
 
+        if current_version < 8:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS clause_relations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    from_doc TEXT NOT NULL,
+                    from_article TEXT NOT NULL,
+                    to_doc TEXT NOT NULL,
+                    to_article TEXT NOT NULL,
+                    relation_type TEXT NOT NULL,
+                    confidence REAL NOT NULL DEFAULT 1.0,
+                    evidence_text TEXT NOT NULL DEFAULT '',
+                    source TEXT NOT NULL DEFAULT 'regex',
+                    is_verified INTEGER NOT NULL DEFAULT 0,
+                    verified_by INTEGER,
+                    verified_at TEXT,
+                    notes TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    UNIQUE(from_doc, from_article, to_doc, to_article, relation_type)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_clause_relations_from ON clause_relations(from_doc, from_article)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_clause_relations_to ON clause_relations(to_doc, to_article)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_clause_relations_type ON clause_relations(relation_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_clause_relations_source ON clause_relations(source)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_clause_relations_confidence ON clause_relations(confidence)")
+            logger.info("迁移: 创建 clause_relations 表")
+
     def _hash_password(self, password: str) -> str:
         return hashlib.pbkdf2_hmac(
             "sha256",
@@ -344,6 +376,19 @@ class Database:
                 ("admin", admin_hash, "admin", api_key, now.isoformat(), expires.isoformat()),
             )
             logger.info("已创建默认管理员账户 (admin/admin123)，API Key有效期90天")
+
+        demo_row = conn.execute("SELECT id FROM users WHERE username = 'demo'").fetchone()
+        if not demo_row:
+            demo_hash = self._hash_password("demo")
+            demo_api_key = "demo-key-insurance-review-2024"
+            now = datetime.now()
+            expires = now + timedelta(days=365)
+            conn.execute(
+                "INSERT INTO users (username, password_hash, role, api_key, api_key_created_at, api_key_expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("demo", demo_hash, "reviewer", demo_api_key, now.isoformat(), expires.isoformat()),
+            )
+            logger.info("已创建默认演示账户 (demo)，API Key: demo-key-insurance-review-2024")
 
     def _sync_violation_types(self, conn):
         try:
@@ -369,6 +414,42 @@ class Database:
                     )
         except Exception as e:
             logger.warning(f"同步违规类型到数据库失败: {e}")
+
+    def _ensure_regulation_versions(self):
+        conn = self._get_conn()
+        existing = {row[0] for row in conn.execute("SELECT doc_name FROM regulation_versions").fetchall()}
+
+        regulations = [
+            {"doc_name": "保险销售行为管理办法", "version": "1.0", "article_count": 50, "effective_date": "2024-01-01"},
+            {"doc_name": "互联网保险业务监管办法", "version": "1.0", "article_count": 83, "effective_date": "2021-02-01"},
+            {"doc_name": "金融产品网络营销管理办法（征求意见稿）", "version": "1.0", "article_count": 37, "effective_date": "2022-01-01"},
+        ]
+
+        for reg in regulations:
+            if reg["doc_name"] not in existing:
+                content_hash = hashlib.sha256(reg["doc_name"].encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT INTO regulation_versions (doc_name, version, content_hash, article_count, effective_date) VALUES (?, ?, ?, ?, ?)",
+                    (reg["doc_name"], reg["version"], content_hash, reg["article_count"], reg["effective_date"]),
+                )
+        conn.commit()
+
+    def _sync_clause_mappings(self):
+        try:
+            from src.violation_registry import violation_registry
+            conn = self._get_conn()
+            conn.execute("DELETE FROM clause_type_mappings")
+            count = 0
+            for cm in violation_registry._mappings.values():
+                conn.execute(
+                    "INSERT INTO clause_type_mappings (id, violation_type_id, doc_name, article_number, mapping_logic, effective_date) VALUES (?, ?, ?, ?, ?, ?)",
+                    (cm.id, cm.violation_type_id, cm.doc_name, cm.article_number, cm.mapping_logic, cm.effective_date),
+                )
+                count += 1
+            conn.commit()
+            logger.info(f"同步条款映射完成: {count}条")
+        except Exception as e:
+            logger.warning(f"同步条款映射失败: {e}")
 
     def close(self):
         if hasattr(self._local, 'conn') and self._local.conn:
@@ -518,7 +599,7 @@ class Database:
         total = count_row["cnt"]
 
         rows = conn.execute(
-            f"SELECT id, input_hash, input_length, compliant, violation_type, "
+            f"SELECT id, input_content, input_hash, input_length, compliant, violation_type, "
             f"confidence, review_mode, latency_ms, client_id, created_at "
             f"FROM review_records WHERE {where} "
             f"ORDER BY created_at DESC LIMIT ? OFFSET ?",
@@ -672,6 +753,9 @@ class Database:
         avg_confidence = conn.execute(
             "SELECT AVG(confidence) as avg FROM review_records WHERE is_deleted = 0"
         ).fetchone()["avg"] or 0
+        pending_count = conn.execute(
+            "SELECT COUNT(*) as cnt FROM review_records WHERE decision = 'human_review' AND is_deleted = 0"
+        ).fetchone()["cnt"]
         feedback = self.get_feedback_stats()
         db_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
 
@@ -679,9 +763,12 @@ class Database:
             "total_reviews": total_reviews,
             "violation_reviews": violation_reviews,
             "compliant_reviews": total_reviews - violation_reviews,
+            "pending_count": pending_count,
             "violation_rate": violation_reviews / total_reviews if total_reviews > 0 else 0,
             "avg_latency_ms": round(avg_latency, 2),
+            "avg_review_latency": round(avg_latency, 2),
             "avg_confidence": round(avg_confidence, 4),
+            "model_status": "active" if not config.DEMO_MODE else "demo",
             "feedback": feedback,
             "db_size_bytes": db_size,
             "db_size_mb": round(db_size / 1024 / 1024, 2),
@@ -710,11 +797,20 @@ class Database:
     def get_review_violations(self, review_id: int) -> List[Dict]:
         conn = self._get_conn()
         rows = conn.execute(
-            "SELECT id, review_id, violation_type_id, violation_type_name, is_deprecated, created_at "
+            "SELECT id, review_id, violation_type_id, violation_type_name, violated_articles, reasoning, source, is_deprecated, created_at "
             "FROM review_violations WHERE review_id = ?",
             (review_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            d = dict(r)
+            if d.get("violated_articles") and isinstance(d["violated_articles"], str):
+                try:
+                    d["violated_articles"] = json.loads(d["violated_articles"])
+                except (json.JSONDecodeError, TypeError):
+                    d["violated_articles"] = []
+            result.append(d)
+        return result
 
     def save_violation_feedback(self, review_id: int, violation_type_id: str, feedback_type: str, comment: str = "", user_id: int = None) -> int:
         with self.transaction() as conn:
@@ -772,3 +868,50 @@ class Database:
             (review_id,)
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def save_clause_relation(self, from_doc, from_article, to_doc, to_article, relation_type, confidence=1.0, evidence_text='', source='regex'):
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO clause_relations (from_doc, from_article, to_doc, to_article, relation_type, confidence, evidence_text, source, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+                (from_doc, from_article, to_doc, to_article, relation_type, confidence, evidence_text, source)
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"保存条款关系失败: {e}")
+            return False
+
+    def get_clause_relations(self, doc_name=None, article_number=None, relation_type=None):
+        conn = self._get_conn()
+        query = "SELECT * FROM clause_relations WHERE 1=1"
+        params = []
+        if doc_name:
+            query += " AND (from_doc = ? OR to_doc = ?)"
+            params.extend([doc_name, doc_name])
+        if article_number:
+            query += " AND (from_article = ? OR to_article = ?)"
+            params.extend([article_number, article_number])
+        if relation_type:
+            query += " AND relation_type = ?"
+            params.append(relation_type)
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_all_clause_relations(self):
+        conn = self._get_conn()
+        rows = conn.execute("SELECT * FROM clause_relations").fetchall()
+        return [dict(r) for r in rows]
+
+    def get_relations_for_articles(self, articles):
+        if not articles:
+            return []
+        conn = self._get_conn()
+        results = []
+        for doc_name, article_number in articles:
+            rows = conn.execute(
+                "SELECT * FROM clause_relations WHERE from_doc = ? AND from_article = ?",
+                (doc_name, article_number)
+            ).fetchall()
+            results.extend([dict(r) for r in rows])
+        return results

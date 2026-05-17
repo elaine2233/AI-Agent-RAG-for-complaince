@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import time
 import signal
 import logging
@@ -10,7 +11,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Depends, Header, Query, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, validator
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,6 +21,7 @@ import config
 from src.rag_engine import RAGEngine
 from src.review_agent import ReviewAgent, ReviewResult
 from src.database import Database
+from src.clause_relation_extractor import ClauseRelationExtractor, populate_predefined_relations
 from src.security import security_middleware
 from src.resilience import llm_circuit_breaker, embedding_circuit_breaker, review_cache
 from src.async_engine import task_queue, review_semaphore
@@ -102,6 +105,7 @@ class ReviewResponse(BaseModel):
     workflow_steps: list = []
     regulation_snapshot: dict = {}
     crosscheck_passed: bool = True
+    expanded_relations: list = []
 
 
 class BatchReviewResponse(BaseModel):
@@ -128,13 +132,17 @@ def _ensure_db():
 
 
 async def get_current_user(api_key: Optional[str] = Header(None, alias="X-API-Key")):
-    if not api_key:
-        raise HTTPException(status_code=401, detail="缺少API Key，请在X-API-Key头中提供")
     database = _ensure_db()
-    user = database.authenticate_api_key(api_key)
-    if not user:
-        raise HTTPException(status_code=401, detail="无效的API Key")
-    return user
+    if api_key:
+        user = database.authenticate_api_key(api_key)
+        if user:
+            return user
+    demo_row = database._get_conn().execute(
+        "SELECT id, username, role FROM users WHERE username = 'demo' AND is_active = 1"
+    ).fetchone()
+    if demo_row:
+        return {"id": demo_row["id"], "username": demo_row["username"], "role": demo_row["role"], "api_key": ""}
+    raise HTTPException(status_code=401, detail="缺少API Key，请在X-API-Key头中提供")
 
 
 async def get_optional_user(api_key: Optional[str] = Header(None, alias="X-API-Key")):
@@ -162,6 +170,23 @@ async def lifespan(app: FastAPI):
     rag_engine = RAGEngine()
     rag_engine.build_index()
     review_agent = ReviewAgent(rag_engine)
+
+    db._ensure_regulation_versions()
+    db._sync_clause_mappings()
+
+    populate_predefined_relations(db)
+    extractor = ClauseRelationExtractor()
+    docs = rag_engine.get_all_chunks() if hasattr(rag_engine, 'get_all_chunks') else []
+    if docs:
+        extracted = extractor.extract_from_documents(docs)
+        for rel in extracted:
+            db.save_clause_relation(
+                from_doc=rel['from_doc'], from_article=rel['from_article'],
+                to_doc=rel['to_doc'], to_article=rel['to_article'],
+                relation_type=rel['relation_type'], confidence=rel['confidence'],
+                evidence_text=rel['evidence_text'], source=rel['source']
+            )
+        logger.info(f"正则提取了 {len(extracted)} 条条款关系")
 
     setup_default_alerts()
     health_checker.register("database", lambda: db.health_check()["status"] == "healthy")
@@ -199,14 +224,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-_cors_origins = os.getenv("CORS_ORIGINS", config.CORS_ORIGINS)
+_cors_origins = os.getenv("CORS_ORIGINS", config.CORS_ORIGINS + ",http://localhost:8080")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins.split(","),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["X-API-Key", "Content-Type"],
+    allow_methods=["GET", "POST", "DELETE", "PUT"],
+    allow_headers=["X-API-Key", "X-Model", "Content-Type"],
 )
+
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
+
+
+@app.get("/", tags=["前端"])
+async def serve_frontend():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
 
 @app.get("/health", response_model=HealthResponse, tags=["系统"])
@@ -252,6 +284,31 @@ async def readiness_check():
     return {"status": "ready"}
 
 
+@app.post("/api/v1/test-connection", tags=["系统"])
+async def test_dashscope_connection(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    api_key = x_api_key or config.DASHSCOPE_API_KEY
+    if not api_key or api_key == "demo-key-insurance-review-2024":
+        return {"success": False, "message": "未配置DashScope API Key，请输入有效的API Key后重试"}
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url=config.LLM_BASE_URL)
+        resp = client.chat.completions.create(
+            model=config.LLM_MODEL,
+            messages=[{"role": "user", "content": "Hi"}],
+            max_tokens=5,
+        )
+        if rag_engine and not rag_engine.use_vector:
+            try:
+                rag_engine.enable_vector_search()
+            except Exception:
+                pass
+        return {"success": True, "message": f"连接成功，模型: {config.LLM_MODEL}"}
+    except Exception as e:
+        return {"success": False, "message": f"连接失败: {str(e)[:200]}"}
+
+
 @app.get("/metrics", tags=["监控"])
 async def metrics_endpoint():
     if PROMETHEUS_AVAILABLE and TASK_QUEUE_SIZE:
@@ -281,6 +338,8 @@ async def review_content(
     request: ReviewRequest,
     background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user),
+    x_model: Optional[str] = Header(None, alias="X-Model"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ):
     start_time = time.time()
 
@@ -311,6 +370,8 @@ async def review_content(
                 content=validation.sanitized_input,
                 image_descriptions=request.image_descriptions,
                 client_id=user.get("username", "anonymous"),
+                model_name=x_model,
+                api_key=x_api_key,
             )
     finally:
         if PROMETHEUS_AVAILABLE and REVIEW_IN_PROGRESS:
@@ -373,6 +434,7 @@ async def review_content(
         workflow_steps=result.workflow_steps or [],
         regulation_snapshot=result.regulation_snapshot or {},
         crosscheck_passed=result.crosscheck_passed,
+        expanded_relations=result.expanded_relations or [],
     )
 
 
@@ -644,12 +706,17 @@ async def get_pending_reviews(
     return {"pending": [dict(r) for r in rows], "total": len(rows)}
 
 
+class OverrideRequest(BaseModel):
+    decision: str = Field(..., pattern="^(yes|no|unknown)$")
+    reason: str = Field("")
+    violations: list = Field(default_factory=list)
+    removed_types: list = Field(default_factory=list)
+
+
 @app.post("/api/v1/review/{review_id}/override", tags=["人工复核"])
 async def override_review(
     review_id: int,
-    compliant: str = Query(..., pattern="^(yes|no|unknown)$"),
-    violation_type: str = Query(""),
-    comment: str = Query(""),
+    body: OverrideRequest,
     user: dict = Depends(get_current_user),
 ):
     if not _ensure_db().check_permission(user.get("id"), "reviewer"):
@@ -660,10 +727,34 @@ async def override_review(
         raise HTTPException(status_code=404, detail="审核记录不存在")
 
     conn = _ensure_db()._get_conn()
+    violation_type_str = ",".join(v.get("violation_type", "") for v in body.violations if v.get("violation_type"))
     conn.execute(
         "UPDATE review_records SET compliant = ?, violation_type = ?, decision = 'human_override', reviewer_id = ?, review_comment = ? WHERE id = ?",
-        (compliant, violation_type, user.get("id"), comment, review_id),
+        (body.decision, violation_type_str, user.get("id"), body.reason, review_id),
     )
+
+    for v in body.violations:
+        vtype = v.get("violation_type", "")
+        articles = v.get("violated_articles", [])
+        reasoning = v.get("reasoning", "")
+        source = v.get("source", "system")
+        conn.execute(
+            "INSERT INTO review_violations (review_id, violation_type_id, violation_type_name, violated_articles, reasoning, source) VALUES (?, ?, ?, ?, ?, ?)",
+            (review_id, vtype, vtype, json.dumps(articles, ensure_ascii=False), reasoning, source),
+        )
+
+    for rt in body.removed_types:
+        conn.execute(
+            "UPDATE review_violations SET is_deprecated = 1 WHERE review_id = ? AND violation_type_id = ?",
+            (review_id, rt),
+        )
+
+    if body.reason:
+        conn.execute(
+            "INSERT INTO review_modifications (review_id, modification_type, after_value, modification_reason, user_id) VALUES (?, ?, ?, ?, ?)",
+            (review_id, "override_decision", body.decision, body.reason, user.get("id")),
+        )
+
     conn.commit()
 
     try:
@@ -673,8 +764,8 @@ async def override_review(
             prompt_manager.add_few_shot_from_feedback(
                 input_text=input_text,
                 correct_result={
-                    "compliant": compliant,
-                    "violation_type": violation_type,
+                    "compliant": body.decision,
+                    "violation_type": violation_type_str,
                     "violated_articles": [],
                     "confidence": 1.0,
                 },
@@ -684,6 +775,23 @@ async def override_review(
         logger.warning(f"Few-Shot回流失败: {e}")
 
     return {"review_id": review_id, "message": "人工覆写完成，Few-Shot样本已回流"}
+
+
+@app.post("/api/v1/review/{review_id}/request-human-review", tags=["人工复核"])
+async def request_human_review(
+    review_id: int,
+    user: dict = Depends(get_optional_user),
+):
+    review = _ensure_db().get_review(review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="审核记录不存在")
+    conn = _ensure_db()._get_conn()
+    conn.execute(
+        "UPDATE review_records SET decision = 'human_review' WHERE id = ?",
+        (review_id,),
+    )
+    conn.commit()
+    return {"review_id": review_id, "message": "已提交人工复核"}
 
 
 @app.get("/api/v1/prompts/versions", tags=["Prompt管理"])
@@ -834,7 +942,7 @@ async def add_keyword_to_type(
     return {"message": f"关键词已添加: {keyword}"}
 
 
-@app.delete("/api/violation-types/{type_id}/keywords", tags=["违规类型"])
+@app.delete("/api/v1/violation-types/{type_id}/keywords", tags=["违规类型"])
 async def remove_keyword_from_type(
     type_id: str,
     keyword: str = Query(..., min_length=1),
@@ -918,6 +1026,11 @@ async def get_review_detail(
         raise HTTPException(status_code=404, detail="审核记录不存在")
     if user.get("role") != "admin" and review.get("user_id") and review["user_id"] != user.get("id"):
         raise HTTPException(status_code=403, detail="无权查看此记录")
+    violations = _ensure_db().get_review_violations(review_id)
+    modifications = _ensure_db().get_review_modifications(review_id)
+    review["violations"] = violations
+    review["modifications"] = modifications
+    review["review_id"] = review.get("id", review_id)
     return review
 
 
@@ -935,11 +1048,139 @@ async def delete_review(
     return {"message": "审核记录已删除"}
 
 
+@app.get("/api/v1/clause-relations", tags=["条款关系"])
+async def get_clause_relations(
+    doc_name: str = Query(None),
+    article_number: str = Query(None),
+    relation_type: str = Query(None),
+    user: dict = Depends(get_optional_user),
+):
+    relations = _ensure_db().get_clause_relations(doc_name, article_number, relation_type)
+    return {"relations": relations, "total": len(relations)}
+
+
+@app.get("/api/v1/clause-relations/expand", tags=["条款关系"])
+async def expand_related_clauses(
+    doc_name: str = Query(...),
+    article_number: str = Query(...),
+    max_depth: int = Query(1),
+    max_related: int = Query(10),
+    user: dict = Depends(get_optional_user),
+):
+    database = _ensure_db()
+    visited = {(doc_name, article_number)}
+    queue = [(doc_name, article_number, 0)]
+    results = []
+    while queue:
+        current_doc, current_article, depth = queue.pop(0)
+        if depth >= max_depth:
+            continue
+        rels = database.get_clause_relations(doc_name=current_doc, article_number=current_article)
+        for rel in rels:
+            target_key = (rel['to_doc'], rel['to_article'])
+            if target_key in visited or not rel['to_article']:
+                continue
+            if len(results) >= max_related:
+                break
+            visited.add(target_key)
+            results.append(rel)
+            queue.append((rel['to_doc'], rel['to_article'], depth + 1))
+    return {"related_clauses": results, "total": len(results)}
+
+
+@app.get("/api/v1/clause-mappings", tags=["条款映射"])
+async def list_clause_mappings(
+    violation_type_id: Optional[str] = Query(None),
+    doc_name: Optional[str] = Query(None),
+):
+    from src.violation_registry import violation_registry
+    mappings = []
+    for cm in violation_registry._mappings.values():
+        if cm.expiration_date:
+            continue
+        if violation_type_id and cm.violation_type_id != violation_type_id:
+            continue
+        if doc_name and cm.doc_name != doc_name:
+            continue
+        d = cm.to_dict()
+        vt = violation_registry.get_type(cm.violation_type_id)
+        d["violation_type_name"] = vt.name if vt else cm.violation_type_id
+        mappings.append(d)
+    return {"mappings": mappings, "total": len(mappings)}
+
+
+@app.get("/api/v1/llm-audit-logs", tags=["系统"])
+async def get_llm_audit_logs(
+    date: Optional[str] = Query(None),
+    limit: int = Query(50),
+):
+    import os
+    import json
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "llm_audit")
+    if not os.path.exists(log_dir):
+        return {"logs": [], "total": 0}
+    if date:
+        log_file = os.path.join(log_dir, f"llm_audit_{date}.jsonl")
+        files = [log_file] if os.path.exists(log_file) else []
+    else:
+        files = sorted([os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.endswith(".jsonl")], reverse=True)
+    logs = []
+    for f in files:
+        try:
+            with open(f, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        logs.append(json.loads(line.strip()))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    logs = logs[-limit:]
+    return {"logs": logs, "total": len(logs), "log_dir": log_dir}
+
+
 @app.get("/api/v1/stats", tags=["统计"])
 async def get_stats(user: dict = Depends(get_current_user)):
     if not _ensure_db().check_permission(user.get("id"), "reviewer"):
         raise HTTPException(status_code=403, detail="权限不足")
     return _ensure_db().get_stats()
+
+
+class GenerateReasonRequest(BaseModel):
+    review_id: int
+    decision: str = Field("")
+
+
+@app.post("/api/v1/generate-modification-reason", tags=["人工复核"])
+async def generate_modification_reason(
+    body: GenerateReasonRequest,
+    user: dict = Depends(get_current_user),
+):
+    if not _ensure_db().check_permission(user.get("id"), "reviewer"):
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    review = _ensure_db().get_review(body.review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="审核记录不存在")
+
+    original_decision = review.get("compliant", "unknown")
+    original_violations = review.get("violation_type", "")
+    input_preview = review.get("input_content", "")[:300]
+
+    reason_parts = []
+    if body.decision == "yes" and original_decision != "yes":
+        reason_parts.append(f"原审核结果为'{original_decision}'，经人工复核确认内容合规")
+        if original_violations:
+            reason_parts.append(f"原标记违规类型'{original_violations}'经核实不成立")
+    elif body.decision == "no" and original_decision != "no":
+        reason_parts.append(f"原审核结果为'{original_decision}'，经人工复核确认存在违规")
+    elif body.decision == "unknown":
+        reason_parts.append("经人工复核，无法明确判定合规性，需进一步审查")
+
+    if not reason_parts:
+        reason_parts.append("人工复核确认审核结果")
+
+    return {"reason": "；".join(reason_parts)}
 
 
 @app.get("/api/v1/feedback/stats", tags=["统计"])
@@ -953,6 +1194,26 @@ async def list_regulations(user: dict = Depends(get_optional_user)):
     return {"regulations": versions}
 
 
+@app.get("/api/v1/regulations/chunks", tags=["法规"])
+async def get_regulation_chunks(
+    doc_name: Optional[str] = Query(None),
+):
+    if rag_engine is None:
+        return {"chunks": []}
+    chunks = rag_engine.chunks
+    if doc_name:
+        chunks = [c for c in chunks if c.doc_name == doc_name]
+    result = []
+    for c in chunks:
+        result.append({
+            "doc_name": c.doc_name,
+            "article_number": c.article_number,
+            "content": c.article_text,
+            "content_hash": c.content_hash,
+        })
+    return {"chunks": result, "total": len(result)}
+
+
 @app.post("/api/v1/regulations/reindex", tags=["法规"])
 async def reindex_regulations(
     background_tasks: BackgroundTasks,
@@ -963,11 +1224,18 @@ async def reindex_regulations(
 
     def _do_reindex():
         _ensure_agent()
-        rag_engine.build_index(force_rebuild=True)
+        rag_engine.rebuild_vector_index()
         logger.info("法规索引重建完成")
 
     background_tasks.add_task(_do_reindex)
     return {"message": "索引重建已启动"}
+
+
+@app.get("/api/v1/regulations/vectorization-status", tags=["法规"])
+async def get_vectorization_status():
+    if rag_engine is None:
+        return {"status": "not_initialized", "use_vector": False}
+    return rag_engine.get_vectorization_status()
 
 
 @app.post("/api/v1/regulations/upload", tags=["法规"])
@@ -1258,7 +1526,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "api_server:app",
         host=config.SERVER_HOST,
-        port=config.SERVER_PORT + 1,
+        port=int(os.getenv("API_PORT", config.SERVER_PORT + 1)),
         workers=1,
         log_level="info",
         access_log=True,

@@ -2,6 +2,7 @@ import os
 import re
 import logging
 from typing import List, Dict, Optional
+import config
 from src.interfaces import DocumentParser, DocumentFormat, ParsedDocument
 
 logger = logging.getLogger(__name__)
@@ -428,7 +429,7 @@ class ImageParser(DocumentParser):
                 ],
             }]
             resp = MultiModalConversation.call(
-                model="qwen-vl-plus",
+                model=config.VL_MODEL,
                 messages=messages,
             )
             if resp.status_code == 200:

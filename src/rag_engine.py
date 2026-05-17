@@ -44,8 +44,17 @@ class RAGEngine:
             self.use_vector = False
             return
 
-        if not force_rebuild and self._load_existing_index():
-            logger.info("已加载现有向量索引")
+        if force_rebuild:
+            try:
+                self._build_vector_index()
+                self.use_vector = True
+            except Exception as e:
+                logger.error(f"向量索引构建失败: {e}")
+                logger.info("回退到关键词检索模式")
+                self.use_vector = False
+            return
+
+        if self._try_incremental_update():
             self.use_vector = True
             return
 
@@ -57,13 +66,116 @@ class RAGEngine:
             logger.info("回退到关键词检索模式")
             self.use_vector = False
 
-    def _build_vector_index(self):
+    def enable_vector_search(self):
+        if self.use_vector:
+            return True
+        if not config.DASHSCOPE_API_KEY:
+            return False
+        try:
+            self._build_vector_index()
+            self.use_vector = True
+            logger.info(f"向量检索已启用，索引版本: {self._index_version}，条文数: {len(self.chunks)}")
+            return True
+        except Exception as e:
+            logger.error(f"向量索引构建失败: {e}")
+            self.use_vector = False
+            return False
+
+    def _compute_doc_hashes(self, chunks: List[RegulationChunk]) -> Dict[str, str]:
+        doc_chunk_hashes: Dict[str, List[str]] = {}
+        for chunk in chunks:
+            doc_chunk_hashes.setdefault(chunk.doc_name, []).append(chunk.content_hash)
+        doc_hashes = {}
+        for doc_name, hashes in doc_chunk_hashes.items():
+            combined = "|".join(sorted(hashes))
+            doc_hashes[doc_name] = hashlib.md5(combined.encode()).hexdigest()[:16]
+        return doc_hashes
+
+    def _get_stored_doc_hashes(self) -> Dict[str, str]:
+        if self.collection is None or self.collection.count() == 0:
+            return {}
+        results = self.collection.get(include=["metadatas"])
+        doc_hashes = {}
+        for meta in results["metadatas"]:
+            doc_name = meta["doc_name"]
+            doc_hash = meta.get("doc_content_hash", "")
+            if doc_name not in doc_hashes and doc_hash:
+                doc_hashes[doc_name] = doc_hash
+        return doc_hashes
+
+    def _try_incremental_update(self) -> bool:
+        try:
+            import chromadb
+            from chromadb.config import Settings
+
+            if not os.path.exists(config.VECTOR_STORE_DIR):
+                return False
+
+            self.client = chromadb.PersistentClient(
+                path=config.VECTOR_STORE_DIR,
+                settings=Settings(anonymized_telemetry=False),
+            )
+            self.collection = self.client.get_or_create_collection(
+                name="regulations",
+                metadata={"hnsw:space": "cosine"},
+            )
+
+            if self.collection.count() == 0:
+                return False
+
+            current_doc_hashes = self._compute_doc_hashes(self.chunks)
+            stored_doc_hashes = self._get_stored_doc_hashes()
+
+            changed_docs = set()
+            new_docs = set()
+            removed_docs = set()
+
+            for doc_name, doc_hash in current_doc_hashes.items():
+                if doc_name not in stored_doc_hashes:
+                    new_docs.add(doc_name)
+                elif stored_doc_hashes[doc_name] != doc_hash:
+                    changed_docs.add(doc_name)
+
+            for doc_name in stored_doc_hashes:
+                if doc_name not in current_doc_hashes:
+                    removed_docs.add(doc_name)
+
+            if not changed_docs and not new_docs and not removed_docs:
+                self._load_chunks_from_collection()
+                logger.info("所有文档未变化，已加载现有向量索引")
+                return True
+
+            docs_to_remove = changed_docs | removed_docs
+            for doc_name in docs_to_remove:
+                self.collection.delete(where={"doc_name": doc_name})
+                logger.info(f"已删除文档向量: {doc_name}")
+
+            docs_to_add = new_docs | changed_docs
+            chunks_to_add = [c for c in self.chunks if c.doc_name in docs_to_add]
+
+            if chunks_to_add:
+                self._add_chunks_to_collection(chunks_to_add)
+
+            self._load_chunks_from_collection()
+
+            logger.info(
+                f"增量更新: 新增={len(new_docs)}, 变更={len(changed_docs)}, "
+                f"删除={len(removed_docs)}, 新增向量={len(chunks_to_add)}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"增量更新失败: {e}")
+            return False
+
+    def _add_chunks_to_collection(self, chunks: List[RegulationChunk]):
         import dashscope
         from dashscope import TextEmbedding
         dashscope.api_key = config.DASHSCOPE_API_KEY
 
-        logger.info("开始构建向量索引...")
-        texts = [chunk.article_text for chunk in self.chunks]
+        doc_hashes = self._compute_doc_hashes(chunks)
+
+        texts = [chunk.article_text for chunk in chunks]
         metadatas = [
             {
                 "doc_name": chunk.doc_name,
@@ -71,6 +183,55 @@ class RAGEngine:
                 "article_number": chunk.article_number,
                 "chunk_id": chunk.chunk_id,
                 "content_hash": chunk.content_hash,
+                "doc_content_hash": doc_hashes.get(chunk.doc_name, ""),
+                "index_version": self._index_version,
+            }
+            for chunk in chunks
+        ]
+        ids = [chunk.chunk_id for chunk in chunks]
+
+        logger.info(f"正在生成 {len(texts)} 条文本的向量...")
+        embeddings = self._get_embeddings_with_retry(texts)
+
+        batch_size = 100
+        for i in range(0, len(ids), batch_size):
+            end = min(i + batch_size, len(ids))
+            self.collection.add(
+                ids=ids[i:end],
+                embeddings=embeddings[i:end],
+                documents=texts[i:end],
+                metadatas=metadatas[i:end],
+            )
+
+    def _load_chunks_from_collection(self):
+        results = self.collection.get(include=["metadatas", "documents"])
+        self.chunks = []
+        for i, doc_id in enumerate(results["ids"]):
+            meta = results["metadatas"][i]
+            self.chunks.append(RegulationChunk(
+                doc_name=meta["doc_name"],
+                chapter=meta["chapter"],
+                article_number=meta["article_number"],
+                article_text=results["documents"][i],
+                chunk_id=meta["chunk_id"],
+            ))
+
+    def _build_vector_index(self):
+        import dashscope
+        from dashscope import TextEmbedding
+        dashscope.api_key = config.DASHSCOPE_API_KEY
+
+        logger.info("开始构建向量索引...")
+        texts = [chunk.article_text for chunk in self.chunks]
+        doc_hashes = self._compute_doc_hashes(self.chunks)
+        metadatas = [
+            {
+                "doc_name": chunk.doc_name,
+                "chapter": chunk.chapter,
+                "article_number": chunk.article_number,
+                "chunk_id": chunk.chunk_id,
+                "content_hash": chunk.content_hash,
+                "doc_content_hash": doc_hashes.get(chunk.doc_name, ""),
                 "index_version": self._index_version,
             }
             for chunk in self.chunks
@@ -174,6 +335,41 @@ class RAGEngine:
         except Exception as e:
             logger.error(f"加载现有索引失败: {e}")
             return False
+
+    def rebuild_vector_index(self, strategy: ChunkStrategyType = ChunkStrategyType.ARTICLE):
+        logger.info("强制重建向量索引...")
+        self.build_index(force_rebuild=True, strategy=strategy)
+
+    def get_vectorization_status(self) -> Dict:
+        status = {
+            "use_vector": self.use_vector,
+            "total_chunks": len(self.chunks),
+            "index_version": self._index_version,
+            "documents": {},
+        }
+
+        if self.collection is not None and self.collection.count() > 0:
+            results = self.collection.get(include=["metadatas"])
+            for meta in results["metadatas"]:
+                doc_name = meta["doc_name"]
+                if doc_name not in status["documents"]:
+                    status["documents"][doc_name] = {
+                        "content_hash": meta.get("doc_content_hash", ""),
+                        "chunk_count": 0,
+                    }
+                status["documents"][doc_name]["chunk_count"] += 1
+        elif self.chunks:
+            doc_hashes = self._compute_doc_hashes(self.chunks)
+            doc_chunk_counts: Dict[str, int] = {}
+            for chunk in self.chunks:
+                doc_chunk_counts[chunk.doc_name] = doc_chunk_counts.get(chunk.doc_name, 0) + 1
+            for doc_name, count in doc_chunk_counts.items():
+                status["documents"][doc_name] = {
+                    "content_hash": doc_hashes.get(doc_name, ""),
+                    "chunk_count": count,
+                }
+
+        return status
 
     def _keyword_retrieve(self, query: str, top_k: int = None) -> List[Dict]:
         top_k = top_k or config.TOP_K
@@ -309,6 +505,24 @@ class RAGEngine:
                 f"原文: {item['article_text']}"
             )
         return "\n\n".join(context_parts)
+
+    def get_all_chunks(self):
+        if not self.collection:
+            return []
+        try:
+            results = self.collection.get(include=["metadatas", "documents"])
+            chunks = []
+            for i, doc in enumerate(results['documents']):
+                meta = results['metadatas'][i] if results['metadatas'] else {}
+                chunks.append({
+                    'doc_name': meta.get('doc_name', ''),
+                    'article_number': meta.get('article_number', ''),
+                    'article_text': doc or '',
+                })
+            return chunks
+        except Exception as e:
+            logger.warning(f"获取所有chunks失败: {e}")
+            return []
 
 
 if __name__ == "__main__":

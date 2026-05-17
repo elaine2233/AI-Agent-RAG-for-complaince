@@ -47,6 +47,7 @@ class ReviewResult:
     regulation_snapshot: Dict = None
     crosscheck_passed: bool = True
     violation_types: List[Dict] = None
+    expanded_relations: List[Dict] = None
 
     def to_dict(self):
         d = asdict(self)
@@ -81,6 +82,7 @@ class ReviewAgent:
         engine.register_step("rule_check", self._step_rule_check)
         engine.register_step("rag_retrieve", self._step_rag_retrieve)
         engine.register_step("rerank", self._step_rerank)
+        engine.register_step("expand_relations", self._step_expand_relations)
         engine.register_step("llm_reason", self._step_llm_reason)
         engine.register_step("format", self._step_format)
         engine.register_step("validate", self._step_validate)
@@ -208,9 +210,98 @@ class ReviewAgent:
             top_k=5,
         )
 
+    def _step_expand_relations(self, state: WorkflowState):
+        if not state.reranked_laws:
+            state.expanded_relations = []
+            return
+
+        try:
+            database = Database()
+        except Exception:
+            state.expanded_relations = []
+            return
+
+        visited = set()
+        all_related = []
+
+        for law in state.reranked_laws:
+            doc_name = law.doc_name if hasattr(law, 'doc_name') else law.get('doc_name', '')
+            article_number = law.article_number if hasattr(law, 'article_number') else law.get('article_number', '')
+            if not doc_name or not article_number:
+                continue
+
+            key = (doc_name, article_number)
+            if key in visited:
+                continue
+            visited.add(key)
+
+            try:
+                rels = database.get_clause_relations(doc_name=doc_name, article_number=article_number)
+                for rel in rels:
+                    target_key = (rel['to_doc'], rel['to_article'])
+                    if target_key in visited or not rel['to_article']:
+                        continue
+                    visited.add(target_key)
+
+                    target_text = ''
+                    for chunk in self.rag_engine.chunks:
+                        if chunk.doc_name == rel['to_doc'] and chunk.article_number == rel['to_article']:
+                            target_text = chunk.article_text
+                            break
+
+                    all_related.append({
+                        'from_doc': rel['from_doc'],
+                        'from_article': rel['from_article'],
+                        'to_doc': rel['to_doc'],
+                        'to_article': rel['to_article'],
+                        'relation_type': rel['relation_type'],
+                        'confidence': rel['confidence'],
+                        'evidence_text': rel.get('evidence_text', ''),
+                        'target_article_text': target_text,
+                    })
+
+                    sub_rels = database.get_clause_relations(doc_name=rel['to_doc'], article_number=rel['to_article'])
+                    for sub in sub_rels:
+                        sub_key = (sub['to_doc'], sub['to_article'])
+                        if sub_key not in visited and sub['to_article']:
+                            visited.add(sub_key)
+                            sub_text = ''
+                            for chunk in self.rag_engine.chunks:
+                                if chunk.doc_name == sub['to_doc'] and chunk.article_number == sub['to_article']:
+                                    sub_text = chunk.article_text
+                                    break
+                            all_related.append({
+                                'from_doc': sub['from_doc'],
+                                'from_article': sub['from_article'],
+                                'to_doc': sub['to_doc'],
+                                'to_article': sub['to_article'],
+                                'relation_type': sub['relation_type'],
+                                'confidence': sub['confidence'],
+                                'evidence_text': sub.get('evidence_text', ''),
+                                'target_article_text': sub_text,
+                            })
+            except Exception as e:
+                logger.warning(f"条款关系扩展失败 doc={doc_name} article={article_number}: {e}")
+
+        state.expanded_relations = all_related
+        logger.info(f"条款关系扩展: 找到 {len(all_related)} 条关联条款")
+
     def _step_llm_reason(self, state: WorkflowState):
         active_prompt = prompt_manager.get_active_prompt()
         state.prompt_version = active_prompt.version if active_prompt else "v1"
+
+        if config.DEMO_MODE and state.rule_check_result and state.rule_check_result.get("hit"):
+            state.reasoning_result = {
+                "compliant": state.rule_check_result["compliant"],
+                "violation_type": state.rule_check_result["violation_type"],
+                "violated_articles": state.rule_check_result["violated_articles"],
+                "confidence": state.rule_check_result["confidence"],
+                "reasoning": f"规则引擎命中: {', '.join(state.rule_check_result.get('matched_keywords', []))}",
+                "suggestions": self._generate_suggestions(
+                    state.rule_check_result["violation_type"].split("、")
+                ),
+            }
+            return
 
         context = self.rag_engine.format_retrieved_context(state.reranked_laws)
 
@@ -230,15 +321,31 @@ class ReviewAgent:
                 f"**重要**: 请在确认以上规则命中的基础上，继续检查是否存在规则未覆盖的深层/隐含违规。**不要重复输出规则已命中的违规，只输出额外发现。**\n"
             )
 
+        relation_hint = ""
+        if state.expanded_relations:
+            relation_lines = []
+            for rel in state.expanded_relations:
+                line = f"- {rel['from_doc']}第{rel['from_article']}条 → {rel['to_doc']}第{rel['to_article']}条（关系: {rel['relation_type']}）"
+                if rel.get('target_article_text'):
+                    line += f"\n  关联条文原文: {rel['target_article_text'][:200]}"
+                if rel.get('evidence_text'):
+                    line += f"\n  依据: {rel['evidence_text'][:100]}"
+                relation_lines.append(line)
+            relation_hint = (
+                f"\n\n## 条款隐含关联（以下条款之间存在引用、例外、补充等隐含逻辑关系，请综合考量）\n"
+                + "\n".join(relation_lines)
+                + "\n**重要**: 请注意条款间的关联关系，某些条款的适用可能受关联条款的例外、补充或前提条件影响。\n"
+            )
+
         if active_prompt and active_prompt.user_prompt_template:
             user_prompt = active_prompt.user_prompt_template.format(
                 content=state.original_text,
                 context=context,
                 few_shots=few_shot_text,
-            ) + rule_hint
+            ) + rule_hint + relation_hint
             system_prompt = active_prompt.system_prompt
         else:
-            user_prompt = f"## 待审核内容\n{state.original_text}\n\n## 相关法规\n{context}\n\n## 参考案例\n{few_shot_text}\n{rule_hint}\n请进行合规审核，按JSON格式输出。"
+            user_prompt = f"## 待审核内容\n{state.original_text}\n\n## 相关法规\n{context}\n\n## 参考案例\n{few_shot_text}\n{rule_hint}\n{relation_hint}\n请进行合规审核，按JSON格式输出。"
             system_prompt = REASON_SYSTEM_PROMPT
 
         try:
@@ -282,6 +389,8 @@ class ReviewAgent:
             llm_types = set(llm_result.get("violation_type", "").split("、")) if llm_result.get("violation_type") else set()
             llm_types.discard("")
             merged_types = rule_types | llm_types
+            if len(merged_types) > 1:
+                merged_types.discard("其他违规")
 
             rule_articles = rule_result.get("violated_articles", [])
             llm_articles = llm_result.get("violated_articles", [])
@@ -484,8 +593,26 @@ class ReviewAgent:
         content: str,
         image_descriptions: List[str] = None,
         client_id: str = "anonymous",
+        model_name: str = None,
+        api_key: str = None,
     ) -> ReviewResult:
         start_time = time.time()
+
+        if api_key and api_key != "demo-key-insurance-review-2024":
+            config.DASHSCOPE_API_KEY = api_key
+            config.DEMO_MODE = False
+            llm_gateway._register_default_models()
+            if hasattr(self, 'rag_engine') and self.rag_engine:
+                self.rag_engine.enable_vector_search()
+            if model_name:
+                llm_gateway.ensure_model(model_name)
+                self.extract_model = model_name
+                self.reason_model = model_name
+                self.crosscheck_model = model_name
+            else:
+                self.extract_model = config.EXTRACT_MODEL
+                self.reason_model = config.REASON_MODEL
+                self.crosscheck_model = config.CROSSCHECK_MODEL
 
         validation = security_middleware.validate_and_sanitize(content, client_id)
         if not validation.is_valid:
@@ -503,6 +630,12 @@ class ReviewAgent:
             )
 
         sanitized_content = validation.sanitized_input
+
+        if model_name and not config.DEMO_MODE:
+            llm_gateway.ensure_model(model_name)
+            self.extract_model = model_name
+            self.reason_model = model_name
+            self.crosscheck_model = model_name
 
         if image_descriptions:
             full_content = sanitized_content + "\n\n[图片描述信息]\n" + "\n".join(
@@ -560,6 +693,7 @@ class ReviewAgent:
             workflow_steps=[{"name": s.name, "status": s.status.value, "latency_ms": s.latency_ms} for s in state.steps],
             regulation_snapshot=regulation_snapshot,
             crosscheck_passed=crosscheck_passed,
+            expanded_relations=state.expanded_relations,
         )
 
         if result.violation_type:
