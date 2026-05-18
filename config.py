@@ -77,7 +77,7 @@ DB_BACKUP_DIR = os.getenv("DB_BACKUP_DIR", os.path.join(os.path.dirname(os.path.
 DATA_RETENTION_DAYS = int(os.getenv("DATA_RETENTION_DAYS", "365"))
 MAX_INPUT_LENGTH = int(os.getenv("MAX_INPUT_LENGTH", "10000"))
 MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "50"))
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:7860,http://localhost:7861")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:7860,http://localhost:7861,http://localhost:3000")
 
 PASSWORD_SALT = os.getenv("PASSWORD_SALT", "insurance_review_2024_salt")
 API_KEY_EXPIRE_DAYS = int(os.getenv("API_KEY_EXPIRE_DAYS", "90"))

@@ -1,10 +1,39 @@
 import logging
 import time
+import json as _json
+import os as _os
+from datetime import datetime as _datetime
 from typing import Dict, List, Optional
 
 import config
 
 logger = logging.getLogger(__name__)
+
+_rerank_audit_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "llm_audit")
+_os.makedirs(_rerank_audit_dir, exist_ok=True)
+
+def _write_rerank_audit_log(model_name, query_preview, doc_count, doc_names, latency_ms, success, error_type=None, review_id=None):
+    try:
+        ts = _datetime.now().strftime("%Y%m%d")
+        log_file = _os.path.join(_rerank_audit_dir, f"llm_audit_{ts}.jsonl")
+        doc_info = "; ".join(doc_names[:10]) if doc_names else f"{doc_count}条条款"
+        entry = {
+            "timestamp": _datetime.now().isoformat(),
+            "model": model_name,
+            "step_name": "rerank",
+            "user_prompt": f"[Rerank] 对{doc_count}条法规条款重排序: {doc_info}",
+            "response": f"查询: {query_preview[:150]}",
+            "latency_ms": round(latency_ms, 1),
+            "success": success,
+        }
+        if error_type:
+            entry["error_type"] = error_type
+        if review_id is not None:
+            entry["review_id"] = review_id
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 
 
 class Reranker:
@@ -45,6 +74,8 @@ class Reranker:
 
         dashscope.api_key = config.DASHSCOPE_API_KEY
         doc_texts = [d.get("article_text", "") for d in documents]
+        doc_names = [f"{d.get('doc_name','')}第{d.get('article_number','')}条" for d in documents[:10]]
+        _start = time.time()
 
         for attempt in range(config.RERANKER_RETRY_MAX):
             try:
@@ -66,6 +97,8 @@ class Reranker:
                         doc_copy["rerank_method"] = "cross_encoder"
                         scored.append(doc_copy)
                     scored.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
+                    _lat = (time.time() - _start) * 1000
+                    _write_rerank_audit_log(self._model_name, query[:100], len(documents), doc_names, _lat, True)
                     logger.info(f"Cross-Encoder重排完成: {len(scored)}条结果, 模型={self._model_name}")
                     return scored[:top_k]
                 elif resp.status_code == 429:
@@ -79,6 +112,8 @@ class Reranker:
                     logger.warning(f"Rerank API网络错误: {e}，等待重试")
                     time.sleep(config.RERANKER_RETRY_DELAY * (attempt + 1))
                     continue
+                _lat = (time.time() - _start) * 1000
+                _write_rerank_audit_log(self._model_name, query[:100], len(documents), doc_names, _lat, False, error_type=type(e).__name__)
                 raise
 
         raise RuntimeError(f"Rerank API重试{config.RERANKER_RETRY_MAX}次均失败")

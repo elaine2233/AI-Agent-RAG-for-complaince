@@ -116,10 +116,6 @@ class ReviewAgent:
 
         try:
             extract_prompt = f"请从以下营销内容中提取关键要素：\n\n{state.original_text}"
-            if state.image_descriptions:
-                extract_prompt += "\n\n[图片描述信息]\n" + "\n".join(
-                    f"图片{i+1}: {desc}" for i, desc in enumerate(state.image_descriptions)
-                )
 
             image_urls = None
             if state.image_paths:
@@ -268,6 +264,7 @@ class ReviewAgent:
                 "matched_keywords": list(set(matched_keywords)),
                 "confidence": 0.90,
             }
+            state.metadata["rule_check_result"] = state.rule_check_result
         else:
             state.rule_check_result = {
                 "hit": False,
@@ -278,6 +275,7 @@ class ReviewAgent:
                 "matched_keywords": [],
                 "confidence": 0.0,
             }
+            state.metadata["rule_check_result"] = state.rule_check_result
 
     def _step_rag_retrieve(self, state: WorkflowState):
         query = state.effective_text or state.original_text
@@ -286,10 +284,19 @@ class ReviewAgent:
 
         raw_results = self.rag_engine.retrieve(query, top_k=20)
         state.retrieved_laws = raw_results
+        rag_meta = []
+        for r in raw_results[:10]:
+            rag_meta.append({
+                "doc_name": r.doc_name if hasattr(r, 'doc_name') else r.get('doc_name', ''),
+                "article_number": r.article_number if hasattr(r, 'article_number') else r.get('article_number', ''),
+                "similarity": r.similarity if hasattr(r, 'similarity') else r.get('similarity', 0),
+            })
+        state.metadata["rag_results"] = rag_meta
 
     def _step_rerank(self, state: WorkflowState):
         if not state.retrieved_laws:
             state.reranked_laws = []
+            state.metadata["reranked_laws"] = []
             return
 
         state.reranked_laws = reranker.rerank(
@@ -297,6 +304,14 @@ class ReviewAgent:
             documents=state.retrieved_laws,
             top_k=5,
         )
+        rerank_meta = []
+        for r in state.reranked_laws[:5]:
+            rerank_meta.append({
+                "doc_name": r.doc_name if hasattr(r, 'doc_name') else r.get('doc_name', ''),
+                "article_number": r.article_number if hasattr(r, 'article_number') else r.get('article_number', ''),
+                "relevance_score": r.relevance_score if hasattr(r, 'relevance_score') else r.get('relevance_score', 0),
+            })
+        state.metadata["reranked_laws"] = rerank_meta
 
     def _step_expand_relations(self, state: WorkflowState):
         if not state.reranked_laws:
@@ -372,6 +387,16 @@ class ReviewAgent:
                 logger.warning(f"条款关系扩展失败 doc={doc_name} article={article_number}: {e}")
 
         state.expanded_relations = all_related
+        state.metadata["expanded_relations"] = [
+            {
+                "from_doc": r.get("from_doc", ""),
+                "from_article": r.get("from_article", ""),
+                "to_doc": r.get("to_doc", ""),
+                "to_article": r.get("to_article", ""),
+                "relation_type": r.get("relation_type", ""),
+            }
+            for r in all_related[:10]
+        ]
         logger.info(f"条款关系扩展: 找到 {len(all_related)} 条关联条款")
 
     def _step_llm_reason(self, state: WorkflowState):
@@ -467,10 +492,13 @@ class ReviewAgent:
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 model_name=self.reason_model,
+                step_name="llm_reason",
             )
             raw_content = resp.content
             state.reasoning_result = self._parse_json(raw_content)
             state.model_used = resp.model
+            state.metadata["reasoning_result"] = state.reasoning_result
+            state.metadata["model_used"] = resp.model
             if not state.reasoning_result and raw_content:
                 logger.warning(f"LLM输出JSON解析失败，可能是输出被截断(长度={len(raw_content)})")
             if state.reasoning_result:
@@ -652,6 +680,7 @@ class ReviewAgent:
                         result["violations"] = [{
                             "violation_type_id": "",
                             "violation_type_name": rule_vt,
+                            "reasoning": f"规则引擎命中{rule_vt}（LLM引用验证失败，回退规则引擎结果）",
                             "violated_articles": deduped[:5],
                         }]
                     else:
@@ -672,6 +701,7 @@ class ReviewAgent:
                                 rule_violations.append({
                                     "violation_type_id": "",
                                     "violation_type_name": vt_name,
+                                    "reasoning": f"规则引擎命中{vt_name}（LLM引用验证失败，回退规则引擎结果）",
                                     "violated_articles": vt_articles,
                                 })
                         unassigned = [a for idx, a in enumerate(deduped) if idx not in assigned]
@@ -680,6 +710,7 @@ class ReviewAgent:
                         result["violations"] = rule_violations if rule_violations else [{
                             "violation_type_id": "",
                             "violation_type_name": rule_vt,
+                            "reasoning": f"规则引擎命中{rule_vt}（LLM引用验证失败，回退规则引擎结果）",
                             "violated_articles": deduped[:5],
                         }]
                     result["reasoning"] = f"[LLM引用条文验证失败，已回退到规则引擎结果] " + result.get("reasoning", "")
@@ -737,6 +768,7 @@ class ReviewAgent:
 
         if result.get("compliant") != "no":
             state.crosscheck_result = {"passed": True, "reason": "合规内容无需复核"}
+            state.metadata["crosscheck_result"] = state.crosscheck_result
             for step in state.steps:
                 if step.name == "crosscheck" and step.status.value == "running":
                     from src.workflow import StepStatus
@@ -747,6 +779,7 @@ class ReviewAgent:
         has_real_llm_cc = any(m.provider == "openai_compatible" for m in llm_gateway._models.values())
         if not has_real_llm_cc:
             state.crosscheck_result = {"passed": True, "reason": "无LLM可用，跳过复核"}
+            state.metadata["crosscheck_result"] = state.crosscheck_result
             for step in state.steps:
                 if step.name == "crosscheck" and step.status.value == "running":
                     from src.workflow import StepStatus
@@ -798,6 +831,7 @@ class ReviewAgent:
                 system_prompt="你是一位严谨的审核复核专家，只做事实性验证，不做主观判断。",
                 user_prompt=crosscheck_prompt,
                 model_name=self.crosscheck_model,
+                step_name="crosscheck",
             )
             parsed = self._parse_json(resp.content)
             if parsed:
@@ -825,11 +859,14 @@ class ReviewAgent:
                     "confidence_adjustment": confidence_adj,
                     "recommend_human_review": recommend_hr,
                 }
+                state.metadata["crosscheck_result"] = state.crosscheck_result
             else:
                 state.crosscheck_result = {"passed": True, "reason": "复核解析失败，默认通过"}
+            state.metadata["crosscheck_result"] = state.crosscheck_result
         except Exception as e:
             logger.warning(f"CrossCheck步骤失败，跳过复核: {e}")
             state.crosscheck_result = {"passed": True, "reason": f"复核失败: {str(e)}"}
+            state.metadata["crosscheck_result"] = state.crosscheck_result
             for step in state.steps:
                 if step.name == "crosscheck" and step.status.value == "running":
                     from src.workflow import StepStatus
@@ -967,6 +1004,7 @@ class ReviewAgent:
             review_mode = "rule+llm" if (state.rule_check_result and state.rule_check_result.get("hit")) else "llm"
         else:
             review_mode = "rule(fallback)" if (state.rule_check_result and state.rule_check_result.get("hit")) else "fallback"
+        state.metadata["review_mode"] = review_mode
 
         regulation_snapshot = {}
         try:
@@ -1269,6 +1307,7 @@ class ReviewAgent:
                     continue
                 vt_name = vt_item.get("violation_type_name", "")
                 vt_id = vt_item.get("violation_type_id", "")
+                vt_reasoning = vt_item.get("reasoning", "")
                 matched_articles = []
                 for a in violated_articles_raw:
                     if not isinstance(a, dict):
@@ -1278,11 +1317,14 @@ class ReviewAgent:
                         matched_articles.append(a)
                 if not matched_articles and len(violation_types_raw) == 1:
                     matched_articles = [a for a in violated_articles_raw if isinstance(a, dict)]
-                violations.append({
+                v_entry = {
                     "violation_type_id": vt_id,
                     "violation_type_name": vt_name,
                     "violated_articles": matched_articles,
-                })
+                }
+                if vt_reasoning:
+                    v_entry["reasoning"] = vt_reasoning
+                violations.append(v_entry)
         elif violation_type_str:
             type_names = [t.strip() for t in violation_type_str.split("、") if t.strip()]
             if len(type_names) <= 1:
@@ -1338,9 +1380,11 @@ class ReviewAgent:
             if not vt_name:
                 continue
             vt_id = ""
+            vt_desc = ""
             matched = violation_registry.get_type_by_name(vt_name)
             if matched:
                 vt_id = matched.id
+                vt_desc = matched.description or ""
             vt_articles = []
             for idx, a in enumerate(violated_articles):
                 if idx in assigned_indices:
@@ -1351,9 +1395,14 @@ class ReviewAgent:
             if not vt_articles and len(type_names) == 1:
                 vt_articles = list(violated_articles)
             if vt_articles:
+                kw_list = [a.get("violation_reason", "") for a in vt_articles if a.get("violation_reason")]
+                reasoning = vt_desc or f"规则引擎命中{vt_name}"
+                if kw_list:
+                    reasoning += f"（{'; '.join(kw_list[:3])}）"
                 violations.append({
                     "violation_type_id": vt_id,
                     "violation_type_name": vt_name,
+                    "reasoning": reasoning,
                     "violated_articles": vt_articles,
                 })
         unassigned = [a for idx, a in enumerate(violated_articles) if idx not in assigned_indices]

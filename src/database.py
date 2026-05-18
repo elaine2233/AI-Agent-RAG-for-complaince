@@ -923,10 +923,15 @@ class Database:
             type_id = vt["violation_type_id"]
             if type_id not in valid_ids:
                 type_id = "other_violation"
+            articles = vt.get("violated_articles", [])
+            if isinstance(articles, list):
+                articles = json.dumps(articles, ensure_ascii=False)
+            elif not isinstance(articles, str):
+                articles = "[]"
             conn.execute(
-                "INSERT INTO review_violations (review_id, violation_type_id, violation_type_name, is_deprecated) "
-                "VALUES (?, ?, ?, ?)",
-                (review_id, type_id, vt["violation_type_name"], int(vt.get("is_deprecated", False))),
+                "INSERT INTO review_violations (review_id, violation_type_id, violation_type_name, violated_articles, reasoning, is_deprecated) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (review_id, type_id, vt["violation_type_name"], articles, vt.get("reasoning", ""), int(vt.get("is_deprecated", False))),
             )
 
     def save_review_violations(self, review_id: int, violation_types: List[Dict]):

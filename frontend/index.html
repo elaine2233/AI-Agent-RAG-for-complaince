@@ -28,10 +28,14 @@
   --amber-500: #f59e0b;
   --amber-400: #fbbf24;
   --amber-100: #fef3c7;
+  --red-700: #991b1b;
   --red-600: #dc2626;
   --red-500: #ef4444;
   --red-400: #f87171;
+  --red-300: #fca5a5;
+  --red-200: #fecaca;
   --red-100: #fee2e2;
+  --red-50: #fef2f2;
   --green-600: #16a34a;
   --green-500: #22c55e;
   --green-400: #4ade80;
@@ -663,6 +667,7 @@ body {
 }
 
 .risk-level-badge.high { background: var(--red-100); color: var(--red-600); }
+.risk-level-badge.critical { background: #7f1d1d; color: #fecaca; font-weight: 800; }
 .risk-level-badge.medium { background: var(--amber-100); color: var(--amber-500); }
 .risk-level-badge.low { background: var(--green-100); color: var(--green-600); }
 
@@ -1463,7 +1468,7 @@ select.form-control {
   <span>⚠️</span> 未配置 API Key — 系统运行在规则引擎模式，仅支持关键词匹配审核，配置 DashScope API Key 后可启用 LLM 语义审核
 </div>
 <div id="backendErrorBanner" style="display:none;background:var(--red-100);border-bottom:1px solid var(--red-400);padding:10px 32px;font-size:0.82rem;color:var(--red-600);align-items:center;gap:8px;">
-  <span>❌</span> 后端服务未启动，请先运行 python app.py
+  <span>❌</span> 后端服务未启动或无法连接，请检查后端是否运行在端口 7861
 </div>
 
   <!-- ========== 内容审核 ========== -->
@@ -1930,7 +1935,7 @@ const EXAMPLE_TEXTS = [
 let isRuleEngineMode = false;
 let isDemoMode = false;
 let backendReachable = true;
-const BASE_URL = '';
+const BASE_URL = window.location.port === '3000' ? 'http://localhost:7861' : '';
 let historyData = [];
 let historySortField = 'id';
 let historySortDir = 'desc';
@@ -2066,7 +2071,16 @@ async function apiCall(method, url, body = null) {
   const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
 
-  const resp = await fetch(BASE_URL + url, opts);
+  let resp;
+  try {
+    resp = await fetch(BASE_URL + url, opts);
+  } catch (e) {
+    if (BASE_URL && url.startsWith('/')) {
+      resp = await fetch(url, opts);
+    } else {
+      throw e;
+    }
+  }
   if (!resp.ok) throw new Error(`API Error: ${resp.status} ${resp.statusText}`);
   return resp.json();
 }
@@ -2325,7 +2339,7 @@ function renderReviewResult(result) {
     violations = result.violations.map(v => ({
       ...v,
       violation_type: v.violation_type_name || v.violation_type || '其他违规',
-      reasoning: v.reasoning || result.reasoning || '',
+      reasoning: v.reasoning || '',
     }));
   } else if (result.violated_articles && result.violated_articles.length > 0) {
     const grouped = {};
@@ -2335,11 +2349,6 @@ function renderReviewResult(result) {
       grouped[type].violated_articles.push(a);
     });
     violations = Object.values(grouped);
-    if (result.reasoning) {
-      violations.forEach((v, i) => {
-        if (!v.reasoning) v.reasoning = result.reasoning;
-      });
-    }
   }
 
   const inputContent = document.getElementById('reviewInput').value.trim();
@@ -2371,7 +2380,7 @@ function renderReviewResult(result) {
           <div class="violation-accordion-body" id="violation-body-${i}" style="display:none;">
             <div class="violation-reasoning">
               <div class="reasoning-label">推理过程</div>
-              <div class="reasoning-text">${v.reasoning || '无'}</div>
+              <div class="reasoning-text">${v.reasoning || '该违规类型暂无独立推理，请参考下方引用条款的违规原因'}</div>
             </div>
             <div class="violation-trigger">
               <div class="trigger-label">触发文字</div>
@@ -2392,7 +2401,7 @@ function renderReviewResult(result) {
   const confOffset = circumference - (circumference * result.confidence);
 
   const riskPct = result.risk_score;
-  const riskColor = riskPct > 0.7 ? 'var(--red-500)' : riskPct > 0.4 ? 'var(--amber-500)' : 'var(--green-500)';
+  const riskColor = riskPct > 0.9 ? 'var(--red-700)' : riskPct > 0.7 ? 'var(--red-500)' : riskPct > 0.4 ? 'var(--amber-500)' : 'var(--green-500)';
   const gaugeCircumference = Math.PI * 80;
   const gaugeOffset = gaugeCircumference - (gaugeCircumference * riskPct);
 
@@ -2462,8 +2471,9 @@ function renderReviewResult(result) {
               <span>低风险</span><span>高风险</span>
             </div>
             <div class="risk-level-badge ${result.risk_level}">
-              ${result.risk_level === 'high' ? '高风险' : result.risk_level === 'medium' ? '中风险' : '低风险'}
+              ${result.risk_level === 'critical' ? '极高风险' : result.risk_level === 'high' ? '高风险' : result.risk_level === 'medium' ? '中风险' : '低风险'}
             </div>
+            <div style="font-size:1.1rem;font-weight:700;margin-top:6px;color:${riskColor};">${(riskPct * 100).toFixed(0)}分</div>
           </div>
         </div>
       </div>
@@ -2640,7 +2650,7 @@ async function openReviewDetail(reviewId) {
       resp.violations.forEach((v, i) => {
         const vType = v.violation_type_name || v.violation_type || '其他违规';
         const vArticles = v.violated_articles ? (typeof v.violated_articles === 'string' ? JSON.parse(v.violated_articles) : v.violated_articles) : (resp.violated_articles || []);
-        const vReasoning = v.reasoning || resp.reasoning || '';
+        const vReasoning = v.reasoning || '';
         violationReviewState[`system_${i}`] = {
           type: vType,
           agreed: true,
@@ -2659,9 +2669,9 @@ async function openReviewDetail(reviewId) {
             type: t.trim(),
             agreed: true,
             articles: articles,
-            reasoning: resp.reasoning || '',
+            reasoning: '',
             originalArticles: JSON.parse(JSON.stringify(articles)),
-            originalReasoning: resp.reasoning || ''
+            originalReasoning: ''
           };
         });
       } else {
@@ -2669,9 +2679,9 @@ async function openReviewDetail(reviewId) {
           type: resp.violation_type || '其他违规',
           agreed: true,
           articles: articles,
-          reasoning: resp.reasoning || '',
+          reasoning: '',
           originalArticles: JSON.parse(JSON.stringify(articles)),
-          originalReasoning: resp.reasoning || ''
+          originalReasoning: ''
         };
       }
     }
@@ -4317,28 +4327,37 @@ function renderLLMAuditLogs(logs) {
   if (!container) return;
   const total = window._llmAuditTotal || logs.length;
   container.innerHTML = `
-    <input type="text" id="llmAuditSearch" placeholder="搜索模型名、Prompt内容..." style="width:100%;padding:6px 10px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.8rem;margin-bottom:8px;" oninput="filterLLMAuditLogs()">
-    <div style="font-size:0.75rem;color:var(--slate-500);margin-bottom:8px;">共 ${total} 条记录（显示最近 ${logs.length} 条）</div>
-    ${logs.map((log, i) => `
-      <div style="border:1px solid var(--slate-200);border-radius:8px;padding:12px;margin-bottom:8px;background:${log.success ? 'white' : '#fef2f2'};">
+    <input type="text" id="llmAuditSearch" placeholder="搜索模型名、步骤名、审核编号..." style="width:100%;padding:6px 10px;border:1px solid var(--slate-200);border-radius:6px;font-size:0.8rem;margin-bottom:8px;" oninput="filterLLMAuditLogs()">
+    <div style="font-size:0.75rem;color:var(--slate-500);margin-bottom:8px;">共 ${total} 条记录（按时间从新到旧排列，显示最近 ${logs.length} 条）</div>
+    ${logs.map((log, i) => {
+      const stepBadge = log.step_name ? `<span style="font-size:0.6rem;padding:1px 5px;border-radius:3px;background:${log.step_name==='llm_reason'?'var(--blue-100)':log.step_name==='crosscheck'?'var(--amber-100)':log.step_name==='rerank'?'var(--purple-100)':'var(--slate-100)'};color:${log.step_name==='llm_reason'?'var(--blue-700)':log.step_name==='crosscheck'?'var(--amber-700)':log.step_name==='rerank'?'var(--purple-700)':'var(--slate-700)'};font-weight:500;">${log.step_name}</span>` : '';
+      const reviewBadge = log.review_id ? `<span style="font-size:0.6rem;padding:1px 5px;border-radius:3px;background:#ecfdf5;color:#065f46;font-weight:500;">#${log.review_id}</span>` : '';
+      return `
+      <div style="border:1px solid ${i === 0 ? 'var(--teal-400)' : 'var(--slate-200)'};border-radius:8px;padding:12px;margin-bottom:8px;background:${log.success ? (i === 0 ? '#f0fdfa' : 'white') : '#fef2f2'};">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <div style="font-weight:600;font-size:0.8rem;color:var(--navy-700);">${log.model || '-'}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:0.65rem;color:var(--slate-400);background:var(--slate-100);padding:1px 5px;border-radius:3px;">#${i + 1}</span>
+            <span style="font-weight:600;font-size:0.8rem;color:var(--navy-700);">${log.model || '-'}</span>
+            ${stepBadge}
+            ${reviewBadge}
+            ${i === 0 ? '<span style="font-size:0.6rem;padding:1px 5px;border-radius:3px;background:var(--teal-100);color:var(--teal-700);font-weight:600;">最新</span>' : ''}
+          </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <span style="font-size:0.7rem;padding:2px 6px;border-radius:4px;background:${log.success ? 'var(--teal-50)' : '#fee2e2'};color:${log.success ? 'var(--teal-700)' : '#dc2626'};">${log.success ? '成功' : '失败'}</span>
             <span style="font-size:0.7rem;color:var(--slate-400);">${log.latency_ms ? log.latency_ms + 'ms' : '-'}</span>
           </div>
         </div>
-        <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:4px;">${log.timestamp || '-'}</div>
+        <div style="font-size:0.72rem;color:var(--slate-500);margin-bottom:4px;">${log.timestamp || '-'}</div>
         <details style="margin-top:4px;">
           <summary style="font-size:0.75rem;color:var(--navy-500);cursor:pointer;">查看详情</summary>
           <div style="margin-top:6px;font-size:0.7rem;color:var(--slate-600);">
-            <div style="margin-bottom:4px;"><strong>System Prompt:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${log.system_prompt || '-'}</pre></div>
-            <div style="margin-bottom:4px;"><strong>User Prompt:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${log.user_prompt || '-'}</pre></div>
-            <div><strong>Response:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${log.response || '-'}</pre></div>
+            <div style="margin-bottom:4px;"><strong>System Prompt:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${(log.system_prompt || '-').substring(0, 2000)}</pre></div>
+            <div style="margin-bottom:4px;"><strong>User Prompt:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${(log.user_prompt || '-').substring(0, 2000)}</pre></div>
+            <div><strong>Response:</strong> <pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:var(--slate-50);padding:6px;border-radius:4px;margin-top:2px;">${(log.response || '-').substring(0, 2000)}</pre></div>
           </div>
         </details>
-      </div>
-    `).join('')}
+      </div>`;
+    }).join('')}
   `;
 }
 
@@ -4351,6 +4370,8 @@ function filterLLMAuditLogs() {
   }
   const filtered = allLogs.filter(log => {
     return (log.model || '').toLowerCase().includes(q) ||
+           (log.step_name || '').toLowerCase().includes(q) ||
+           (log.review_id || '').toString().includes(q) ||
            (log.system_prompt || '').toLowerCase().includes(q) ||
            (log.user_prompt || '').toLowerCase().includes(q) ||
            (log.response || '').toLowerCase().includes(q);
@@ -4620,29 +4641,45 @@ function deleteRegulation(filename) {
 }
 
 async function checkBackendHealth() {
-  try {
-    const resp = await fetch(BASE_URL + '/health');
-    const data = await resp.json();
-    backendReachable = true;
-    document.getElementById('backendErrorBanner').style.display = 'none';
-    isDemoMode = !!data.demo_mode;
-    const components = data.components || {};
-    const ragStatus = components.rag_engine ? components.rag_engine.status : 'unknown';
-    const useVector = components.rag_engine ? components.rag_engine.use_vector : false;
-    if (!useVector || ragStatus === 'not_initialized') {
-      isRuleEngineMode = true;
-      document.getElementById('ruleEngineBanner').style.display = 'flex';
-    } else {
-      isRuleEngineMode = false;
-      document.getElementById('ruleEngineBanner').style.display = 'none';
+  const healthUrls = [
+    BASE_URL + '/health',
+    '/health',
+    '/api/v1/health'
+  ];
+  for (const url of healthUrls) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const resp = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (data.status) {
+        backendReachable = true;
+        document.getElementById('backendErrorBanner').style.display = 'none';
+        isDemoMode = !!data.demo_mode;
+        const components = data.components || {};
+        const ragStatus = components.rag_engine ? components.rag_engine.status : 'unknown';
+        const useVector = components.rag_engine ? components.rag_engine.use_vector : false;
+        if (!useVector || ragStatus === 'not_initialized') {
+          isRuleEngineMode = true;
+          document.getElementById('ruleEngineBanner').style.display = 'flex';
+        } else {
+          isRuleEngineMode = false;
+          document.getElementById('ruleEngineBanner').style.display = 'none';
+        }
+        console.log('[Health] OK via', url, 'status=', data.status);
+        return;
+      }
+    } catch (e) {
+      console.warn('[Health] Failed via', url, e.message);
     }
-  } catch (e) {
-    backendReachable = false;
-    isRuleEngineMode = true;
-    isDemoMode = true;
-    document.getElementById('backendErrorBanner').style.display = 'flex';
-    document.getElementById('ruleEngineBanner').style.display = 'none';
   }
+  backendReachable = false;
+  isRuleEngineMode = true;
+  isDemoMode = true;
+  document.getElementById('backendErrorBanner').style.display = 'flex';
+  document.getElementById('ruleEngineBanner').style.display = 'none';
 }
 
 async function testConnection() {

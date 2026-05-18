@@ -12,7 +12,7 @@ from datetime import datetime as _datetime
 _audit_log_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "llm_audit")
 _os.makedirs(_audit_log_dir, exist_ok=True)
 
-def _write_audit_log(model_name, system_prompt, user_prompt, response_text, latency_ms, success, error_type=None):
+def _write_audit_log(model_name, system_prompt, user_prompt, response_text, latency_ms, success, error_type=None, review_id=None, step_name=None):
     try:
         ts = _datetime.now().strftime("%Y%m%d")
         log_file = _os.path.join(_audit_log_dir, f"llm_audit_{ts}.jsonl")
@@ -27,6 +27,10 @@ def _write_audit_log(model_name, system_prompt, user_prompt, response_text, late
         }
         if error_type:
             entry["error_type"] = error_type
+        if review_id is not None:
+            entry["review_id"] = review_id
+        if step_name:
+            entry["step_name"] = step_name
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
@@ -118,6 +122,8 @@ class LLMGateway:
         role: ModelRole = None,
         temperature: float = None,
         image_urls: List[str] = None,
+        review_id: int = None,
+        step_name: str = None,
     ) -> LLMResponse:
         _start = __import__('time').time()
         effective_model = model_name
@@ -126,11 +132,11 @@ class LLMGateway:
                 try:
                     result = self._call_model(model_name, system_prompt, user_prompt, temperature, image_urls=image_urls)
                     _lat = (__import__('time').time() - _start) * 1000
-                    _write_audit_log(model_name, system_prompt, user_prompt, result.content, _lat, True)
+                    _write_audit_log(model_name, system_prompt, user_prompt, result.content, _lat, True, review_id=review_id, step_name=step_name)
                     return result
                 except Exception as e:
                     _lat = (__import__('time').time() - _start) * 1000
-                    _write_audit_log(model_name, system_prompt, user_prompt, str(e), _lat, False, error_type=type(e).__name__)
+                    _write_audit_log(model_name, system_prompt, user_prompt, str(e), _lat, False, error_type=type(e).__name__, review_id=review_id, step_name=step_name)
                     raise
 
             candidates = self._get_candidates(role)
@@ -149,12 +155,12 @@ class LLMGateway:
                         effective_temp, image_urls=image_urls,
                     )
                     _lat = (__import__('time').time() - _start) * 1000
-                    _write_audit_log(model_config.name, system_prompt, user_prompt, result.content, _lat, True)
+                    _write_audit_log(model_config.name, system_prompt, user_prompt, result.content, _lat, True, review_id=review_id, step_name=step_name)
                     return result
                 except Exception as e:
                     last_error = e
                     _lat = (__import__('time').time() - _start) * 1000
-                    _write_audit_log(model_config.name, system_prompt, user_prompt, str(e), _lat, False, error_type=type(e).__name__)
+                    _write_audit_log(model_config.name, system_prompt, user_prompt, str(e), _lat, False, error_type=type(e).__name__, review_id=review_id, step_name=step_name)
                     logger.warning(f"模型 {model_config.name} 调用失败(含重试): {e}")
                     if cb:
                         cb.record_failure()
@@ -164,7 +170,7 @@ class LLMGateway:
         except Exception as e:
             _lat = (__import__('time').time() - _start) * 1000
             if not isinstance(e, RuntimeError):
-                _write_audit_log(effective_model or "unknown", system_prompt, user_prompt, str(e), _lat, False, error_type=type(e).__name__)
+                _write_audit_log(effective_model or "unknown", system_prompt, user_prompt, str(e), _lat, False, error_type=type(e).__name__, review_id=review_id, step_name=step_name)
             raise
 
     def _get_candidates(self, role: ModelRole = None) -> List[ModelConfig]:

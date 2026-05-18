@@ -393,6 +393,11 @@ async def detailed_health(user: dict = Depends(get_optional_user)):
     return health_checker.run_all()
 
 
+@app.get("/api/v1/health", tags=["系统"])
+async def api_v1_health():
+    return await health_check()
+
+
 @app.post("/api/v1/review", response_model=ReviewResponse, tags=["审核"])
 async def review_content(
     request: ReviewRequest,
@@ -478,7 +483,7 @@ async def review_content(
     review_data = {
         "user_id": user.get("id"),
         "input_content": validation.sanitized_input,
-        "input_hash": hashlib.sha256(validation.sanitized_input.encode()).hexdigest()[:16],
+        "input_hash": hashlib.sha256((validation.sanitized_input + "|" + "|".join(request.image_descriptions or [])).encode()).hexdigest()[:16],
         "input_length": len(validation.sanitized_input),
         "compliant": result.compliant,
         "violation_type": result.violation_type,
@@ -621,7 +626,7 @@ async def batch_review(
         review_data = {
             "user_id": user.get("id"),
             "input_content": validation.sanitized_input,
-            "input_hash": hashlib.sha256(validation.sanitized_input.encode()).hexdigest()[:16],
+            "input_hash": hashlib.sha256((validation.sanitized_input + "|" + "|".join(request.image_descriptions or [])).encode()).hexdigest()[:16],
             "input_length": len(validation.sanitized_input),
             "compliant": result.compliant,
             "violation_type": result.violation_type,
@@ -715,7 +720,7 @@ async def async_review_content(
 
     sanitized = request.content if request.content.strip() else validation.sanitized_input
     input_length = len(sanitized)
-    input_hash = hashlib.sha256(sanitized.encode()).hexdigest()[:16]
+    input_hash = hashlib.sha256((sanitized + "|" + "|".join(request.image_descriptions or [])).encode()).hexdigest()[:16]
     client_id = user.get("username", "anonymous")
     user_id = user.get("id")
 
@@ -1337,7 +1342,8 @@ async def get_llm_audit_logs(
                         pass
         except Exception:
             pass
-    logs = logs[-limit:]
+    logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    logs = logs[:limit]
     return {"logs": logs, "total": len(logs), "log_dir": log_dir}
 
 
@@ -1646,7 +1652,7 @@ async def multimodal_review(
     review_data = {
         "user_id": user.get("id"),
         "input_content": validation.sanitized_input[:500],
-        "input_hash": hashlib.sha256(validation.sanitized_input.encode()).hexdigest()[:16],
+        "input_hash": hashlib.sha256((validation.sanitized_input + "|" + "|".join([img.get("description", "") or img.get("ocr_text", "") for img in processed.images if img.get("description") or img.get("ocr_text")])).encode()).hexdigest()[:16],
         "input_length": len(validation.sanitized_input),
         "compliant": result.compliant,
         "violation_type": result.violation_type,
@@ -1738,7 +1744,7 @@ async def upload_and_review(
     review_data = {
         "user_id": user.get("id"),
         "input_content": validation.sanitized_input[:500],
-        "input_hash": hashlib.sha256(validation.sanitized_input.encode()).hexdigest()[:16],
+        "input_hash": hashlib.sha256((validation.sanitized_input + "|" + "|".join([img.get("description", "") or img.get("ocr_text", "") for img in processed.images if img.get("description") or img.get("ocr_text")])).encode()).hexdigest()[:16],
         "input_length": len(validation.sanitized_input),
         "compliant": result.compliant,
         "violation_type": result.violation_type,

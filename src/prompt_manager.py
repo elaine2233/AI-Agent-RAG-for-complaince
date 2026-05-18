@@ -126,6 +126,7 @@ REASON_SYSTEM_PROMPT = """你是一位专业的金融保险合规审核专家。
         {
             "violation_type_id": "违规类型ID，从上方对照表中选择",
             "violation_type_name": "违规类型中文名称",
+            "reasoning": "该违规类型的独立推理过程：为什么判定此类型违规、哪些内容触发了此违规、与哪些法规条文冲突（150字以内）",
             "violated_articles": [
                 {
                     "doc_name": "法规名称",
@@ -137,13 +138,14 @@ REASON_SYSTEM_PROMPT = """你是一位专业的金融保险合规审核专家。
         }
     ],
     "confidence": 0.0到1.0,
-    "reasoning": "详细的CoT推理过程，必须包含语义隐含分析",
+    "reasoning": "整体推理摘要（100字以内，概括所有违规类型的核心逻辑）",
     "suggestions": "修改建议"
 }
 ```
 
 重要：
 - violations数组中每个元素代表一种违规类型，该类型下所有违反的条文放在violated_articles中
+- 每个violation必须包含reasoning字段，说明该类型违规的独立推理过程，不同违规类型的reasoning不能相同
 - 不要在violations之外再单独输出violation_type或violated_articles
 - 如果compliant为yes，violations为空数组
 - violated_articles中输出doc_name、article_number和article_snippet（与违规相关的原文关键片段，30字以内），不需要输出条文全文（系统会根据条款号自动从法规库中查找完整原文）
@@ -163,6 +165,7 @@ FORMAT_SYSTEM_PROMPT = """你是一位数据格式化专家。你的任务是确
         {
             "violation_type_id": "",
             "violation_type_name": "",
+            "reasoning": "该违规类型的独立推理过程",
             "violated_articles": [{"doc_name":"", "article_number":"", "article_snippet":"", "violation_reason":""}]
         }
     ],
@@ -175,8 +178,9 @@ FORMAT_SYSTEM_PROMPT = """你是一位数据格式化专家。你的任务是确
 规则：
 - compliant只能是"yes"或"no"
 - confidence必须是0到1之间的数字
-- violations必须是数组，每项包含violation_type_id、violation_type_name和violated_articles
+- violations必须是数组，每项包含violation_type_id、violation_type_name、reasoning和violated_articles
 - violated_articles必须是数组
+- 每个violation的reasoning字段必须保留，描述该类型违规的独立推理
 - 如果输入中有violation_type字符串和violation_types数组，合并到violations数组中
 - 只输出JSON，不要添加其他文字"""
 
