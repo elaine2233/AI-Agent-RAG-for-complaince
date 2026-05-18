@@ -28,7 +28,9 @@ class WorkflowStep:
 @dataclass
 class WorkflowState:
     original_text: str = ""
+    effective_text: str = ""
     image_descriptions: List[str] = field(default_factory=list)
+    image_paths: List[str] = field(default_factory=list)
     extracted_claims: List[Dict] = field(default_factory=list)
     rule_check_result: Optional[Dict] = None
     retrieved_laws: List[Dict] = field(default_factory=list)
@@ -89,7 +91,8 @@ class WorkflowEngine:
 
             try:
                 handler(state)
-                step.status = StepStatus.COMPLETED
+                if step.status == StepStatus.RUNNING:
+                    step.status = StepStatus.COMPLETED
                 step.output_data = _safe_snapshot(state)
             except Exception as e:
                 step.status = StepStatus.FAILED

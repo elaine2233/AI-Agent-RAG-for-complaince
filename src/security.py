@@ -1,7 +1,6 @@
 import os
 import re
 import time
-import builtins
 import json
 import logging
 import hashlib
@@ -233,6 +232,7 @@ class RateLimiter:
 class AuditLogger:
     _SIGNING_KEY = config.AUDIT_SIGNING_KEY
     _MAX_LOG_DAYS = config.AUDIT_MAX_LOG_DAYS
+    _builtin_open = open
 
     def __init__(self, log_dir: str = None):
         self.log_dir = log_dir or config.AUDIT_LOG_DIR
@@ -298,7 +298,7 @@ class AuditLogger:
         log_path = os.path.join(self.log_dir, f"audit_{date_str}.jsonl")
 
         try:
-            with open(log_path, "a", encoding="utf-8") as f:
+            with AuditLogger._builtin_open(log_path, "a", encoding="utf-8") as f:
                 for entry in self._buffer:
                     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:

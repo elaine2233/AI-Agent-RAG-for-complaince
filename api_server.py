@@ -13,11 +13,12 @@ from fastapi import FastAPI, HTTPException, Depends, Header, Query, BackgroundTa
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
+config.load_user_config()
 from src.rag_engine import RAGEngine
 from src.review_agent import ReviewAgent, ReviewResult
 from src.database import Database
@@ -41,14 +42,18 @@ _shutdown_event = asyncio.Event()
 
 
 class ReviewRequest(BaseModel):
-    content: str = Field(..., min_length=1, max_length=10000, description="待审核的营销文本")
+    content: str = Field("", max_length=10000, description="待审核的营销文本")
     image_descriptions: Optional[List[str]] = Field(None, max_length=5, description="图片描述列表")
+    image_data: Optional[List[str]] = Field(None, max_length=5, description="图片base64数据列表")
 
-    @validator("content")
-    def content_must_not_be_empty(cls, v):
-        if not v.strip():
-            raise ValueError("内容不能为空")
-        return v.strip()
+    @root_validator(skip_on_failure=True)
+    def check_at_least_one_input(cls, values):
+        content = (values.get("content") or "").strip()
+        images = values.get("image_descriptions") or []
+        img_data = values.get("image_data") or []
+        if not content and not images and not img_data:
+            raise ValueError("内容和图片不能同时为空")
+        return values
 
     @validator("image_descriptions")
     def image_descriptions_length(cls, v):
@@ -106,6 +111,8 @@ class ReviewResponse(BaseModel):
     regulation_snapshot: dict = {}
     crosscheck_passed: bool = True
     expanded_relations: list = []
+    violation_types: list = []
+    violations: list = []
 
 
 class BatchReviewResponse(BaseModel):
@@ -119,6 +126,7 @@ class HealthResponse(BaseModel):
     version: str
     uptime_seconds: float
     components: dict
+    demo_mode: bool = False
 
 
 _start_time = time.time()
@@ -178,15 +186,25 @@ async def lifespan(app: FastAPI):
     extractor = ClauseRelationExtractor()
     docs = rag_engine.get_all_chunks() if hasattr(rag_engine, 'get_all_chunks') else []
     if docs:
+        existing_relations = db.get_all_clause_relations()
+        existing_keys = {
+            (r['from_doc'], r['from_article'], r['to_doc'], r['to_article'], r['relation_type'])
+            for r in existing_relations
+        }
         extracted = extractor.extract_from_documents(docs)
+        new_count = 0
         for rel in extracted:
+            key = (rel['from_doc'], rel['from_article'], rel['to_doc'], rel['to_article'], rel['relation_type'])
+            if key in existing_keys:
+                continue
             db.save_clause_relation(
                 from_doc=rel['from_doc'], from_article=rel['from_article'],
                 to_doc=rel['to_doc'], to_article=rel['to_article'],
                 relation_type=rel['relation_type'], confidence=rel['confidence'],
                 evidence_text=rel['evidence_text'], source=rel['source']
             )
-        logger.info(f"正则提取了 {len(extracted)} 条条款关系")
+            new_count += 1
+        logger.info(f"正则提取条款关系: 新增{new_count}条, 已存在{len(existing_keys)}条")
 
     setup_default_alerts()
     health_checker.register("database", lambda: db.health_check()["status"] == "healthy")
@@ -272,6 +290,7 @@ async def health_check():
         version="2.0.0",
         uptime_seconds=round(time.time() - _start_time, 1),
         components=components,
+        demo_mode=not config.has_api_key(),
     )
 
 
@@ -287,26 +306,67 @@ async def readiness_check():
 @app.post("/api/v1/test-connection", tags=["系统"])
 async def test_dashscope_connection(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_model: Optional[str] = Header(None, alias="X-Model"),
 ):
     api_key = x_api_key or config.DASHSCOPE_API_KEY
-    if not api_key or api_key == "demo-key-insurance-review-2024":
+    _demo_keys = {"demo-key", "demo-key-insurance-review-2024", "test", ""}
+    if not api_key or api_key in _demo_keys:
         return {"success": False, "message": "未配置DashScope API Key，请输入有效的API Key后重试"}
+
+    config.DASHSCOPE_API_KEY = api_key
+    config.save_user_config(api_key=api_key)
+
+    if x_model and x_model.strip():
+        config.LLM_MODEL = x_model.strip()
+        config.EXTRACT_MODEL = x_model.strip()
+        config.REASON_MODEL = x_model.strip()
+        config.CROSSCHECK_MODEL = x_model.strip()
+        config.save_user_config(model_name=x_model.strip())
+
+    from src.llm_gateway import llm_gateway
+    llm_gateway._register_default_models()
+    agent = _ensure_agent()
+    if agent:
+        agent.extract_model = config.EXTRACT_MODEL
+        agent.reason_model = config.REASON_MODEL
+        agent.crosscheck_model = config.CROSSCHECK_MODEL
+
+    _test_start = time.time()
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=api_key, base_url=config.LLM_BASE_URL)
+        client = OpenAI(api_key=api_key, base_url=config.LLM_BASE_URL, timeout=30.0)
+        _test_model = config.LLM_MODEL
+        _test_messages = [{"role": "user", "content": "Hi"}]
         resp = client.chat.completions.create(
-            model=config.LLM_MODEL,
-            messages=[{"role": "user", "content": "Hi"}],
+            model=_test_model,
+            messages=_test_messages,
             max_tokens=5,
         )
+        _test_latency = (time.time() - _test_start) * 1000
+        _test_response = resp.choices[0].message.content if resp.choices else ""
+        from src.llm_gateway import _write_audit_log
+        _write_audit_log(_test_model, "", "Hi", _test_response, _test_latency, True)
+        vectorize_msg = ""
         if rag_engine and not rag_engine.use_vector:
             try:
-                rag_engine.enable_vector_search()
-            except Exception:
-                pass
-        return {"success": True, "message": f"连接成功，模型: {config.LLM_MODEL}"}
+                vec_result = rag_engine.enable_vector_search()
+                if vec_result:
+                    vectorize_msg = "，向量检索已启用"
+                else:
+                    vectorize_msg = "，但向量化失败（可能Embedding权限未开通），将使用关键词检索"
+            except Exception as ve:
+                vectorize_msg = f"，向量化失败: {str(ve)[:80]}"
+        return {"success": True, "message": f"连接成功，模型: {config.LLM_MODEL}{vectorize_msg}", "embedding_model": config.EMBEDDING_MODEL}
     except Exception as e:
-        return {"success": False, "message": f"连接失败: {str(e)[:200]}"}
+        error_msg = str(e)[:200]
+        _test_latency = (time.time() - _test_start) * 1000
+        from src.llm_gateway import _write_audit_log
+        _write_audit_log(config.LLM_MODEL, "", "Hi", str(e), _test_latency, False, error_type=type(e).__name__)
+        if "504" in error_msg or "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+            return {"success": False, "message": f"连接超时（504），但API Key已保存，审核时将尝试调用LLM。如持续超时请检查网络。错误: {error_msg}", "key_saved": True}
+        if "401" in error_msg or "Incorrect API key" in error_msg or "invalid_api_key" in error_msg:
+            return {"success": False, "message": f"API Key无效或已过期，请检查后重新输入。错误: {error_msg}"}
+        return {"success": False, "message": f"连接失败: {error_msg}", "key_saved": True}
 
 
 @app.get("/metrics", tags=["监控"])
@@ -343,8 +403,13 @@ async def review_content(
 ):
     start_time = time.time()
 
+    text_for_validation = request.content
+    if not text_for_validation.strip() and (request.image_descriptions or request.image_data):
+        parts = (request.image_descriptions or []) + (request.image_data or [])
+        text_for_validation = " ".join(parts) if parts else "image"
+
     validation = security_middleware.validate_and_sanitize(
-        request.content, client_id=user.get("username", "anonymous")
+        text_for_validation, client_id=user.get("username", "anonymous")
     )
     if not validation.is_valid:
         if PROMETHEUS_AVAILABLE and SECURITY_BLOCKED:
@@ -365,10 +430,29 @@ async def review_content(
         if PROMETHEUS_AVAILABLE and REVIEW_IN_PROGRESS:
             REVIEW_IN_PROGRESS.inc()
 
-        with trace_operation("review", {"user": user.get("username", "anonymous"), "mode": "llm" if not config.DEMO_MODE else "rule"}):
+        image_paths = []
+        if request.image_data:
+            import base64 as b64mod
+            upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "uploads")
+            os.makedirs(upload_dir, exist_ok=True)
+            for i, img_b64 in enumerate(request.image_data):
+                try:
+                    if img_b64.startswith("data:"):
+                        img_b64 = img_b64.split(",", 1)[1]
+                    img_bytes = b64mod.b64decode(img_b64)
+                    fname = f"{int(time.time()*1000)}_{i}.png"
+                    fpath = os.path.join(upload_dir, fname)
+                    with open(fpath, "wb") as f:
+                        f.write(img_bytes)
+                    image_paths.append(fpath)
+                except Exception as e:
+                    logger.warning(f"图片保存失败: {e}")
+
+        with trace_operation("review", {"user": user.get("username", "anonymous"), "mode": "llm" if config.has_api_key() else "rule"}):
             result = _ensure_agent().review(
                 content=validation.sanitized_input,
                 image_descriptions=request.image_descriptions,
+                image_paths=image_paths,
                 client_id=user.get("username", "anonymous"),
                 model_name=x_model,
                 api_key=x_api_key,
@@ -384,10 +468,10 @@ async def review_content(
         REVIEW_TOTAL.labels(
             status=result.compliant,
             violation_type=result.violation_type[:50],
-            review_mode="llm" if not config.DEMO_MODE else "rule",
+            review_mode="llm" if config.has_api_key() else "rule",
         ).inc()
     if PROMETHEUS_AVAILABLE and REVIEW_DURATION:
-        REVIEW_DURATION.labels(review_mode="llm" if not config.DEMO_MODE else "rule").observe(
+        REVIEW_DURATION.labels(review_mode="llm" if config.has_api_key() else "rule").observe(
             latency_ms / 1000
         )
 
@@ -402,7 +486,7 @@ async def review_content(
         "confidence": result.confidence,
         "reasoning": result.reasoning,
         "suggestions": result.suggestions,
-        "review_mode": result.review_mode or ("llm" if not config.DEMO_MODE else "rule"),
+        "review_mode": result.review_mode or ("llm" if config.has_api_key() else "rule"),
         "latency_ms": latency_ms,
         "client_id": user.get("username", "anonymous"),
         "threats": validation.threats,
@@ -415,6 +499,35 @@ async def review_content(
     }
 
     review_id = _ensure_db().save_review(review_data)
+
+    violations_list = []
+    if result.violations:
+        violations_list = result.violations
+    elif result.violation_types and result.violated_articles:
+        for vt in result.violation_types:
+            vt_name = vt.get("violation_type_name", vt.get("violation_type", ""))
+            vt_id = vt.get("violation_type_id", "")
+            vt_articles = [a for a in result.violated_articles if a.get("violation_type") == vt_name or a.get("violation_type_name") == vt_name]
+            if not vt_articles:
+                vt_articles = result.violated_articles
+            violations_list.append({
+                "violation_type": vt_name,
+                "violation_type_id": vt_id,
+                "violated_articles": vt_articles,
+                "reasoning": result.reasoning if len(result.violation_types) == 1 else "",
+            })
+    elif result.violated_articles:
+        grouped = {}
+        for a in result.violated_articles:
+            t = a.get("violation_type", a.get("violation_type_name", "其他违规"))
+            if t not in grouped:
+                grouped[t] = {"violation_type": t, "violated_articles": [], "reasoning": ""}
+            grouped[t]["violated_articles"].append(a)
+        violations_list = list(grouped.values())
+        if result.reasoning:
+            for v in violations_list:
+                if not v["reasoning"]:
+                    v["reasoning"] = result.reasoning
 
     return ReviewResponse(
         review_id=review_id,
@@ -435,6 +548,8 @@ async def review_content(
         regulation_snapshot=result.regulation_snapshot or {},
         crosscheck_passed=result.crosscheck_passed,
         expanded_relations=result.expanded_relations or [],
+        violation_types=result.violation_types or [],
+        violations=violations_list,
     )
 
 
@@ -500,8 +615,8 @@ async def batch_review(
             REVIEW_TOTAL.labels(
                 status=result.compliant,
                 violation_type=result.violation_type[:50],
-                review_mode="llm" if not config.DEMO_MODE else "rule",
-            ).inc()
+                review_mode="llm" if config.has_api_key() else "rule",
+        ).inc()
 
         review_data = {
             "user_id": user.get("id"),
@@ -514,7 +629,7 @@ async def batch_review(
             "confidence": result.confidence,
             "reasoning": result.reasoning,
             "suggestions": result.suggestions,
-            "review_mode": "llm" if not config.DEMO_MODE else "rule",
+            "review_mode": "llm" if config.has_api_key() else "rule",
             "latency_ms": item_latency,
             "client_id": user.get("username", "anonymous"),
             "threats": validation.threats,
@@ -561,9 +676,33 @@ class AsyncReviewResponse(BaseModel):
 async def async_review_content(
     request: ReviewRequest,
     user: dict = Depends(get_current_user),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_model: Optional[str] = Header(None, alias="X-Model"),
 ):
+    _demo_keys = {"demo-key", "demo-key-insurance-review-2024", "test", ""}
+    if x_api_key and x_api_key not in _demo_keys and (x_api_key.startswith("sk-") or len(x_api_key) >= 20):
+        config.DASHSCOPE_API_KEY = x_api_key
+        config.save_user_config(api_key=x_api_key)
+        if x_model and x_model.strip():
+            config.LLM_MODEL = x_model.strip()
+            config.EXTRACT_MODEL = x_model.strip()
+            config.REASON_MODEL = x_model.strip()
+            config.CROSSCHECK_MODEL = x_model.strip()
+            config.save_user_config(model_name=x_model.strip())
+        from src.llm_gateway import llm_gateway
+        llm_gateway._register_default_models()
+        agent = _ensure_agent()
+        if agent:
+            agent.extract_model = config.EXTRACT_MODEL
+            agent.reason_model = config.REASON_MODEL
+            agent.crosscheck_model = config.CROSSCHECK_MODEL
+
+    text_for_validation = request.content
+    if not text_for_validation.strip() and request.image_descriptions:
+        text_for_validation = " ".join(request.image_descriptions)
+
     validation = security_middleware.validate_and_sanitize(
-        request.content, client_id=user.get("username", "anonymous")
+        text_for_validation, client_id=user.get("username", "anonymous")
     )
     if not validation.is_valid:
         if PROMETHEUS_AVAILABLE and SECURITY_BLOCKED:
@@ -574,43 +713,74 @@ async def async_review_content(
             detail={"message": "输入校验失败", "threats": validation.threats},
         )
 
-    sanitized = validation.sanitized_input
+    sanitized = request.content if request.content.strip() else validation.sanitized_input
     input_length = len(sanitized)
     input_hash = hashlib.sha256(sanitized.encode()).hexdigest()[:16]
     client_id = user.get("username", "anonymous")
     user_id = user.get("id")
 
+    _review_api_key = x_api_key
+    _review_model_name = x_model.strip() if x_model else None
+    _review_start_time = time.time()
+
+    image_paths = []
+    if request.image_data:
+        import base64 as b64mod
+        upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        for i, img_b64 in enumerate(request.image_data):
+            try:
+                if img_b64.startswith("data:"):
+                    img_b64 = img_b64.split(",", 1)[1]
+                img_bytes = b64mod.b64decode(img_b64)
+                fname = f"{int(time.time()*1000)}_{i}.png"
+                fpath = os.path.join(upload_dir, fname)
+                with open(fpath, "wb") as f:
+                    f.write(img_bytes)
+                image_paths.append(fpath)
+            except Exception as e:
+                logger.warning(f"图片保存失败: {e}")
+
     def _do_review():
         if not review_semaphore.acquire(timeout=30.0):
             raise RuntimeError("并发审核数已达上限")
         try:
-            return _ensure_agent().review(
+            result = _ensure_agent().review(
                 content=sanitized,
                 image_descriptions=request.image_descriptions,
+                image_paths=image_paths,
                 client_id=client_id,
+                api_key=_review_api_key,
+                model_name=_review_model_name,
             )
+            latency_ms = (time.time() - _review_start_time) * 1000
+            review_data = {
+                "user_id": user_id,
+                "input_content": sanitized,
+                "input_hash": input_hash,
+                "input_length": input_length,
+                "compliant": result.compliant,
+                "violation_type": result.violation_type,
+                "violated_articles": result.violated_articles,
+                "confidence": result.confidence,
+                "reasoning": result.reasoning,
+                "suggestions": result.suggestions,
+                "review_mode": result.review_mode or ("llm" if config.has_api_key() else "rule"),
+                "latency_ms": latency_ms,
+                "client_id": client_id,
+                "threats": [],
+                "violation_types": result.violation_types,
+                "decision": result.decision,
+                "risk_score": result.risk_score,
+                "risk_level": result.risk_level,
+                "model_used": result.model_used,
+                "prompt_version": result.prompt_version,
+            }
+            saved_id = _ensure_db().save_review(review_data)
+            result.review_id = saved_id
+            return result
         finally:
             review_semaphore.release()
-
-    def _on_complete(review_result: ReviewResult):
-        review_data = {
-            "user_id": user_id,
-            "input_content": sanitized,
-            "input_hash": input_hash,
-            "input_length": input_length,
-            "compliant": review_result.compliant,
-            "violation_type": review_result.violation_type,
-            "violated_articles": review_result.violated_articles,
-            "confidence": review_result.confidence,
-            "reasoning": review_result.reasoning,
-            "suggestions": review_result.suggestions,
-            "review_mode": "llm" if not config.DEMO_MODE else "rule",
-            "latency_ms": 0,
-            "client_id": client_id,
-            "threats": [],
-            "violation_types": review_result.violation_types,
-        }
-        _ensure_db().save_review(review_data)
 
     try:
         task_id = task_queue.submit(_do_review)
@@ -733,14 +903,17 @@ async def override_review(
         (body.decision, violation_type_str, user.get("id"), body.reason, review_id),
     )
 
+    valid_type_ids = {r[0] for r in conn.execute("SELECT id FROM violation_types").fetchall()}
     for v in body.violations:
         vtype = v.get("violation_type", "")
+        if vtype not in valid_type_ids:
+            vtype = "other_violation"
         articles = v.get("violated_articles", [])
         reasoning = v.get("reasoning", "")
         source = v.get("source", "system")
         conn.execute(
             "INSERT INTO review_violations (review_id, violation_type_id, violation_type_name, violated_articles, reasoning, source) VALUES (?, ?, ?, ?, ?, ?)",
-            (review_id, vtype, vtype, json.dumps(articles, ensure_ascii=False), reasoning, source),
+            (review_id, vtype, v.get("violation_type", vtype), json.dumps(articles, ensure_ascii=False), reasoning, source),
         )
 
     for rt in body.removed_types:
@@ -957,6 +1130,18 @@ async def remove_keyword_from_type(
     return {"message": f"关键词已删除: {keyword}"}
 
 
+@app.put("/api/v1/violation-types/{type_id}/keywords", tags=["违规类型"])
+async def update_violation_type_keywords(type_id: str, keywords: List[str]):
+    from src.violation_registry import violation_registry
+    vt = violation_registry.get_type(type_id)
+    if not vt:
+        raise HTTPException(status_code=404, detail="违规类型不存在")
+    if not config.has_api_key():
+        raise HTTPException(status_code=403, detail="Demo模式不支持编辑关键词")
+    violation_registry.update_type(type_id, keywords=keywords)
+    return {"success": True, "type_id": type_id, "keywords": keywords}
+
+
 @app.get("/api/v1/violation-types/annotations/pending", tags=["违规类型"])
 async def get_pending_annotations(
     user: dict = Depends(get_current_user),
@@ -1056,6 +1241,15 @@ async def get_clause_relations(
     user: dict = Depends(get_optional_user),
 ):
     relations = _ensure_db().get_clause_relations(doc_name, article_number, relation_type)
+    if rag_engine is not None:
+        for rel in relations:
+            rel["from_article_text"] = ""
+            rel["to_article_text"] = ""
+            for chunk in rag_engine.chunks:
+                if chunk.doc_name == rel["from_doc"] and chunk.article_number == rel["from_article"]:
+                    rel["from_article_text"] = chunk.article_text
+                if chunk.doc_name == rel["to_doc"] and chunk.article_number == rel["to_article"]:
+                    rel["to_article_text"] = chunk.article_text
     return {"relations": relations, "total": len(relations)}
 
 
@@ -1083,6 +1277,14 @@ async def expand_related_clauses(
             if len(results) >= max_related:
                 break
             visited.add(target_key)
+            if rag_engine is not None:
+                rel["from_article_text"] = ""
+                rel["to_article_text"] = ""
+                for chunk in rag_engine.chunks:
+                    if chunk.doc_name == rel["from_doc"] and chunk.article_number == rel["from_article"]:
+                        rel["from_article_text"] = chunk.article_text
+                    if chunk.doc_name == rel["to_doc"] and chunk.article_number == rel["to_article"]:
+                        rel["to_article_text"] = chunk.article_text
             results.append(rel)
             queue.append((rel['to_doc'], rel['to_article'], depth + 1))
     return {"related_clauses": results, "total": len(results)}
@@ -1198,6 +1400,24 @@ async def list_regulations(user: dict = Depends(get_optional_user)):
 async def get_regulation_chunks(
     doc_name: Optional[str] = Query(None),
 ):
+    try:
+        from src.database import Database
+        db = Database()
+        db_chunks = db.get_chunks(doc_name=doc_name)
+        if db_chunks:
+            result = [
+                {
+                    "doc_name": c["doc_name"],
+                    "article_number": c["article_number"],
+                    "content": c["article_text"],
+                    "content_hash": c["content_hash"],
+                    "chapter": c["chapter"],
+                }
+                for c in db_chunks
+            ]
+            return {"chunks": result, "total": len(result)}
+    except Exception:
+        pass
     if rag_engine is None:
         return {"chunks": []}
     chunks = rag_engine.chunks
@@ -1236,6 +1456,45 @@ async def get_vectorization_status():
     if rag_engine is None:
         return {"status": "not_initialized", "use_vector": False}
     return rag_engine.get_vectorization_status()
+
+
+@app.post("/api/v1/regulations/vectorize", tags=["法规"])
+async def vectorize_regulations(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    api_key = x_api_key or config.DASHSCOPE_API_KEY
+    _demo_keys = {"demo-key", "demo-key-insurance-review-2024", "test", ""}
+    if not api_key or api_key in _demo_keys:
+        return {"success": False, "message": "未配置有效的DashScope API Key，请先在左侧输入API Key"}
+    try:
+        config.DASHSCOPE_API_KEY = api_key
+        if len(rag_engine.chunks) == 0:
+            return {"success": False, "message": "没有可向量化的法规条款，请先上传法规文件或确认数据库中有条款数据"}
+        result = rag_engine.enable_vector_search()
+        if result:
+            from src.llm_gateway import llm_gateway
+            llm_gateway._register_default_models()
+            agent = _ensure_agent()
+            if agent:
+                agent.extract_model = config.EXTRACT_MODEL
+                agent.reason_model = config.REASON_MODEL
+                agent.crosscheck_model = config.CROSSCHECK_MODEL
+            status = rag_engine.get_vectorization_status()
+            return {"success": True, "message": "向量化完成", "status": status}
+        else:
+            return {"success": False, "message": "向量化失败：API Key可能无效或DashScope服务不可用，请点击'测试连接'验证API Key"}
+    except ImportError as e:
+        return {"success": False, "message": f"缺少依赖包: {str(e)}，请执行 pip install dashscope"}
+    except Exception as e:
+        error_msg = str(e)
+        if "api_key" in error_msg.lower() or "auth" in error_msg.lower() or "401" in error_msg:
+            return {"success": False, "message": f"API Key认证失败: {error_msg}"}
+        return {"success": False, "message": f"向量化失败: {error_msg}"}
+
+
+@app.get("/api/v1/regulations/vectorize-progress", tags=["法规"])
+async def get_vectorize_progress():
+    return rag_engine.vectorize_progress
 
 
 @app.post("/api/v1/regulations/upload", tags=["法规"])
@@ -1303,6 +1562,34 @@ async def get_supported_formats():
     return {"supported_formats": formats}
 
 
+@app.delete("/api/v1/regulations/{filename}", tags=["法规"])
+async def delete_regulation(
+    filename: str,
+    user: dict = Depends(get_current_user),
+):
+    if not config.has_api_key():
+        raise HTTPException(status_code=403, detail="演示模式下禁止删除法规文档")
+    if not _ensure_db().check_permission(user.get("id"), "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可删除法规文档")
+
+    import urllib.parse
+    decoded_filename = urllib.parse.unquote(filename)
+    file_path = os.path.join(config.REGULATIONS_DIR, decoded_filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"法规文件不存在: {decoded_filename}")
+
+    os.remove(file_path)
+
+    _ensure_db()._get_conn().execute(
+        "DELETE FROM regulation_chunks WHERE doc_name LIKE ?",
+        (decoded_filename.replace(os.path.splitext(decoded_filename)[1], "%"),),
+    )
+    _ensure_db()._get_conn().commit()
+
+    return {"message": f"法规文档已删除: {decoded_filename}"}
+
+
 @app.post("/api/v1/review/multimodal", response_model=ReviewResponse, tags=["审核"])
 async def multimodal_review(
     request: MultiModalReviewRequest,
@@ -1367,7 +1654,7 @@ async def multimodal_review(
         "confidence": result.confidence,
         "reasoning": result.reasoning,
         "suggestions": result.suggestions,
-        "review_mode": "llm" if not config.DEMO_MODE else "rule",
+        "review_mode": "llm" if config.has_api_key() else "rule",
         "latency_ms": latency_ms,
         "client_id": user.get("username", "anonymous"),
         "threats": validation.threats,
@@ -1459,7 +1746,7 @@ async def upload_and_review(
         "confidence": result.confidence,
         "reasoning": result.reasoning,
         "suggestions": result.suggestions,
-        "review_mode": "llm" if not config.DEMO_MODE else "rule",
+        "review_mode": "llm" if config.has_api_key() else "rule",
         "latency_ms": latency_ms,
         "client_id": user.get("username", "anonymous"),
         "threats": validation.threats,

@@ -52,11 +52,13 @@ class TxtParser(DocumentParser):
             chapter_match = re.match(r"^第[一二三四五六七八九十百]+章\s+(.+)$", stripped)
             if chapter_match:
                 if current_article_num and buffer:
-                    sections.append({
-                        "chapter": current_chapter,
-                        "article_number": current_article_num,
-                        "article_text": "".join(buffer).strip(),
-                    })
+                    text_content = "".join(buffer).strip()
+                    if text_content:
+                        sections.append({
+                            "chapter": current_chapter,
+                            "article_number": current_article_num,
+                            "article_text": text_content,
+                        })
                 current_chapter = stripped
                 current_article_num = None
                 buffer = []
@@ -64,25 +66,32 @@ class TxtParser(DocumentParser):
 
             article_match = re.match(r"^第([一二三四五六七八九十百]+)条\s*(.*)$", stripped)
             if article_match:
+                article_text_part = article_match.group(2).strip().replace("\u3000", " ").strip()
+                if not article_text_part:
+                    continue
                 if current_article_num and buffer:
-                    sections.append({
-                        "chapter": current_chapter,
-                        "article_number": current_article_num,
-                        "article_text": "".join(buffer).strip(),
-                    })
+                    text_content = "".join(buffer).strip()
+                    if text_content:
+                        sections.append({
+                            "chapter": current_chapter,
+                            "article_number": current_article_num,
+                            "article_text": text_content,
+                        })
                 current_article_num = article_match.group(1)
-                buffer = [article_match.group(2)]
+                buffer = [article_text_part]
                 continue
 
             if current_article_num:
                 buffer.append(stripped)
 
         if current_article_num and buffer:
-            sections.append({
-                "chapter": current_chapter,
-                "article_number": current_article_num,
-                "article_text": "".join(buffer).strip(),
-            })
+            text_content = "".join(buffer).strip()
+            if text_content:
+                sections.append({
+                    "chapter": current_chapter,
+                    "article_number": current_article_num,
+                    "article_text": text_content,
+                })
 
         return sections
 

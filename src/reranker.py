@@ -1,15 +1,15 @@
 import logging
+import time
 from typing import Dict, List, Optional
 
 import config
-from src.resilience import with_retry, RetryPolicy, embedding_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
 
 class Reranker:
     def __init__(self):
-        self._model_name = getattr(config, "RERANKER_MODEL", "bge-reranker-v2-m3")
+        self._model_name = getattr(config, "RERANKER_MODEL", "qwen3-rerank")
 
     def rerank(
         self,
@@ -24,68 +24,64 @@ class Reranker:
         if top_k is None:
             top_k = config.RERANKER_TOP_K
 
-        if config.DEMO_MODE:
-            result = self._rule_based_rerank(query, documents, top_k)
-        else:
+        if config.DASHSCOPE_API_KEY:
             try:
-                result = self._api_rerank(query, documents, top_k)
+                result = self._cross_encoder_rerank(query, documents, top_k)
             except Exception as e:
-                logger.warning(f"API重排失败，降级到规则重排: {e}")
-                logger.info("Reranker降级到规则重排，生产环境应配置BM25作为中间层")
+                logger.warning(f"Cross-Encoder重排失败: {e}，降级到规则重排")
                 result = self._rule_based_rerank(query, documents, top_k)
+        else:
+            logger.info("无API Key，使用规则重排")
+            result = self._rule_based_rerank(query, documents, top_k)
 
         if expand_context:
             result = self._expand_adjacent_articles(result, documents)
 
         return result
 
-    def _get_embeddings_with_retry(self, texts, batch_size=None):
+    def _cross_encoder_rerank(self, query: str, documents: List[Dict], top_k: int) -> List[Dict]:
         import dashscope
-        from dashscope import TextEmbedding
+        from dashscope import TextReRank
+
         dashscope.api_key = config.DASHSCOPE_API_KEY
+        doc_texts = [d.get("article_text", "") for d in documents]
 
-        if batch_size is None:
-            batch_size = config.EMBEDDING_BATCH_SIZE
-
-        all_embs = []
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            for attempt in range(config.RERANKER_RETRY_MAX):
-                resp = TextEmbedding.call(
-                    model=config.EMBEDDING_MODEL,
-                    input=batch,
-                    dimension=config.EMBEDDING_DIMENSION,
+        for attempt in range(config.RERANKER_RETRY_MAX):
+            try:
+                resp = TextReRank.call(
+                    model=self._model_name,
+                    query=query,
+                    documents=doc_texts,
+                    top_n=min(top_k, len(doc_texts)),
+                    return_documents=False,
                 )
                 if resp.status_code == 200:
-                    all_embs.extend([e["embedding"] for e in resp.output["embeddings"]])
-                    break
-                elif attempt < config.RERANKER_RETRY_MAX - 1:
-                    import time
+                    results = resp.output.get("results", [])
+                    scored = []
+                    for r in results:
+                        idx = r.get("index", 0)
+                        score = r.get("relevance_score", 0.0)
+                        doc_copy = dict(documents[idx])
+                        doc_copy["rerank_score"] = round(score, 4)
+                        doc_copy["rerank_method"] = "cross_encoder"
+                        scored.append(doc_copy)
+                    scored.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
+                    logger.info(f"Cross-Encoder重排完成: {len(scored)}条结果, 模型={self._model_name}")
+                    return scored[:top_k]
+                elif resp.status_code == 429:
+                    logger.warning(f"Rerank API限流，等待重试 (attempt {attempt+1}/{config.RERANKER_RETRY_MAX})")
                     time.sleep(config.RERANKER_RETRY_DELAY * (attempt + 1))
+                    continue
                 else:
-                    raise RuntimeError(f"Embedding调用失败({config.RERANKER_RETRY_MAX}次重试): {resp.message}")
-        return all_embs
+                    raise RuntimeError(f"Rerank API错误: status={resp.status_code}, code={resp.code}, msg={resp.message}")
+            except Exception as e:
+                if attempt < config.RERANKER_RETRY_MAX - 1 and ("Connection" in str(e) or "Timeout" in str(e) or "429" in str(e)):
+                    logger.warning(f"Rerank API网络错误: {e}，等待重试")
+                    time.sleep(config.RERANKER_RETRY_DELAY * (attempt + 1))
+                    continue
+                raise
 
-    def _api_rerank(self, query: str, documents: List[Dict], top_k: int) -> List[Dict]:
-        try:
-            query_embs = self._get_embeddings_with_retry([query])
-            query_emb = query_embs[0]
-
-            doc_texts = [d.get("article_text", "") for d in documents]
-            doc_embs = self._get_embeddings_with_retry(doc_texts)
-
-            scored = []
-            for i, (doc, doc_emb) in enumerate(zip(documents, doc_embs)):
-                similarity = self._cosine_similarity(query_emb, doc_emb)
-                doc_copy = dict(doc)
-                doc_copy["rerank_score"] = round(similarity, 4)
-                scored.append(doc_copy)
-
-            scored.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
-            return scored[:top_k]
-
-        except ImportError:
-            raise RuntimeError("dashscope未安装")
+        raise RuntimeError(f"Rerank API重试{config.RERANKER_RETRY_MAX}次均失败")
 
     def _rule_based_rerank(self, query: str, documents: List[Dict], top_k: int) -> List[Dict]:
         scored = []
@@ -113,6 +109,7 @@ class Reranker:
 
             doc_copy = dict(doc)
             doc_copy["rerank_score"] = round(min(score, 1.0), 4)
+            doc_copy["rerank_method"] = "rule"
             scored.append(doc_copy)
 
         scored.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
@@ -169,15 +166,6 @@ class Reranker:
                             seen_keys.add(adj_key)
 
         return expanded
-
-    @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
-        dot = sum(x * y for x, y in zip(a, b))
-        norm_a = sum(x * x for x in a) ** 0.5
-        norm_b = sum(x * x for x in b) ** 0.5
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-        return dot / (norm_a * norm_b)
 
 
 reranker = Reranker()

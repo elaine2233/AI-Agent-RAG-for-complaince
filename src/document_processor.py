@@ -157,6 +157,14 @@ class DocumentProcessor:
         if parsed.tables:
             for t_idx, table in enumerate(parsed.tables):
                 table_text = self._table_to_text(table)
+                if not table_text or len(table_text.strip()) < 20:
+                    continue
+                article_refs = re.findall(r"第[一二三四五六七八九十百]+条", table_text)
+                if len(article_refs) > 3:
+                    continue
+                has_regulation_keyword = any(kw in table_text for kw in ["保险", "金融", "监管", "法规", "条款"])
+                if not article_refs and not has_regulation_keyword:
+                    continue
                 chunk = RegulationChunk(
                     doc_name=doc_name, chapter="", article_number=f"table_{t_idx}",
                     article_text=table_text, chunk_id=f"{doc_name}_table_{t_idx}",
@@ -265,7 +273,9 @@ class DocumentProcessor:
             chapter_match = re.match(r"^第[一二三四五六七八九十百]+章\s+(.+)$", stripped)
             if chapter_match:
                 if current_article_num and buffer:
-                    sections.append({"chapter": current_chapter, "article_number": current_article_num, "article_text": "".join(buffer).strip()})
+                    text_content = "".join(buffer).strip()
+                    if text_content:
+                        sections.append({"chapter": current_chapter, "article_number": current_article_num, "article_text": text_content})
                 current_chapter = stripped
                 current_article_num = None
                 buffer = []
@@ -273,17 +283,24 @@ class DocumentProcessor:
 
             article_match = re.match(r"^第([一二三四五六七八九十百]+)条\s*(.*)$", stripped)
             if article_match:
+                article_text_part = article_match.group(2).strip().replace("\u3000", " ").strip()
+                if not article_text_part:
+                    continue
                 if current_article_num and buffer:
-                    sections.append({"chapter": current_chapter, "article_number": current_article_num, "article_text": "".join(buffer).strip()})
+                    text_content = "".join(buffer).strip()
+                    if text_content:
+                        sections.append({"chapter": current_chapter, "article_number": current_article_num, "article_text": text_content})
                 current_article_num = article_match.group(1)
-                buffer = [article_match.group(2)]
+                buffer = [article_text_part]
                 continue
 
             if current_article_num:
                 buffer.append(stripped)
 
         if current_article_num and buffer:
-            sections.append({"chapter": current_chapter, "article_number": current_article_num, "article_text": "".join(buffer).strip()})
+            text_content = "".join(buffer).strip()
+            if text_content:
+                sections.append({"chapter": current_chapter, "article_number": current_article_num, "article_text": text_content})
         return sections
 
     def _split_long_text(self, text: str, max_tokens: int, overlap_tokens: int) -> List[str]:

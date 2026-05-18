@@ -27,6 +27,7 @@ class RAGEngine:
         self.client = None
         self.use_vector = False
         self._index_version = ""
+        self.vectorize_progress = {"status": "idle", "current": 0, "total": 0, "message": ""}
 
     def build_index(
         self,
@@ -34,12 +35,28 @@ class RAGEngine:
         strategy: ChunkStrategyType = ChunkStrategyType.ARTICLE,
     ):
         self.chunks = self.processor.load_all_regulations(strategy=strategy)
+        self._deduplicate_chunks()
+
+        if len(self.chunks) == 0:
+            logger.warning("文件解析未获得任何条款，尝试从数据库加载")
+            self._load_chunks_from_database()
+
+        if len(self.chunks) == 0:
+            logger.error("无法获取任何法规条款（文件解析和数据库均为空）")
+
         self._index_version = hashlib.md5(
             "|".join(c.content_hash for c in self.chunks).encode()
         ).hexdigest()[:8]
         logger.info(f"索引版本: {self._index_version}, 条文数: {len(self.chunks)}")
 
-        if config.DEMO_MODE:
+        try:
+            from src.database import Database
+            db = Database()
+            db.sync_chunks(self.chunks)
+        except Exception as e:
+            logger.warning(f"同步条款到数据库失败: {e}")
+
+        if not config.has_api_key():
             logger.warning("未检测到 DASHSCOPE_API_KEY，使用关键词检索模式")
             self.use_vector = False
             return
@@ -66,12 +83,58 @@ class RAGEngine:
             logger.info("回退到关键词检索模式")
             self.use_vector = False
 
+    def _load_chunks_from_database(self):
+        try:
+            from src.database import Database
+            db = Database()
+            rows = db.get_chunks()
+            if not rows:
+                logger.warning("数据库中也没有条款数据")
+                return
+            for row in rows:
+                chunk = RegulationChunk(
+                    doc_name=row["doc_name"],
+                    chapter=row.get("chapter", ""),
+                    article_number=row["article_number"],
+                    article_text=row["article_text"],
+                    chunk_id=row.get("chunk_id", f"{row['doc_name']}_{row['article_number']}"),
+                    content_hash=row.get("content_hash", ""),
+                    source_format=row.get("source_format", ""),
+                )
+                if not chunk.content_hash:
+                    chunk.content_hash = chunk.compute_hash()
+                self.chunks.append(chunk)
+            logger.info(f"从数据库加载了 {len(self.chunks)} 条法规条款")
+        except Exception as e:
+            logger.error(f"从数据库加载条款失败: {e}")
+
+    def _deduplicate_chunks(self):
+        seen = {}
+        for c in self.chunks:
+            key = (c.doc_name, c.article_number)
+            if key not in seen:
+                seen[key] = c
+            else:
+                existing = seen[key]
+                if len(c.article_text) > len(existing.article_text):
+                    seen[key] = c
+        original_count = len(self.chunks)
+        self.chunks = list(seen.values())
+        if len(self.chunks) < original_count:
+            logger.info(f"条款去重: {original_count} → {len(self.chunks)}（移除 {original_count - len(self.chunks)} 条重复/空条款）")
+
     def enable_vector_search(self):
         if self.use_vector:
             return True
         if not config.DASHSCOPE_API_KEY:
+            logger.error("无法启用向量检索: DASHSCOPE_API_KEY 未配置")
+            return False
+        if len(self.chunks) == 0:
+            logger.error("无法启用向量检索: 没有可向量化的法规条款")
             return False
         try:
+            import dashscope
+            dashscope.api_key = config.DASHSCOPE_API_KEY
             self._build_vector_index()
             self.use_vector = True
             logger.info(f"向量检索已启用，索引版本: {self._index_version}，条文数: {len(self.chunks)}")
@@ -238,8 +301,47 @@ class RAGEngine:
         ]
         ids = [chunk.chunk_id for chunk in self.chunks]
 
-        logger.info(f"正在生成 {len(texts)} 条文本的向量...")
-        embeddings = self._get_embeddings_with_retry(texts)
+        total = len(texts)
+        self.vectorize_progress = {"status": "embedding", "current": 0, "total": total, "message": f"正在生成向量 (0/{total})"}
+        logger.info(f"正在生成 {total} 条文本的向量...")
+
+        all_embeddings = []
+        batch_size = config.EMBEDDING_BATCH_SIZE
+        _embed_start = __import__('time').time()
+        _embed_success = True
+        for i in range(0, total, batch_size):
+            batch = texts[i:i + batch_size]
+            resp = TextEmbedding.call(
+                model=config.EMBEDDING_MODEL,
+                input=batch,
+                dimension=1024,
+            )
+            if resp.status_code == 200:
+                for item in resp.output["embeddings"]:
+                    all_embeddings.append(item["embedding"])
+            else:
+                _embed_success = False
+                raise RuntimeError(
+                    f"Embedding API调用失败: {resp.status_code} - {resp.message}"
+                )
+            current = min(i + batch_size, total)
+            self.vectorize_progress = {"status": "embedding", "current": current, "total": total, "message": f"正在生成向量 ({current}/{total})"}
+
+        _embed_lat = (__import__('time').time() - _embed_start) * 1000
+        try:
+            from src.llm_gateway import _write_audit_log
+            _write_audit_log(
+                config.EMBEDDING_MODEL,
+                f"向量化 {total} 条法规条款",
+                f"batch_size={batch_size}, dimension=1024",
+                f"成功生成 {len(all_embeddings)} 条向量" if _embed_success else "失败",
+                _embed_lat, _embed_success,
+                error_type=None if _embed_success else "EmbeddingError",
+            )
+        except Exception:
+            pass
+
+        self.vectorize_progress = {"status": "storing", "current": total, "total": total, "message": "正在存储向量..."}
 
         import chromadb
         from chromadb.config import Settings
@@ -260,17 +362,18 @@ class RAGEngine:
         if self.collection.count() > 0:
             self.collection.delete(where={})
 
-        batch_size = 100
-        for i in range(0, len(ids), batch_size):
-            end = min(i + batch_size, len(ids))
+        add_batch_size = 100
+        for i in range(0, len(ids), add_batch_size):
+            end = min(i + add_batch_size, len(ids))
             self.collection.add(
                 ids=ids[i:end],
-                embeddings=embeddings[i:end],
+                embeddings=all_embeddings[i:end],
                 documents=texts[i:end],
                 metadatas=metadatas[i:end],
             )
 
         logger.info(f"向量索引构建完成，共 {self.collection.count()} 条")
+        self.vectorize_progress = {"status": "done", "current": total, "total": total, "message": "向量化完成"}
 
     @with_retry(
         policy=RetryPolicy(max_retries=3, base_delay=1.0),
@@ -282,7 +385,7 @@ class RAGEngine:
         dashscope.api_key = config.DASHSCOPE_API_KEY
 
         all_embeddings = []
-        batch_size = 25
+        batch_size = config.EMBEDDING_BATCH_SIZE
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             resp = TextEmbedding.call(
@@ -300,7 +403,29 @@ class RAGEngine:
         return all_embeddings
 
     def _get_embeddings(self, texts: List[str]) -> List[List[float]]:
-        return self._get_embeddings_with_retry(texts)
+        _start = time.time()
+        _success = True
+        _count = len(texts)
+        try:
+            result = self._get_embeddings_with_retry(texts)
+            return result
+        except Exception as e:
+            _success = False
+            raise
+        finally:
+            _lat = (time.time() - _start) * 1000
+            try:
+                from src.llm_gateway import _write_audit_log
+                _write_audit_log(
+                    config.EMBEDDING_MODEL,
+                    f"Embedding查询 ({_count}条文本)",
+                    texts[0][:200] if texts else "",
+                    f"成功生成 {_count} 条向量" if _success else "失败",
+                    _lat, _success,
+                    error_type=None if _success else "EmbeddingError",
+                )
+            except Exception:
+                pass
 
     def _load_existing_index(self) -> bool:
         if not os.path.exists(config.VECTOR_STORE_DIR):
@@ -341,14 +466,24 @@ class RAGEngine:
         self.build_index(force_rebuild=True, strategy=strategy)
 
     def get_vectorization_status(self) -> Dict:
+        total_chunks = len(self.chunks)
+        vectorized_count = 0
+        if self.collection is not None:
+            try:
+                vectorized_count = self.collection.count()
+            except Exception:
+                vectorized_count = 0
+
         status = {
             "use_vector": self.use_vector,
-            "total_chunks": len(self.chunks),
+            "total_chunks": total_chunks,
+            "vectorized_count": vectorized_count,
+            "not_vectorized_count": max(0, total_chunks - vectorized_count),
             "index_version": self._index_version,
             "documents": {},
         }
 
-        if self.collection is not None and self.collection.count() > 0:
+        if self.collection is not None and vectorized_count > 0:
             results = self.collection.get(include=["metadatas"])
             for meta in results["metadatas"]:
                 doc_name = meta["doc_name"]
@@ -499,10 +634,13 @@ class RAGEngine:
 
         context_parts = []
         for i, item in enumerate(retrieved, 1):
+            article_text = item['article_text']
+            if len(article_text) > 300:
+                article_text = article_text[:300] + "..."
             context_parts.append(
                 f"[{i}] 《{item['doc_name']}》{item['chapter']} - "
                 f"第{item['article_number']}条 (相关度: {item['similarity']})\n"
-                f"原文: {item['article_text']}"
+                f"原文: {article_text}"
             )
         return "\n\n".join(context_parts)
 

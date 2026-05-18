@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 import logging
@@ -48,11 +49,16 @@ class ReviewResult:
     crosscheck_passed: bool = True
     violation_types: List[Dict] = None
     expanded_relations: List[Dict] = None
+    violations: List[Dict] = None
+    review_id: int = None
+    metadata: Dict = None
 
     def to_dict(self):
         d = asdict(self)
         if d["workflow_steps"] is None:
             d["workflow_steps"] = []
+        if d["violations"] is None:
+            d["violations"] = []
         return d
 
 
@@ -71,10 +77,11 @@ class ReviewAgent:
         self.extract_model = config.EXTRACT_MODEL
         self.reason_model = config.REASON_MODEL
         self.crosscheck_model = config.CROSSCHECK_MODEL
-        if config.DEMO_MODE:
-            self.extract_model = "rule-engine-light"
+        has_real_llm = any(m.provider == "openai_compatible" for m in llm_gateway._models.values())
+        if not has_real_llm:
+            self.extract_model = "rule-engine"
             self.reason_model = "rule-engine"
-            self.crosscheck_model = "rule-engine-light"
+            self.crosscheck_model = "rule-engine"
 
     def _build_workflow(self) -> WorkflowEngine:
         engine = WorkflowEngine()
@@ -92,7 +99,8 @@ class ReviewAgent:
 
     def _step_extract(self, state: WorkflowState):
         rules = _get_violation_rules()
-        if config.DEMO_MODE:
+        has_real_llm = any(m.provider == "openai_compatible" for m in llm_gateway._models.values())
+        if not has_real_llm:
             claims = []
             keywords = []
             for rule in rules:
@@ -103,13 +111,43 @@ class ReviewAgent:
 
             state.extracted_claims = claims
             state.metadata["keywords"] = list(set(keywords))
+            state.effective_text = state.original_text
             return
 
         try:
+            extract_prompt = f"请从以下营销内容中提取关键要素：\n\n{state.original_text}"
+            if state.image_descriptions:
+                extract_prompt += "\n\n[图片描述信息]\n" + "\n".join(
+                    f"图片{i+1}: {desc}" for i, desc in enumerate(state.image_descriptions)
+                )
+
+            image_urls = None
+            if state.image_paths:
+                import base64 as _b64
+                image_urls = []
+                for path in state.image_paths:
+                    if not os.path.exists(path):
+                        continue
+                    try:
+                        processed_path = self._preprocess_image(path)
+                        with open(processed_path, "rb") as _f:
+                            _data = _b64.b64encode(_f.read()).decode()
+                        image_urls.append(f"data:image/jpeg;base64,{_data}")
+                        if processed_path != path:
+                            try:
+                                os.unlink(processed_path)
+                            except OSError:
+                                pass
+                    except Exception as e:
+                        logger.warning(f"图片读取失败 {path}: {e}")
+                if image_urls:
+                    extract_prompt += "\n\n以上包含图片，请结合图片内容一起提取信息。"
+
             resp = llm_gateway.generate(
                 system_prompt=EXTRACT_SYSTEM_PROMPT,
-                user_prompt=f"请从以下营销内容中提取关键要素：\n\n{state.original_text}",
+                user_prompt=extract_prompt,
                 model_name=self.extract_model,
+                image_urls=image_urls,
             )
             parsed = self._parse_json(resp.content)
             if parsed:
@@ -118,6 +156,29 @@ class ReviewAgent:
                 state.metadata["has_risk_disclosure"] = parsed.get("has_risk_disclosure", False)
                 state.metadata["has_return_promise"] = parsed.get("has_return_promise", False)
                 state.metadata["has_absolute_language"] = parsed.get("has_absolute_language", False)
+                image_text = parsed.get("image_text", "")
+                image_desc = parsed.get("image_description", "")
+                if image_text or image_desc:
+                    state.metadata["image_text"] = image_text
+                    state.metadata["image_description"] = image_desc
+                    if image_text:
+                        state.metadata["keywords"].extend([w for w in image_text.split() if len(w) > 1])
+                        state.metadata["keywords"] = list(set(state.metadata["keywords"]))
+            else:
+                raw = resp.content or ""
+                import re as _re
+                it_match = _re.search(r'"image_text"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
+                id_match = _re.search(r'"image_description"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
+                if it_match:
+                    state.metadata["image_text"] = it_match.group(1).encode().decode('unicode_escape')
+                if id_match:
+                    state.metadata["image_description"] = id_match.group(1).encode().decode('unicode_escape')
+                kw_match = _re.search(r'"keywords"\s*:\s*\[([^\]]*)\]', raw)
+                if kw_match:
+                    kw_str = kw_match.group(1)
+                    kws = _re.findall(r'"([^"]+)"', kw_str)
+                    if kws:
+                        state.metadata["keywords"] = kws
             state.model_used = resp.model
         except Exception as e:
             logger.warning(f"信息提取步骤失败，使用关键词降级: {e}")
@@ -131,24 +192,51 @@ class ReviewAgent:
             state.extracted_claims = claims
             state.metadata["keywords"] = list(set(keywords))
 
+        state.effective_text = self._build_effective_text(state)
+
+    def _build_effective_text(self, state: WorkflowState) -> str:
+        base_text = state.original_text
+        image_text = state.metadata.get("image_text", "")
+        image_desc = state.metadata.get("image_description", "")
+
+        image_placeholder = ""
+        if state.image_descriptions:
+            image_placeholder = "\n\n[图片描述信息]\n" + "\n".join(
+                f"图片{i+1}: {desc}" for i, desc in enumerate(state.image_descriptions)
+            )
+
+        if image_placeholder and image_placeholder in base_text:
+            base_text = base_text.replace(image_placeholder, "")
+
+        base_text = base_text.strip()
+
+        parts = [base_text] if base_text else []
+        if image_text:
+            parts.append(f"[图片文字] {image_text}")
+        if image_desc:
+            parts.append(f"[图片描述] {image_desc}")
+
+        if not parts and state.image_paths:
+            parts.append("[包含图片内容，请结合图片信息审核]")
+
+        effective = "\n".join(parts) if parts else state.original_text
+        state.metadata["effective_text"] = effective
+        return effective
+
     def _step_rule_check(self, state: WorkflowState):
         rules = _get_violation_rules()
         violations = []
         violation_types = []
         matched_keywords = []
 
+        check_text = state.effective_text or state.original_text
+
         for rule in rules:
             for kw in rule["keywords"]:
-                if kw in state.original_text:
+                if kw in check_text:
                     matched_keywords.append(kw)
                     violation_types.append(rule["violation_type"])
                     for article_info in rule["articles"]:
-                        article_text = ""
-                        for chunk in self.rag_engine.chunks:
-                            if (chunk.doc_name == article_info["doc_name"] and
-                                    chunk.article_number == article_info["article_number"]):
-                                article_text = chunk.article_text
-                                break
                         reason = article_info.get("reason", "")
                         if not reason:
                             vt = violation_registry.get_type(rule.get("type_id", ""))
@@ -157,8 +245,8 @@ class ReviewAgent:
                         violations.append({
                             "doc_name": article_info["doc_name"],
                             "article_number": article_info["article_number"],
-                            "article_text": article_text,
                             "violation_reason": f"{reason}（匹配: {kw}）" if reason else f"违规（匹配: {kw}）",
+                            "violation_type": rule["violation_type"],
                         })
                     break
 
@@ -192,9 +280,9 @@ class ReviewAgent:
             }
 
     def _step_rag_retrieve(self, state: WorkflowState):
-        query = state.original_text
+        query = state.effective_text or state.original_text
         if state.metadata.get("keywords"):
-            query = state.original_text + " " + " ".join(state.metadata["keywords"])
+            query = query + " " + " ".join(state.metadata["keywords"])
 
         raw_results = self.rag_engine.retrieve(query, top_k=20)
         state.retrieved_laws = raw_results
@@ -205,7 +293,7 @@ class ReviewAgent:
             return
 
         state.reranked_laws = reranker.rerank(
-            query=state.original_text,
+            query=state.effective_text or state.original_text,
             documents=state.retrieved_laws,
             top_k=5,
         )
@@ -290,16 +378,37 @@ class ReviewAgent:
         active_prompt = prompt_manager.get_active_prompt()
         state.prompt_version = active_prompt.version if active_prompt else "v1"
 
-        if config.DEMO_MODE and state.rule_check_result and state.rule_check_result.get("hit"):
+        has_real_llm = any(
+            m.provider == "openai_compatible"
+            for m in llm_gateway._models.values()
+        )
+        if not has_real_llm and state.rule_check_result and state.rule_check_result.get("hit"):
+            raw_types = state.rule_check_result["violation_type"].split("、")
+            resolved_types = []
+            for vt_name in raw_types:
+                vt_name = vt_name.strip()
+                if not vt_name:
+                    continue
+                matched = violation_registry.get_type_by_name(vt_name)
+                if matched and matched.level == 1:
+                    for child in violation_registry._types.values():
+                        if child.parent_id == matched.id and child.status == "active" and child.keywords:
+                            resolved_types.append(child.name)
+                            break
+                    else:
+                        resolved_types.append(vt_name)
+                else:
+                    resolved_types.append(vt_name)
+            resolved_type_str = "、".join(resolved_types) if resolved_types else state.rule_check_result["violation_type"]
+            rule_violations = self._build_violations_from_rule(
+                resolved_types, state.rule_check_result["violated_articles"]
+            )
             state.reasoning_result = {
                 "compliant": state.rule_check_result["compliant"],
-                "violation_type": state.rule_check_result["violation_type"],
-                "violated_articles": state.rule_check_result["violated_articles"],
+                "violations": rule_violations,
                 "confidence": state.rule_check_result["confidence"],
                 "reasoning": f"规则引擎命中: {', '.join(state.rule_check_result.get('matched_keywords', []))}",
-                "suggestions": self._generate_suggestions(
-                    state.rule_check_result["violation_type"].split("、")
-                ),
+                "suggestions": self._generate_suggestions(resolved_types),
             }
             return
 
@@ -313,12 +422,15 @@ class ReviewAgent:
 
         rule_hint = ""
         if state.rule_check_result and state.rule_check_result.get("hit"):
+            rule_articles = []
+            for a in state.rule_check_result.get('violated_articles', []):
+                rule_articles.append(f"《{a.get('doc_name', '')}》第{a.get('article_number', '')}条")
             rule_hint = (
-                f"\n\n## 规则引擎预检结果（已命中，请在此基础上继续检查是否还有其他违规）\n"
-                f"- 已命中违规类型: {state.rule_check_result.get('violation_type', '')}\n"
-                f"- 已命中关键词: {', '.join(state.rule_check_result.get('matched_keywords', []))}\n"
-                f"- 已命中条文: {json.dumps(state.rule_check_result.get('violated_articles', []), ensure_ascii=False)}\n"
-                f"**重要**: 请在确认以上规则命中的基础上，继续检查是否存在规则未覆盖的深层/隐含违规。**不要重复输出规则已命中的违规，只输出额外发现。**\n"
+                f"\n\n## 规则引擎预检结果（仅供参考，请独立判断）\n"
+                f"- 规则引擎命中的违规类型: {state.rule_check_result.get('violation_type', '')}\n"
+                f"- 规则引擎命中的关键词: {', '.join(state.rule_check_result.get('matched_keywords', []))}\n"
+                f"- 规则引擎命中的条文: {', '.join(rule_articles)}\n"
+                f"**重要**: 以上为规则引擎的参考结果，请独立判断内容是否违规，包括规则命中的和多路召回的所有条款。你可以确认、否定或补充规则引擎的结果，最终以你的判断为准。\n"
             )
 
         relation_hint = ""
@@ -337,15 +449,17 @@ class ReviewAgent:
                 + "\n**重要**: 请注意条款间的关联关系，某些条款的适用可能受关联条款的例外、补充或前提条件影响。\n"
             )
 
+        review_content = state.effective_text or state.original_text
+
         if active_prompt and active_prompt.user_prompt_template:
             user_prompt = active_prompt.user_prompt_template.format(
-                content=state.original_text,
+                content=review_content,
                 context=context,
                 few_shots=few_shot_text,
             ) + rule_hint + relation_hint
             system_prompt = active_prompt.system_prompt
         else:
-            user_prompt = f"## 待审核内容\n{state.original_text}\n\n## 相关法规\n{context}\n\n## 参考案例\n{few_shot_text}\n{rule_hint}\n{relation_hint}\n请进行合规审核，按JSON格式输出。"
+            user_prompt = f"## 待审核内容\n{review_content}\n\n## 相关法规\n{context}\n\n## 参考案例\n{few_shot_text}\n{rule_hint}\n{relation_hint}\n请进行合规审核，按JSON格式输出。"
             system_prompt = REASON_SYSTEM_PROMPT
 
         try:
@@ -354,75 +468,77 @@ class ReviewAgent:
                 user_prompt=user_prompt,
                 model_name=self.reason_model,
             )
-            state.reasoning_result = self._parse_json(resp.content)
+            raw_content = resp.content
+            state.reasoning_result = self._parse_json(raw_content)
             state.model_used = resp.model
+            if not state.reasoning_result and raw_content:
+                logger.warning(f"LLM输出JSON解析失败，可能是输出被截断(长度={len(raw_content)})")
+            if state.reasoning_result:
+                self._resolve_violation_type_ids(state.reasoning_result)
         except Exception as e:
             logger.error(f"LLM推理失败: {e}")
+            error_msg = str(e)
+            for step in state.steps:
+                if step.name == "llm_reason" and step.status.value == "running":
+                    from src.workflow import StepStatus
+                    step.status = StepStatus.SKIPPED
+                    step.error = error_msg[:200]
+                    break
+            if "401" in error_msg or "Incorrect API key" in error_msg or "invalid_api_key" in error_msg:
+                error_hint = "API Key无效或已过期，请检查DashScope API Key是否正确"
+            elif "403" in error_msg or "free tier" in error_msg.lower() or "exhausted" in error_msg.lower():
+                error_hint = f"模型配额已耗尽: {error_msg[:150]}"
+            elif "400" in error_msg or "invalid_value" in error_msg:
+                error_hint = f"API参数错误: {error_msg[:100]}"
+            elif "429" in error_msg or "rate" in error_msg.lower():
+                error_hint = f"API调用限流: {error_msg[:100]}"
+            else:
+                error_hint = f"LLM服务暂时不可用: {error_msg[:150]}"
             if state.rule_check_result and state.rule_check_result.get("hit"):
+                fallback_violations = self._build_violations_from_rule(
+                    state.rule_check_result["violation_type"].split("、"),
+                    state.rule_check_result["violated_articles"]
+                )
                 state.reasoning_result = {
                     "compliant": state.rule_check_result["compliant"],
-                    "violation_type": state.rule_check_result["violation_type"],
-                    "violated_articles": state.rule_check_result["violated_articles"],
+                    "violations": fallback_violations,
                     "confidence": state.rule_check_result["confidence"],
-                    "reasoning": "LLM不可用，基于规则引擎结果",
+                    "reasoning": f"LLM不可用（{error_hint}），基于规则引擎结果",
                     "suggestions": self._generate_suggestions(
                         state.rule_check_result["violation_type"].split("、")
-                    ),
+                    ) + f"\n\n⚠️ LLM错误: {error_hint}",
                 }
             else:
                 state.reasoning_result = {
                     "compliant": "unknown",
-                    "violation_type": "LLM不可用",
-                    "violated_articles": [],
+                    "violations": [],
                     "confidence": 0.0,
-                    "reasoning": f"LLM推理失败: {str(e)}",
-                    "suggestions": "请稍后重试或联系管理员",
+                    "reasoning": f"LLM推理失败: {error_msg[:200]}",
+                    "suggestions": error_hint,
                 }
 
     def _step_format(self, state: WorkflowState):
-        if state.reasoning_result and state.rule_check_result and state.rule_check_result.get("hit"):
-            llm_result = state.reasoning_result
-            rule_result = state.rule_check_result
-
-            rule_types = set(rule_result.get("violation_type", "").split("、")) if rule_result.get("violation_type") else set()
-            rule_types.discard("")
-            llm_types = set(llm_result.get("violation_type", "").split("、")) if llm_result.get("violation_type") else set()
-            llm_types.discard("")
-            merged_types = rule_types | llm_types
-            if len(merged_types) > 1:
-                merged_types.discard("其他违规")
-
-            rule_articles = rule_result.get("violated_articles", [])
-            llm_articles = llm_result.get("violated_articles", [])
-            seen_keys = set()
-            merged_articles = []
-            for a in rule_articles + llm_articles:
-                key = f"{a.get('doc_name', '')}::{a.get('article_number', '')}"
-                if key not in seen_keys:
-                    merged_articles.append(a)
-                    seen_keys.add(key)
-
-            llm_compliant = llm_result.get("compliant", "yes")
-            result = {
-                "compliant": "no" if (rule_result.get("compliant") == "no" or llm_compliant == "no") else llm_compliant,
-                "violation_type": "、".join(merged_types) if merged_types else "",
-                "violated_articles": merged_articles,
-                "confidence": max(
-                    rule_result.get("confidence", 0.5),
-                    float(llm_result.get("confidence", 0.5)) if llm_result.get("confidence") else 0.5,
-                ),
-                "reasoning": f"规则引擎命中: {', '.join(rule_result.get('matched_keywords', []))}。{llm_result.get('reasoning', '')}",
-                "suggestions": llm_result.get("suggestions", "") or self._generate_suggestions(list(merged_types)),
-            }
-        elif state.reasoning_result:
-            result = state.reasoning_result
+        if state.reasoning_result:
+            result = dict(state.reasoning_result)
+            result = self._normalize_to_violations(result)
+            for v in result.get("violations", []):
+                articles = v.get("violated_articles", [])
+                v["violated_articles"] = [a for a in articles if isinstance(a, dict)]
+            if state.rule_check_result and state.rule_check_result.get("hit"):
+                rule_kw = ', '.join(state.rule_check_result.get('matched_keywords', []))
+                orig_reasoning = result.get("reasoning", "")
+                if rule_kw and rule_kw not in orig_reasoning:
+                    result["reasoning"] = f"[规则引擎参考命中: {rule_kw}] {orig_reasoning}"
         elif state.rule_check_result and state.rule_check_result.get("hit"):
+            rule_violations = self._build_violations_from_rule(
+                state.rule_check_result["violation_type"].split("、"),
+                state.rule_check_result["violated_articles"]
+            )
             result = {
                 "compliant": state.rule_check_result["compliant"],
-                "violation_type": state.rule_check_result["violation_type"],
-                "violated_articles": state.rule_check_result["violated_articles"],
+                "violations": rule_violations,
                 "confidence": state.rule_check_result["confidence"],
-                "reasoning": f"规则引擎命中关键词: {', '.join(state.rule_check_result.get('matched_keywords', []))}",
+                "reasoning": f"LLM不可用，仅规则引擎命中: {', '.join(state.rule_check_result.get('matched_keywords', []))}",
                 "suggestions": self._generate_suggestions(
                     state.rule_check_result["violation_type"].split("、")
                 ),
@@ -430,8 +546,7 @@ class ReviewAgent:
         else:
             result = {
                 "compliant": "unknown",
-                "violation_type": "",
-                "violated_articles": [],
+                "violations": [],
                 "confidence": 0.0,
                 "reasoning": "规则引擎和LLM均未返回结果",
                 "suggestions": "请稍后重试",
@@ -447,63 +562,208 @@ class ReviewAgent:
             confidence = 0.5
         result["confidence"] = max(0.0, min(1.0, confidence))
 
-        if not isinstance(result.get("violated_articles"), list):
-            result["violated_articles"] = []
+        violations = result.get("violations", [])
+        if not isinstance(violations, list):
+            violations = []
+        for v in violations:
+            if not isinstance(v.get("violated_articles"), list):
+                v["violated_articles"] = []
+        result["violations"] = violations
 
         state.formatted_result = result
 
     def _step_validate(self, state: WorkflowState):
         result = state.formatted_result
-        validated_articles = []
+        all_articles = []
+        for v in result.get("violations", []):
+            all_articles.extend(v.get("violated_articles", []))
 
-        for article in result.get("violated_articles", []):
+        validated_articles = []
+        hallucinated_articles = []
+
+        for article in all_articles:
             doc_name = article.get("doc_name", "")
             article_number = article.get("article_number", "")
-            article_text = article.get("article_text", "")
 
             verified = False
             for chunk in self.rag_engine.chunks:
-                if chunk.doc_name == doc_name and chunk.article_number == article_number:
+                if self._fuzzy_doc_match(chunk.doc_name, doc_name) and self._fuzzy_article_match(chunk.article_number, article_number):
                     verified = True
-                    if not article_text or len(article_text) < 10:
-                        article["article_text"] = chunk.article_text
+                    article["doc_name"] = chunk.doc_name
+                    article["article_number"] = chunk.article_number
+                    article["article_text"] = chunk.article_text
                     break
 
             if verified:
                 validated_articles.append(article)
             else:
-                logger.warning(
-                    f"幻觉检测: 引用条文不存在 doc={doc_name} article={article_number}，已移除"
-                )
-                article["hallucination_detected"] = True
-                article["violation_reason"] = f"[引用验证失败] {article.get('violation_reason', '')}"
+                fuzzy_match = None
+                if doc_name:
+                    for chunk in self.rag_engine.chunks:
+                        if self._fuzzy_doc_match(chunk.doc_name, doc_name):
+                            if self._fuzzy_article_match(chunk.article_number, article_number):
+                                fuzzy_match = chunk
+                                break
+                if fuzzy_match:
+                    article["article_number"] = fuzzy_match.article_number
+                    article["article_text"] = fuzzy_match.article_text
+                    article["fuzzy_matched"] = True
+                    validated_articles.append(article)
+                    logger.info(
+                        f"幻觉修正: {doc_name} {article_number} → {fuzzy_match.article_number}（模糊匹配）"
+                    )
+                else:
+                    logger.warning(
+                        f"幻觉检测: 引用条文不存在 doc={doc_name} article={article_number}，已移除"
+                    )
+                    article["hallucination_detected"] = True
+                    hallucinated_articles.append(article)
 
-        if len(validated_articles) < len(result.get("violated_articles", [])):
-            removed = len(result.get("violated_articles", [])) - len(validated_articles)
-            result["reasoning"] = f"[注意: {removed}条引用经验证不存在，已移除] " + result.get("reasoning", "")
+        removed_count = len(hallucinated_articles)
+        if removed_count > 0:
+            result["reasoning"] = f"[注意: {removed_count}条引用经验证不存在，已移除] " + result.get("reasoning", "")
 
-        result["violated_articles"] = validated_articles
+        for v in result.get("violations", []):
+            va = v.get("violated_articles", [])
+            v["violated_articles"] = [a for a in va if not a.get("hallucination_detected")]
 
-        if not validated_articles and result["compliant"] == "no":
-            result["compliant"] = "unknown"
-            result["confidence"] = min(result.get("confidence", 0.5), 0.4)
-            result["reasoning"] = "[引用条文验证失败，无法确认违规] " + result.get("reasoning", "")
+        total_remaining = sum(len(v.get("violated_articles", [])) for v in result.get("violations", []))
+        if total_remaining == 0 and result["compliant"] == "no":
+            if state.rule_check_result and state.rule_check_result.get("hit"):
+                rule_articles = state.rule_check_result.get("violated_articles", [])
+                if rule_articles:
+                    for chunk in self.rag_engine.chunks:
+                        for ra in rule_articles:
+                            if self._fuzzy_doc_match(chunk.doc_name, ra.get("doc_name", "")) and self._fuzzy_article_match(chunk.article_number, ra.get("article_number", "")):
+                                ra["doc_name"] = chunk.doc_name
+                                ra["article_number"] = chunk.article_number
+                                ra["article_text"] = chunk.article_text
+                    verified_articles = [a for a in rule_articles if a.get("article_text")]
+                    seen_keys = set()
+                    deduped = []
+                    for a in verified_articles:
+                        key = f"{a.get('doc_name','')}_{a.get('article_number','')}"
+                        if key not in seen_keys:
+                            seen_keys.add(key)
+                            deduped.append(a)
+                    rule_vt = state.rule_check_result.get("violation_type", "")
+                    rule_vt_names = [t.strip() for t in rule_vt.split("、") if t.strip()]
+                    if len(rule_vt_names) <= 1 or len(deduped) <= 3:
+                        result["violations"] = [{
+                            "violation_type_id": "",
+                            "violation_type_name": rule_vt,
+                            "violated_articles": deduped[:5],
+                        }]
+                    else:
+                        per_type = max(1, 5 // len(rule_vt_names))
+                        rule_violations = []
+                        assigned = set()
+                        for vt_name in rule_vt_names:
+                            vt_articles = []
+                            for idx, a in enumerate(deduped):
+                                if idx in assigned:
+                                    continue
+                                if a.get("violation_type") == vt_name:
+                                    vt_articles.append(a)
+                                    assigned.add(idx)
+                                if len(vt_articles) >= per_type:
+                                    break
+                            if vt_articles:
+                                rule_violations.append({
+                                    "violation_type_id": "",
+                                    "violation_type_name": vt_name,
+                                    "violated_articles": vt_articles,
+                                })
+                        unassigned = [a for idx, a in enumerate(deduped) if idx not in assigned]
+                        if unassigned and rule_violations:
+                            rule_violations[0]["violated_articles"].extend(unassigned[:2])
+                        result["violations"] = rule_violations if rule_violations else [{
+                            "violation_type_id": "",
+                            "violation_type_name": rule_vt,
+                            "violated_articles": deduped[:5],
+                        }]
+                    result["reasoning"] = f"[LLM引用条文验证失败，已回退到规则引擎结果] " + result.get("reasoning", "")
+                    result["confidence"] = min(result.get("confidence", 0.5), 0.7)
+                else:
+                    result["compliant"] = "unknown"
+                    result["confidence"] = min(result.get("confidence", 0.5), 0.4)
+                    result["reasoning"] = "[引用条文验证失败，无法确认违规] " + result.get("reasoning", "")
+            else:
+                result["compliant"] = "unknown"
+                result["confidence"] = min(result.get("confidence", 0.5), 0.4)
+                result["reasoning"] = "[引用条文验证失败，无法确认违规] " + result.get("reasoning", "")
 
         state.validation_result = result
+
+    @staticmethod
+    def _fuzzy_doc_match(doc_a: str, doc_b: str) -> bool:
+        if not doc_a or not doc_b:
+            return False
+        if doc_a == doc_b:
+            return True
+        a_clean = re.sub(r'[《》\s]', '', doc_a)
+        b_clean = re.sub(r'[《》\s]', '', doc_b)
+        return a_clean == b_clean
+
+    @staticmethod
+    def _fuzzy_article_match(num_a: str, num_b: str) -> bool:
+        if not num_a or not num_b:
+            return False
+        if num_a == num_b:
+            return True
+        def normalize(num: str) -> str:
+            num = num.strip()
+            num = re.sub(r'^第\s*', '', num)
+            num = re.sub(r'\s*条$', '', num)
+            cn_digits = {"一": "1", "二": "2", "三": "3", "四": "4", "五": "5",
+                         "六": "6", "七": "7", "八": "8", "九": "9", "十": "10",
+                         "十一": "11", "十二": "12", "十三": "13", "十四": "14", "十五": "15",
+                         "十六": "16", "十七": "17", "十八": "18", "十九": "19", "二十": "20",
+                         "二十一": "21", "二十二": "22", "二十三": "23", "二十四": "24", "二十五": "25",
+                         "二十六": "26", "二十七": "27", "二十八": "28", "二十九": "29", "三十": "30",
+                         "三十一": "31", "三十二": "32", "三十三": "33", "三十四": "34", "三十五": "35",
+                         "三十六": "36", "三十七": "37", "三十八": "38", "三十九": "39", "四十": "40",
+                         "四十一": "41", "四十二": "42", "四十三": "43", "四十四": "44", "四十五": "45",
+                         "四十六": "46", "四十七": "47", "四十八": "48", "四十九": "49", "五十": "50",
+                         "五十一": "51", "五十二": "52", "五十三": "53", "五十四": "54", "五十五": "55",
+                         "五十六": "56", "五十七": "57", "五十八": "58", "五十九": "59", "六十": "60",
+                         "六十一": "61", "六十二": "62", "六十三": "63", "六十四": "64", "六十五": "65",
+                         "六十六": "66", "六十七": "67", "六十八": "68", "六十九": "69", "七十": "70"}
+            return cn_digits.get(num, num)
+        return normalize(num_a) == normalize(num_b)
 
     def _step_crosscheck(self, state: WorkflowState):
         result = state.validation_result
 
         if result.get("compliant") != "no":
             state.crosscheck_result = {"passed": True, "reason": "合规内容无需复核"}
+            for step in state.steps:
+                if step.name == "crosscheck" and step.status.value == "running":
+                    from src.workflow import StepStatus
+                    step.status = StepStatus.SKIPPED
+                    break
             return
 
-        if config.DEMO_MODE:
-            state.crosscheck_result = {"passed": True, "reason": "Demo模式跳过LLM复核"}
+        has_real_llm_cc = any(m.provider == "openai_compatible" for m in llm_gateway._models.values())
+        if not has_real_llm_cc:
+            state.crosscheck_result = {"passed": True, "reason": "无LLM可用，跳过复核"}
+            for step in state.steps:
+                if step.name == "crosscheck" and step.status.value == "running":
+                    from src.workflow import StepStatus
+                    step.status = StepStatus.SKIPPED
+                    break
             return
 
-        violated_articles = result.get("violated_articles", [])
-        input_text = state.original_text
+        violated_articles = []
+        for v in result.get("violations", []):
+            for a in v.get("violated_articles", []):
+                violated_articles.append({
+                    "doc_name": a.get("doc_name", ""),
+                    "article_number": a.get("article_number", ""),
+                    "violation_reason": a.get("violation_reason", ""),
+                })
+        violation_type_str = "、".join(v.get("violation_type_name", "") for v in result.get("violations", []) if v.get("violation_type_name"))
+        input_text = state.effective_text or state.original_text
         crosscheck_prompt = f"""请对以下审核结论进行交叉验证，判断结论是否合理。
 
 ## 原始营销内容
@@ -511,7 +771,7 @@ class ReviewAgent:
 
 ## 审核结论
 - 合规判定: {result.get('compliant', 'unknown')}
-- 违规类型: {result.get('violation_type', '')}
+- 违规类型: {violation_type_str}
 - 置信度: {result.get('confidence', 0)}
 - 推理过程: {result.get('reasoning', '')}
 
@@ -570,15 +830,26 @@ class ReviewAgent:
         except Exception as e:
             logger.warning(f"CrossCheck步骤失败，跳过复核: {e}")
             state.crosscheck_result = {"passed": True, "reason": f"复核失败: {str(e)}"}
+            for step in state.steps:
+                if step.name == "crosscheck" and step.status.value == "running":
+                    from src.workflow import StepStatus
+                    step.status = StepStatus.SKIPPED
+                    step.error = str(e)[:200]
+                    break
 
     def _step_risk_assess(self, state: WorkflowState):
         result = state.validation_result
         rule_hit = state.rule_check_result.get("hit", False) if state.rule_check_result else False
 
+        all_violated_articles = []
+        for v in result.get("violations", []):
+            all_violated_articles.extend(v.get("violated_articles", []))
+        violation_type_str = "、".join(v.get("violation_type_name", "") for v in result.get("violations", []) if v.get("violation_type_name"))
+
         assessment = risk_engine.assess(
             compliant=result.get("compliant", "unknown"),
-            violation_type=result.get("violation_type", ""),
-            violated_articles=result.get("violated_articles", []),
+            violation_type=violation_type_str,
+            violated_articles=all_violated_articles,
             confidence=result.get("confidence", 0.5),
             rule_hit=rule_hit,
         )
@@ -592,46 +863,68 @@ class ReviewAgent:
         self,
         content: str,
         image_descriptions: List[str] = None,
+        image_paths: List[str] = None,
         client_id: str = "anonymous",
         model_name: str = None,
         api_key: str = None,
     ) -> ReviewResult:
         start_time = time.time()
 
-        if api_key and api_key != "demo-key-insurance-review-2024":
+        _demo_keys = {"demo-key", "demo-key-insurance-review-2024", "test", ""}
+        if api_key and api_key not in _demo_keys and (api_key.startswith("sk-") or len(api_key) >= 20):
             config.DASHSCOPE_API_KEY = api_key
-            config.DEMO_MODE = False
+            config.save_user_config(api_key=api_key)
+            if model_name and model_name.strip():
+                config.LLM_MODEL = model_name.strip()
+                config.EXTRACT_MODEL = model_name.strip()
+                config.REASON_MODEL = model_name.strip()
+                config.CROSSCHECK_MODEL = model_name.strip()
+                config.save_user_config(model_name=model_name.strip())
             llm_gateway._register_default_models()
             if hasattr(self, 'rag_engine') and self.rag_engine:
                 self.rag_engine.enable_vector_search()
-            if model_name:
-                llm_gateway.ensure_model(model_name)
-                self.extract_model = model_name
-                self.reason_model = model_name
-                self.crosscheck_model = model_name
-            else:
-                self.extract_model = config.EXTRACT_MODEL
-                self.reason_model = config.REASON_MODEL
-                self.crosscheck_model = config.CROSSCHECK_MODEL
+
+        if model_name and config.has_api_key():
+            llm_gateway.ensure_model(model_name)
+            self.extract_model = model_name
+            self.reason_model = model_name
+            self.crosscheck_model = model_name
+            if model_name not in (config.LLM_MODEL, config.EXTRACT_MODEL, config.REASON_MODEL, config.CROSSCHECK_MODEL):
+                config.LLM_MODEL = model_name
+                config.EXTRACT_MODEL = model_name
+                config.REASON_MODEL = model_name
+                config.CROSSCHECK_MODEL = model_name
+                config.save_user_config(model_name=model_name)
+        elif config.has_api_key():
+            self.extract_model = config.EXTRACT_MODEL
+            self.reason_model = config.REASON_MODEL
+            self.crosscheck_model = config.CROSSCHECK_MODEL
 
         validation = security_middleware.validate_and_sanitize(content, client_id)
         if not validation.is_valid:
-            return ReviewResult(
-                compliant="unknown",
-                violation_type="输入校验失败",
-                violated_articles=[],
-                confidence=0.0,
-                reasoning=f"输入未通过安全校验: {'; '.join(validation.threats)}",
-                suggestions="请修改输入内容后重新提交。",
-                risk_score=0.0,
+            if not image_paths and not image_descriptions:
+                return ReviewResult(
+                    compliant="unknown",
+                    violation_type="输入校验失败",
+                    violated_articles=[],
+                    confidence=0.0,
+                    reasoning=f"输入未通过安全校验: {'; '.join(validation.threats)}",
+                    suggestions="请修改输入内容后重新提交。",
+                    risk_score=0.0,
+                    risk_level="low",
+                    decision="auto_block",
+                    review_mode="security_block",
+                )
+            validation = type(validation)(
+                is_valid=True,
+                sanitized_input=content or "",
+                threats=[],
                 risk_level="low",
-                decision="auto_block",
-                review_mode="security_block",
             )
 
         sanitized_content = validation.sanitized_input
 
-        if model_name and not config.DEMO_MODE:
+        if model_name and config.has_api_key():
             llm_gateway.ensure_model(model_name)
             self.extract_model = model_name
             self.reason_model = model_name
@@ -644,7 +937,10 @@ class ReviewAgent:
         else:
             full_content = sanitized_content
 
-        cache_key = hashlib.sha256(full_content.encode()).hexdigest()
+        cache_key_content = full_content
+        if image_paths:
+            cache_key_content += "\n[图片文件]" + "|".join(sorted(image_paths))
+        cache_key = hashlib.sha256(cache_key_content.encode()).hexdigest()
         cached = review_cache.get(cache_key)
         if cached is not None:
             if PROMETHEUS_AVAILABLE and CACHE_HITS:
@@ -656,6 +952,7 @@ class ReviewAgent:
         state = WorkflowState(
             original_text=full_content,
             image_descriptions=image_descriptions or [],
+            image_paths=image_paths or [],
         )
 
         _trace = trace_operation or _noop_trace
@@ -663,7 +960,13 @@ class ReviewAgent:
             state = self._workflow.run(state)
 
         result_data = state.validation_result or {}
-        review_mode = "rule+llm" if (state.rule_check_result and state.rule_check_result.get("hit")) else "llm"
+        llm_actually_worked = bool(state.model_used) and "rule" not in state.model_used
+        if not config.has_api_key():
+            review_mode = "rule" if (state.rule_check_result and state.rule_check_result.get("hit")) else "no_api"
+        elif llm_actually_worked:
+            review_mode = "rule+llm" if (state.rule_check_result and state.rule_check_result.get("hit")) else "llm"
+        else:
+            review_mode = "rule(fallback)" if (state.rule_check_result and state.rule_check_result.get("hit")) else "fallback"
 
         regulation_snapshot = {}
         try:
@@ -677,11 +980,31 @@ class ReviewAgent:
         if state.crosscheck_result:
             crosscheck_passed = state.crosscheck_result.get("passed", True)
 
+        violations = result_data.get("violations", [])
+        violation_type_str = "、".join(v.get("violation_type_name", "") for v in violations if v.get("violation_type_name"))
+        all_violated_articles = []
+        for v in violations:
+            all_violated_articles.extend(v.get("violated_articles", []))
+        violation_types_list = [
+            {
+                "violation_type_id": v.get("violation_type_id", ""),
+                "violation_type_name": v.get("violation_type_name", ""),
+            }
+            for v in violations
+            if v.get("violation_type_name")
+        ]
+
+        raw_confidence = result_data.get("confidence", 0.0)
+        try:
+            raw_confidence = round(float(raw_confidence), 2)
+        except (ValueError, TypeError):
+            raw_confidence = 0.5
+
         result = ReviewResult(
             compliant=result_data.get("compliant", "unknown"),
-            violation_type=result_data.get("violation_type", ""),
-            violated_articles=result_data.get("violated_articles", []),
-            confidence=result_data.get("confidence", 0.0),
+            violation_type=violation_type_str,
+            violated_articles=all_violated_articles,
+            confidence=raw_confidence,
             reasoning=result_data.get("reasoning", ""),
             suggestions=result_data.get("suggestions", ""),
             risk_score=state.risk_score,
@@ -694,9 +1017,12 @@ class ReviewAgent:
             regulation_snapshot=regulation_snapshot,
             crosscheck_passed=crosscheck_passed,
             expanded_relations=state.expanded_relations,
+            violation_types=violation_types_list if violation_types_list else None,
+            violations=violations if violations else None,
+            metadata=dict(state.metadata),
         )
 
-        if result.violation_type:
+        if not result.violation_types and result.violation_type:
             result.violation_types = self._build_violation_types_for_save(result.violation_type)
             deprecated_names = self._mark_deprecated_types(result.violation_type)
             if deprecated_names:
@@ -762,27 +1088,284 @@ class ReviewAgent:
                 })
             else:
                 result.append({
-                    "violation_type_id": name,
+                    "violation_type_id": "other_violation",
                     "violation_type_name": name,
                     "is_deprecated": False,
                 })
         return result
 
+    def _preprocess_image(self, image_path: str) -> str:
+        try:
+            from PIL import Image
+            img = Image.open(image_path)
+            if img.mode in ("RGBA", "P", "LA"):
+                background = Image.new("RGB", img.size, (255, 255, 255))
+                if img.mode == "P":
+                    img = img.convert("RGBA")
+                if "A" in img.mode:
+                    background.paste(img, mask=img.split()[-1])
+                else:
+                    background.paste(img)
+                img = background
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+            w, h = img.size
+            scale = 3
+            new_w, new_h = w * scale, h * scale
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False, dir=os.path.dirname(image_path))
+            img.save(tmp.name, "JPEG", quality=95)
+            tmp.close()
+            logger.info(f"图片预处理: {image_path} ({w}x{h}) -> JPG {new_w}x{new_h}")
+            return tmp.name
+        except ImportError:
+            logger.warning("PIL未安装，跳过图片预处理")
+            return image_path
+        except Exception as e:
+            logger.warning(f"图片预处理失败 {image_path}: {e}")
+            return image_path
+
     def _parse_json(self, text: str) -> Dict:
+        text = text.strip()
         try:
             json_str = text
             if "```json" in text:
                 json_str = text.split("```json")[1].split("```")[0].strip()
             elif "```" in text:
                 json_str = text.split("```")[1].split("```")[0].strip()
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', json_str)
+            json_str = re.sub(r'\t', ' ', json_str)
+            json_str = re.sub(r' +', ' ', json_str)
             return json.loads(json_str)
         except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
-            logger.error(f"JSON解析失败: {e}")
+            logger.warning(f"JSON解析失败，尝试修复: {e}")
+
+        try:
+            json_str = text
+            if "```json" in text:
+                json_str = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                json_str = text.split("```")[1].split("```")[0].strip()
+
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', json_str)
+            json_str = re.sub(r'\t', ' ', json_str)
+            json_str = re.sub(r' +', ' ', json_str)
+
+            if not json_str.strip().startswith("{"):
+                idx = json_str.find("{")
+                if idx >= 0:
+                    json_str = json_str[idx:]
+
+            json_str = self._repair_truncated_json(json_str)
+
+            result = json.loads(json_str)
+            logger.info(f"JSON修复成功")
+            return result
+        except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
+            logger.error(f"JSON修复也失败: {e}")
             return {}
+
+    def _repair_truncated_json(self, json_str: str) -> str:
+        json_str = json_str.rstrip()
+        if json_str.endswith(","):
+            json_str = json_str[:-1]
+
+        open_braces = json_str.count("{") - json_str.count("}")
+        open_brackets = json_str.count("[") - json_str.count("]")
+        suffix = ""
+        if open_brackets > 0:
+            suffix += "]" * open_brackets
+        if open_braces > 0:
+            suffix += "}" * open_braces
+
+        try:
+            json.loads(json_str + suffix)
+            return json_str + suffix
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        close_positions = []
+        for i in range(len(json_str) - 1, -1, -1):
+            if json_str[i] in '}]':
+                close_positions.append(i)
+            if len(close_positions) >= 20:
+                break
+
+        for pos in close_positions:
+            prefix = json_str[:pos + 1]
+            prefix = prefix.rstrip()
+            if prefix.endswith(","):
+                prefix = prefix[:-1]
+
+            ob = prefix.count("{") - prefix.count("}")
+            ok = prefix.count("[") - prefix.count("]")
+            s = ""
+            if ok > 0:
+                s += "]" * ok
+            if ob > 0:
+                s += "}" * ob
+
+            try:
+                json.loads(prefix + s)
+                return prefix + s
+            except (json.JSONDecodeError, ValueError):
+                continue
+
+        return json_str + suffix
 
     def _generate_suggestions(self, violation_types: List[str]) -> str:
         suggestions = [violation_registry.get_suggestion(vt) for vt in violation_types]
         return "；".join(suggestions) if suggestions else "请修改营销内容。"
+
+    def _resolve_violation_type_ids(self, result: Dict):
+        violations = result.get("violations", [])
+        if violations and isinstance(violations, list):
+            for v in violations:
+                if not isinstance(v, dict):
+                    continue
+                type_id = v.get("violation_type_id", "")
+                type_name = v.get("violation_type_name", "")
+                if type_id:
+                    matched = violation_registry.get_type(type_id)
+                    if matched and matched.status == "active":
+                        v["violation_type_name"] = matched.name
+                    elif not type_name:
+                        v["violation_type_name"] = type_id
+            return
+
+        violation_types_raw = result.get("violation_types", [])
+        if not violation_types_raw or not isinstance(violation_types_raw, list):
+            return
+        resolved_names = []
+        for vt_item in violation_types_raw:
+            if not isinstance(vt_item, dict):
+                continue
+            type_id = vt_item.get("violation_type_id", "")
+            type_name = vt_item.get("violation_type_name", "")
+            if type_id:
+                matched = violation_registry.get_type(type_id)
+                if matched and matched.status == "active":
+                    resolved_names.append(matched.name)
+                elif type_name:
+                    resolved_names.append(type_name)
+            elif type_name:
+                resolved_names.append(type_name)
+        if resolved_names:
+            result["violation_type"] = "、".join(resolved_names)
+
+    def _normalize_to_violations(self, result: Dict) -> Dict:
+        if result.get("violations") and isinstance(result["violations"], list):
+            return result
+
+        violations = []
+        violation_type_str = result.get("violation_type", "")
+        violation_types_raw = result.get("violation_types", [])
+        violated_articles_raw = result.get("violated_articles", [])
+
+        if violation_types_raw and isinstance(violation_types_raw, list):
+            for vt_item in violation_types_raw:
+                if not isinstance(vt_item, dict):
+                    continue
+                vt_name = vt_item.get("violation_type_name", "")
+                vt_id = vt_item.get("violation_type_id", "")
+                matched_articles = []
+                for a in violated_articles_raw:
+                    if not isinstance(a, dict):
+                        continue
+                    a_vt = a.get("violation_type", a.get("violation_type_name", ""))
+                    if a_vt == vt_name or (not a_vt and not matched_articles):
+                        matched_articles.append(a)
+                if not matched_articles and len(violation_types_raw) == 1:
+                    matched_articles = [a for a in violated_articles_raw if isinstance(a, dict)]
+                violations.append({
+                    "violation_type_id": vt_id,
+                    "violation_type_name": vt_name,
+                    "violated_articles": matched_articles,
+                })
+        elif violation_type_str:
+            type_names = [t.strip() for t in violation_type_str.split("、") if t.strip()]
+            if len(type_names) <= 1:
+                vt_name = type_names[0] if type_names else violation_type_str
+                vt_id = ""
+                matched = violation_registry.get_type_by_name(vt_name)
+                if matched:
+                    vt_id = matched.id
+                violations.append({
+                    "violation_type_id": vt_id,
+                    "violation_type_name": vt_name,
+                    "violated_articles": [a for a in violated_articles_raw if isinstance(a, dict)],
+                })
+            else:
+                for vt_name in type_names:
+                    vt_id = ""
+                    matched = violation_registry.get_type_by_name(vt_name)
+                    if matched:
+                        vt_id = matched.id
+                    vt_articles = [
+                        a for a in violated_articles_raw
+                        if isinstance(a, dict) and (a.get("violation_type", a.get("violation_type_name", "")) == vt_name)
+                    ]
+                    violations.append({
+                        "violation_type_id": vt_id,
+                        "violation_type_name": vt_name,
+                        "violated_articles": vt_articles,
+                    })
+                unassigned = [
+                    a for a in violated_articles_raw
+                    if isinstance(a, dict)
+                    and not any(a.get("violation_type", a.get("violation_type_name", "")) == v.get("violation_type_name") for v in violations)
+                ]
+                if unassigned and violations:
+                    violations[0]["violated_articles"].extend(unassigned)
+        elif violated_articles_raw:
+            violations.append({
+                "violation_type_id": "other_violation",
+                "violation_type_name": "其他违规",
+                "violated_articles": [a for a in violated_articles_raw if isinstance(a, dict)],
+            })
+
+        for key in ("violation_type", "violation_types", "violated_articles"):
+            result.pop(key, None)
+        result["violations"] = violations
+        return result
+
+    def _build_violations_from_rule(self, type_names: List[str], violated_articles: List[Dict]) -> List[Dict]:
+        violations = []
+        assigned_indices = set()
+        for vt_name in type_names:
+            vt_name = vt_name.strip()
+            if not vt_name:
+                continue
+            vt_id = ""
+            matched = violation_registry.get_type_by_name(vt_name)
+            if matched:
+                vt_id = matched.id
+            vt_articles = []
+            for idx, a in enumerate(violated_articles):
+                if idx in assigned_indices:
+                    continue
+                if a.get("violation_type", a.get("violation_type_name", "")) == vt_name:
+                    vt_articles.append(a)
+                    assigned_indices.add(idx)
+            if not vt_articles and len(type_names) == 1:
+                vt_articles = list(violated_articles)
+            if vt_articles:
+                violations.append({
+                    "violation_type_id": vt_id,
+                    "violation_type_name": vt_name,
+                    "violated_articles": vt_articles,
+                })
+        unassigned = [a for idx, a in enumerate(violated_articles) if idx not in assigned_indices]
+        if unassigned and violations:
+            violations[0]["violated_articles"].extend(unassigned)
+        if not violations and violated_articles:
+            violations.append({
+                "violation_type_id": "other_violation",
+                "violation_type_name": "其他违规",
+                "violated_articles": list(violated_articles),
+            })
+        return violations
 
 
 def _noop_trace(operation, attributes=None):

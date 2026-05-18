@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import uuid
 import sqlite3
 import logging
 import shutil
@@ -148,6 +149,22 @@ CREATE INDEX IF NOT EXISTS idx_violation_types_status ON violation_types(status)
 CREATE INDEX IF NOT EXISTS idx_clause_mappings_type ON clause_type_mappings(violation_type_id);
 CREATE INDEX IF NOT EXISTS idx_clause_mappings_article ON clause_type_mappings(doc_name, article_number);
 
+CREATE TABLE IF NOT EXISTS regulation_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_name TEXT NOT NULL,
+    chapter TEXT NOT NULL DEFAULT '',
+    article_number TEXT NOT NULL,
+    article_text TEXT NOT NULL DEFAULT '',
+    chunk_id TEXT NOT NULL,
+    content_hash TEXT NOT NULL DEFAULT '',
+    source_format TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(doc_name, article_number)
+);
+CREATE INDEX IF NOT EXISTS idx_chunks_doc ON regulation_chunks(doc_name);
+CREATE INDEX IF NOT EXISTS idx_chunks_article ON regulation_chunks(doc_name, article_number);
+
 CREATE TABLE IF NOT EXISTS review_violations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     review_id INTEGER NOT NULL,
@@ -252,6 +269,7 @@ class Database:
         conn.execute("DELETE FROM clause_relations WHERE to_article IS NULL OR to_article = '' OR trim(to_article) = ''")
         conn.execute("DELETE FROM clause_relations WHERE from_doc = to_doc AND from_article = to_article")
         conn.commit()
+        self._load_mappings_to_registry()
 
     def _run_migrations(self, conn):
         current_version = conn.execute("PRAGMA user_version").fetchone()[0]
@@ -394,8 +412,25 @@ class Database:
         try:
             from src.violation_registry import violation_registry
             existing = {row[0] for row in conn.execute("SELECT id FROM violation_types").fetchall()}
-            for vt in violation_registry._types.values():
-                if vt.id not in existing:
+            if existing:
+                new_count = 0
+                for vt in violation_registry._types.values():
+                    if vt.id not in existing:
+                        conn.execute(
+                            "INSERT INTO violation_types (id, name, level, parent_id, severity, description, "
+                            "keywords, suggestions, is_system, status, source, created_at, updated_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            (vt.id, vt.name, vt.level, vt.parent_id, vt.severity, vt.description,
+                             json.dumps(vt.keywords, ensure_ascii=False), vt.suggestions,
+                             int(vt.is_system), vt.status, vt.source, vt.created_at, vt.updated_at),
+                        )
+                        new_count += 1
+                if new_count > 0:
+                    logger.info(f"补充新违规类型: {new_count}条")
+                else:
+                    logger.info(f"违规类型已存在{len(existing)}条，无需同步")
+            else:
+                for vt in violation_registry._types.values():
                     conn.execute(
                         "INSERT INTO violation_types (id, name, level, parent_id, severity, description, "
                         "keywords, suggestions, is_system, status, source, created_at, updated_at) "
@@ -404,14 +439,7 @@ class Database:
                          json.dumps(vt.keywords, ensure_ascii=False), vt.suggestions,
                          int(vt.is_system), vt.status, vt.source, vt.created_at, vt.updated_at),
                     )
-                else:
-                    conn.execute(
-                        "UPDATE violation_types SET name=?, level=?, parent_id=?, severity=?, description=?, "
-                        "keywords=?, suggestions=?, is_system=?, status=?, source=?, updated_at=? WHERE id=?",
-                        (vt.name, vt.level, vt.parent_id, vt.severity, vt.description,
-                         json.dumps(vt.keywords, ensure_ascii=False), vt.suggestions,
-                         int(vt.is_system), vt.status, vt.source, vt.updated_at, vt.id),
-                    )
+                logger.info(f"首次初始化违规类型: {len(violation_registry._types)}条")
         except Exception as e:
             logger.warning(f"同步违规类型到数据库失败: {e}")
 
@@ -427,29 +455,136 @@ class Database:
 
         for reg in regulations:
             if reg["doc_name"] not in existing:
+                chunk_count = self.get_chunk_count(doc_name=reg["doc_name"])
+                actual_count = chunk_count if chunk_count > 0 else reg["article_count"]
                 content_hash = hashlib.sha256(reg["doc_name"].encode()).hexdigest()[:16]
                 conn.execute(
                     "INSERT INTO regulation_versions (doc_name, version, content_hash, article_count, effective_date) VALUES (?, ?, ?, ?, ?)",
-                    (reg["doc_name"], reg["version"], content_hash, reg["article_count"], reg["effective_date"]),
+                    (reg["doc_name"], reg["version"], content_hash, actual_count, reg["effective_date"]),
                 )
+                logger.info(f"首次初始化法规版本: {reg['doc_name']}")
         conn.commit()
 
     def _sync_clause_mappings(self):
         try:
+            conn = self._get_conn()
+            existing = conn.execute("SELECT violation_type_id, doc_name, article_number FROM clause_type_mappings").fetchall()
+            existing_keys = {(r[0], r[1], r[2]) for r in existing}
+
+            if not existing_keys:
+                from src.violation_registry import _DEFAULT_MAPPINGS
+                count = 0
+                for mapping_data in _DEFAULT_MAPPINGS:
+                    conn.execute(
+                        "INSERT INTO clause_type_mappings (id, violation_type_id, doc_name, article_number, mapping_logic, effective_date) VALUES (?, ?, ?, ?, ?, ?)",
+                        (str(uuid.uuid4())[:8], mapping_data["violation_type_id"], mapping_data["doc_name"], mapping_data["article_number"], mapping_data["mapping_logic"], mapping_data.get("effective_date", "2026-01-01")),
+                    )
+                    count += 1
+                conn.commit()
+                total = conn.execute("SELECT COUNT(*) FROM clause_type_mappings").fetchone()[0]
+                logger.info(f"首次初始化条款映射: 新增{count}条, 总计{total}条")
+            else:
+                from src.violation_registry import _DEFAULT_MAPPINGS
+                new_count = 0
+                for mapping_data in _DEFAULT_MAPPINGS:
+                    key = (mapping_data["violation_type_id"], mapping_data["doc_name"], mapping_data["article_number"])
+                    if key not in existing_keys:
+                        conn.execute(
+                            "INSERT INTO clause_type_mappings (id, violation_type_id, doc_name, article_number, mapping_logic, effective_date) VALUES (?, ?, ?, ?, ?, ?)",
+                            (str(uuid.uuid4())[:8], mapping_data["violation_type_id"], mapping_data["doc_name"], mapping_data["article_number"], mapping_data["mapping_logic"], mapping_data.get("effective_date", "2026-01-01")),
+                        )
+                        new_count += 1
+                if new_count > 0:
+                    conn.commit()
+                    logger.info(f"补充新条款映射: {new_count}条")
+                else:
+                    logger.info(f"条款映射已存在{len(existing_keys)}条，无需同步")
+        except Exception as e:
+            logger.warning(f"同步条款映射失败: {e}")
+
+    def _load_mappings_to_registry(self):
+        try:
             from src.violation_registry import violation_registry
             conn = self._get_conn()
-            conn.execute("DELETE FROM clause_type_mappings")
+
+            rows = conn.execute("SELECT id, name, level, parent_id, severity, description, keywords, suggestions, is_system, status, source, created_at, updated_at FROM violation_types").fetchall()
+            if rows:
+                from src.violation_registry import ViolationType
+                violation_registry._types.clear()
+                for row in rows:
+                    vt = ViolationType(
+                        id=row[0], name=row[1], level=row[2], parent_id=row[3],
+                        severity=row[4], description=row[5],
+                        keywords=json.loads(row[6]) if row[6] else [],
+                        suggestions=row[7], is_system=bool(row[8]),
+                        status=row[9], source=row[10],
+                        created_at=row[11], updated_at=row[12],
+                    )
+                    violation_registry._types[vt.id] = vt
+                logger.info(f"从数据库加载违规类型到注册表: {len(violation_registry._types)}条")
+
+            mapping_rows = conn.execute("SELECT id, violation_type_id, doc_name, article_number, mapping_logic, effective_date, expiration_date, created_at FROM clause_type_mappings").fetchall()
+            if mapping_rows:
+                from src.violation_registry import ClauseTypeMapping
+                violation_registry._mappings.clear()
+                for row in mapping_rows:
+                    cm = ClauseTypeMapping(
+                        id=row[0], violation_type_id=row[1],
+                        doc_name=row[2], article_number=row[3],
+                        mapping_logic=row[4], effective_date=row[5],
+                        expiration_date=row[6], created_at=row[7],
+                    )
+                    violation_registry._mappings[cm.id] = cm
+                logger.info(f"从数据库加载条款映射到注册表: {len(violation_registry._mappings)}条")
+        except Exception as e:
+            logger.warning(f"加载数据库数据到注册表失败: {e}")
+
+    def sync_chunks(self, chunks):
+        try:
+            conn = self._get_conn()
             count = 0
-            for cm in violation_registry._mappings.values():
+            for c in chunks:
                 conn.execute(
-                    "INSERT INTO clause_type_mappings (id, violation_type_id, doc_name, article_number, mapping_logic, effective_date) VALUES (?, ?, ?, ?, ?, ?)",
-                    (cm.id, cm.violation_type_id, cm.doc_name, cm.article_number, cm.mapping_logic, cm.effective_date),
+                    "INSERT OR REPLACE INTO regulation_chunks (doc_name, chapter, article_number, article_text, chunk_id, content_hash, source_format, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+                    (c.doc_name, c.chapter, c.article_number, c.article_text, c.chunk_id, c.content_hash, c.source_format),
                 )
                 count += 1
             conn.commit()
-            logger.info(f"同步条款映射完成: {count}条")
+            logger.info(f"同步法规条款完成: {count}条")
         except Exception as e:
-            logger.warning(f"同步条款映射失败: {e}")
+            logger.warning(f"同步法规条款失败: {e}")
+
+    def get_chunks(self, doc_name=None, article_number=None):
+        conn = self._get_conn()
+        if doc_name and article_number:
+            rows = conn.execute(
+                "SELECT doc_name, chapter, article_number, article_text, chunk_id, content_hash, source_format FROM regulation_chunks WHERE doc_name = ? AND article_number = ?",
+                (doc_name, article_number),
+            ).fetchall()
+        elif doc_name:
+            rows = conn.execute(
+                "SELECT doc_name, chapter, article_number, article_text, chunk_id, content_hash, source_format FROM regulation_chunks WHERE doc_name = ?",
+                (doc_name,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT doc_name, chapter, article_number, article_text, chunk_id, content_hash, source_format FROM regulation_chunks",
+            ).fetchall()
+        return [
+            {
+                "doc_name": r[0], "chapter": r[1], "article_number": r[2],
+                "article_text": r[3], "chunk_id": r[4], "content_hash": r[5], "source_format": r[6],
+            }
+            for r in rows
+        ]
+
+    def get_chunk_count(self, doc_name=None):
+        conn = self._get_conn()
+        if doc_name:
+            row = conn.execute("SELECT COUNT(*) FROM regulation_chunks WHERE doc_name = ?", (doc_name,)).fetchone()
+        else:
+            row = conn.execute("SELECT COUNT(*) FROM regulation_chunks").fetchone()
+        return row[0] if row else 0
 
     def close(self):
         if hasattr(self._local, 'conn') and self._local.conn:
@@ -768,7 +903,7 @@ class Database:
             "avg_latency_ms": round(avg_latency, 2),
             "avg_review_latency": round(avg_latency, 2),
             "avg_confidence": round(avg_confidence, 4),
-            "model_status": "active" if not config.DEMO_MODE else "demo",
+            "model_status": "active" if config.has_api_key() else "no_api",
             "feedback": feedback,
             "db_size_bytes": db_size,
             "db_size_mb": round(db_size / 1024 / 1024, 2),
@@ -783,11 +918,15 @@ class Database:
             return {"status": "unhealthy", "error": str(e)}
 
     def _save_review_violations_in_txn(self, conn, review_id: int, violation_types: List[Dict]):
+        valid_ids = {r[0] for r in conn.execute("SELECT id FROM violation_types").fetchall()}
         for vt in violation_types:
+            type_id = vt["violation_type_id"]
+            if type_id not in valid_ids:
+                type_id = "other_violation"
             conn.execute(
                 "INSERT INTO review_violations (review_id, violation_type_id, violation_type_name, is_deprecated) "
                 "VALUES (?, ?, ?, ?)",
-                (review_id, vt["violation_type_id"], vt["violation_type_name"], int(vt.get("is_deprecated", False))),
+                (review_id, type_id, vt["violation_type_name"], int(vt.get("is_deprecated", False))),
             )
 
     def save_review_violations(self, review_id: int, violation_types: List[Dict]):
@@ -814,6 +953,9 @@ class Database:
 
     def save_violation_feedback(self, review_id: int, violation_type_id: str, feedback_type: str, comment: str = "", user_id: int = None) -> int:
         with self.transaction() as conn:
+            valid_ids = {r[0] for r in conn.execute("SELECT id FROM violation_types").fetchall()}
+            if violation_type_id not in valid_ids:
+                violation_type_id = "other_violation"
             cursor = conn.execute(
                 "INSERT INTO violation_feedback (review_id, violation_type_id, feedback_type, comment, user_id) "
                 "VALUES (?, ?, ?, ?, ?)",

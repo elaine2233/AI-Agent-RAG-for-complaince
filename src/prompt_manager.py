@@ -46,15 +46,29 @@ EXTRACT_SYSTEM_PROMPT = """你是一位金融保险营销内容分析专家。�
 {
     "product_name": "产品名称（如有）",
     "claims": ["营销内容中的关键声明/承诺列表"],
-    "keywords": ["关键词列表"],
+    "keywords": ["关键词列表，用于法规检索"],
     "has_risk_disclosure": true/false,
     "has_product_info": true/false,
     "has_return_promise": true/false,
     "has_absolute_language": true/false,
     "has_celebrity_endorsement": true/false,
-    "has_inducement": true/false
+    "has_inducement": true/false,
+    "image_text": "图片中出现的所有原始文字（逐字提取，如有图片输入）",
+    "image_description": "图片的营销意图和核心卖点摘要（如有图片输入）"
 }
 ```
+
+注意：
+- 如果输入包含图片，image_text是必填字段！必须逐字提取图片中出现的所有文字（如标题、标语、条款、数字等），不要概括或改写，直接抄录原文。即使图片文字很少也必须填入image_text，不能留空
+- image_description字段用100字以内概括图片的营销意图和核心卖点
+- 如果输入包含多张图片，image_text中用换行分隔不同图片的文字，image_description中合并概括
+- 如果输入包含[图片: ...]标记但后面没有实际图片内容，说明图片不可见，此时image_text和image_description应留空字符串
+- 绝对不要根据文件名猜测图片内容，只能基于你实际看到的图片内容判断
+- keywords应包含文本和图片中的所有关键术语，用于后续法规检索
+- 如果没有图片输入，image_text和image_description留空字符串
+- has_celebrity_endorsement等布尔字段必须基于你实际看到的内容判断，不能基于猜测
+- image_text和image_description中的引号、换行等特殊字符必须正确转义
+- claims数组中每条声明不超过50字，最多10条
 
 只输出JSON，不要添加其他文字。"""
 
@@ -89,25 +103,55 @@ REASON_SYSTEM_PROMPT = """你是一位专业的金融保险合规审核专家。
 - 风险提示、夸大宣传、隐瞒信息、代言合规
 - 诱导销售、信息保护、其他违规
 
+## 可用违规类型ID对照表
+请在violation_types数组中使用以下ID：
+| violation_type_id | violation_type_name | 说明 |
+|---|---|---|
+| absolute_language | 绝对化用语 | 绝对化、确定性用语 |
+| return_promise | 收益承诺 | 对不确定利益作保证性承诺 |
+| exaggerated_return | 夸大收益 | 夸大保险产品收益或回报 |
+| product_confusion | 产品混淆 | 将保险产品与其他金融产品混淆 |
+| unauthorized_endorsement | 无资质代言 | 利用无资质公众人物代言推荐 |
+| inducement_sales | 诱导销售 | 以额外利益诱导购买保险产品 |
+| concealment | 隐瞒信息 | 隐瞒免责条款、退保损失等重要信息 |
+| insufficient_risk_disclosure | 风险提示不足 | 未充分提示保险产品风险 |
+| privacy_violation | 信息保护 | 未经授权收集、使用客户个人信息 |
+
 ## 输出格式
 严格按JSON格式输出：
 ```json
 {
     "compliant": "yes或no",
-    "violation_type": "违规类型，多项用顿号分隔",
-    "violated_articles": [
+    "violations": [
         {
-            "doc_name": "法规名称",
-            "article_number": "条文编号",
-            "article_text": "条文原文",
-            "violation_reason": "违反该条文的具体原因"
+            "violation_type_id": "违规类型ID，从上方对照表中选择",
+            "violation_type_name": "违规类型中文名称",
+            "violated_articles": [
+                {
+                    "doc_name": "法规名称",
+                    "article_number": "条文编号",
+                    "article_snippet": "与违规相关的原文关键片段（30字以内，不要抄录全文）",
+                    "violation_reason": "违反该条文的具体原因"
+                }
+            ]
         }
     ],
     "confidence": 0.0到1.0,
     "reasoning": "详细的CoT推理过程，必须包含语义隐含分析",
     "suggestions": "修改建议"
 }
-```"""
+```
+
+重要：
+- violations数组中每个元素代表一种违规类型，该类型下所有违反的条文放在violated_articles中
+- 不要在violations之外再单独输出violation_type或violated_articles
+- 如果compliant为yes，violations为空数组
+- violated_articles中输出doc_name、article_number和article_snippet（与违规相关的原文关键片段，30字以内），不需要输出条文全文（系统会根据条款号自动从法规库中查找完整原文）
+- violated_articles中的article_number必须使用中文数字格式（如"二十一"而非"第21条"或"21"），与法规原文保持一致
+- 只引用下面提供的法规条文中实际存在的条文，不要编造或推测不存在的条文编号
+- 每种违规类型最多引用3条最相关的条文，不要过度引用
+- reasoning字段控制在300字以内，suggestions字段控制在100字以内
+- violations数组最多5个元素，聚焦最核心的违规类型"""
 
 FORMAT_SYSTEM_PROMPT = """你是一位数据格式化专家。你的任务是确保审核结果严格符合JSON Schema。
 
@@ -115,8 +159,13 @@ FORMAT_SYSTEM_PROMPT = """你是一位数据格式化专家。你的任务是确
 ```json
 {
     "compliant": "yes或no",
-    "violation_type": "违规类型",
-    "violated_articles": [{"doc_name":"", "article_number":"", "article_text":"", "violation_reason":""}],
+    "violations": [
+        {
+            "violation_type_id": "",
+            "violation_type_name": "",
+            "violated_articles": [{"doc_name":"", "article_number":"", "article_snippet":"", "violation_reason":""}]
+        }
+    ],
     "confidence": 0.0到1.0,
     "reasoning": "推理过程",
     "suggestions": "建议"
@@ -126,7 +175,9 @@ FORMAT_SYSTEM_PROMPT = """你是一位数据格式化专家。你的任务是确
 规则：
 - compliant只能是"yes"或"no"
 - confidence必须是0到1之间的数字
+- violations必须是数组，每项包含violation_type_id、violation_type_name和violated_articles
 - violated_articles必须是数组
+- 如果输入中有violation_type字符串和violation_types数组，合并到violations数组中
 - 只输出JSON，不要添加其他文字"""
 
 
