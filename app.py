@@ -2259,7 +2259,7 @@ def create_app():
     <tr><td>认证</td><td>API Key + RBAC (90天过期)</td></tr>
     <tr><td>数据库</td><td>SQLite (WAL模式)</td></tr>
     <tr><td>向量库</td><td>ChromaDB</td></tr>
-    <tr><td>LLM</td><td>百炼 qwen3.5-plus + LLM Gateway 多模型路由</td></tr>
+    <tr><td>LLM</td><td>百炼 Qwen 系列 + LLM Gateway 多模型路由</td></tr>
     <tr><td>Embedding</td><td>text-embedding-v3</td></tr>
     <tr><td>监控</td><td>Prometheus + AlertManager</td></tr>
     <tr><td>异步</td><td>ThreadPoolExecutor + Semaphore</td></tr>

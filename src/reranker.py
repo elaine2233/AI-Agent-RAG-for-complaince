@@ -12,17 +12,26 @@ logger = logging.getLogger(__name__)
 _rerank_audit_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "llm_audit")
 _os.makedirs(_rerank_audit_dir, exist_ok=True)
 
-def _write_rerank_audit_log(model_name, query_preview, doc_count, doc_names, latency_ms, success, error_type=None, review_id=None):
+def _write_rerank_audit_log(model_name, query_preview, doc_count, doc_names, reranked_results, latency_ms, success, error_type=None, review_id=None):
     try:
         ts = _datetime.now().strftime("%Y%m%d")
         log_file = _os.path.join(_rerank_audit_dir, f"llm_audit_{ts}.jsonl")
         doc_info = "; ".join(doc_names[:10]) if doc_names else f"{doc_count}条条款"
+        if reranked_results:
+            result_lines = []
+            for d in reranked_results[:10]:
+                name = f"{d.get('doc_name','')}第{d.get('article_number','')}条"
+                score = d.get("rerank_score", 0)
+                result_lines.append(f"{name}(score={score})")
+            response_text = "重排结果: " + "; ".join(result_lines)
+        else:
+            response_text = f"查询: {query_preview[:150]}"
         entry = {
             "timestamp": _datetime.now().isoformat(),
             "model": model_name,
             "step_name": "rerank",
             "user_prompt": f"[Rerank] 对{doc_count}条法规条款重排序: {doc_info}",
-            "response": f"查询: {query_preview[:150]}",
+            "response": response_text,
             "latency_ms": round(latency_ms, 1),
             "success": success,
         }
@@ -98,7 +107,7 @@ class Reranker:
                         scored.append(doc_copy)
                     scored.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
                     _lat = (time.time() - _start) * 1000
-                    _write_rerank_audit_log(self._model_name, query[:100], len(documents), doc_names, _lat, True)
+                    _write_rerank_audit_log(self._model_name, query[:100], len(documents), doc_names, scored, _lat, True)
                     logger.info(f"Cross-Encoder重排完成: {len(scored)}条结果, 模型={self._model_name}")
                     return scored[:top_k]
                 elif resp.status_code == 429:
@@ -113,7 +122,7 @@ class Reranker:
                     time.sleep(config.RERANKER_RETRY_DELAY * (attempt + 1))
                     continue
                 _lat = (time.time() - _start) * 1000
-                _write_rerank_audit_log(self._model_name, query[:100], len(documents), doc_names, _lat, False, error_type=type(e).__name__)
+                _write_rerank_audit_log(self._model_name, query[:100], len(documents), doc_names, None, _lat, False, error_type=type(e).__name__)
                 raise
 
         raise RuntimeError(f"Rerank API重试{config.RERANKER_RETRY_MAX}次均失败")

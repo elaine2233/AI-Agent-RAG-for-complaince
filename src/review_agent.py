@@ -52,6 +52,8 @@ class ReviewResult:
     violations: List[Dict] = None
     review_id: int = None
     metadata: Dict = None
+    confidence_source: Dict = None
+    risk_breakdown: Dict = None
 
     def to_dict(self):
         d = asdict(self)
@@ -590,6 +592,16 @@ class ReviewAgent:
             confidence = 0.5
         result["confidence"] = max(0.0, min(1.0, confidence))
 
+        if "confidence_source" not in state.metadata:
+            state.metadata["confidence_source"] = {
+                "llm_raw": round(confidence, 4),
+                "adjustments": [],
+                "final": round(result["confidence"], 4),
+            }
+        else:
+            state.metadata["confidence_source"]["llm_raw"] = round(confidence, 4)
+            state.metadata["confidence_source"]["final"] = round(result["confidence"], 4)
+
         violations = result.get("violations", [])
         if not isinstance(violations, list):
             violations = []
@@ -714,14 +726,20 @@ class ReviewAgent:
                             "violated_articles": deduped[:5],
                         }]
                     result["reasoning"] = f"[LLM引用条文验证失败，已回退到规则引擎结果] " + result.get("reasoning", "")
+                    old_conf = result.get("confidence", 0.5)
                     result["confidence"] = min(result.get("confidence", 0.5), 0.7)
+                    self._record_confidence_adj(state, "validate", old_conf, result["confidence"], "LLM引用验证失败→回退规则引擎，cap到0.7")
                 else:
                     result["compliant"] = "unknown"
+                    old_conf = result.get("confidence", 0.5)
                     result["confidence"] = min(result.get("confidence", 0.5), 0.4)
+                    self._record_confidence_adj(state, "validate", old_conf, result["confidence"], "引用条文验证失败，合规状态未知，cap到0.4")
                     result["reasoning"] = "[引用条文验证失败，无法确认违规] " + result.get("reasoning", "")
             else:
                 result["compliant"] = "unknown"
+                old_conf = result.get("confidence", 0.5)
                 result["confidence"] = min(result.get("confidence", 0.5), 0.4)
+                self._record_confidence_adj(state, "validate", old_conf, result["confidence"], "引用条文验证失败，合规状态未知，cap到0.4")
                 result["reasoning"] = "[引用条文验证失败，无法确认违规] " + result.get("reasoning", "")
 
         state.validation_result = result
@@ -846,7 +864,9 @@ class ReviewAgent:
                 if confidence_adj:
                     try:
                         adj = float(confidence_adj)
+                        old_conf = result.get("confidence", 0.5)
                         result["confidence"] = max(0.0, min(1.0, result.get("confidence", 0.5) + adj))
+                        self._record_confidence_adj(state, "crosscheck", old_conf, result["confidence"], f"CrossCheck调整: {adj:+.2f} (passed={passed}, issues={issues})")
                     except (ValueError, TypeError):
                         pass
 
@@ -895,6 +915,21 @@ class ReviewAgent:
         state.risk_level = assessment.risk_level.value
         state.decision = assessment.decision.value
         state.metadata["risk_assessment"] = assessment.to_dict()
+
+        if "confidence_source" in state.metadata:
+            state.metadata["confidence_source"]["final"] = round(result.get("confidence", 0.5), 4)
+
+    @staticmethod
+    def _record_confidence_adj(state, step: str, old_val: float, new_val: float, reason: str):
+        if "confidence_source" not in state.metadata:
+            state.metadata["confidence_source"] = {"llm_raw": None, "adjustments": [], "final": None}
+        state.metadata["confidence_source"]["adjustments"].append({
+            "step": step,
+            "from": round(old_val, 4),
+            "to": round(new_val, 4),
+            "delta": round(new_val - old_val, 4),
+            "reason": reason,
+        })
 
     def review(
         self,
@@ -1058,6 +1093,8 @@ class ReviewAgent:
             violation_types=violation_types_list if violation_types_list else None,
             violations=violations if violations else None,
             metadata=dict(state.metadata),
+            confidence_source=state.metadata.get("confidence_source"),
+            risk_breakdown=state.metadata.get("risk_assessment", {}).get("score_breakdown"),
         )
 
         if not result.violation_types and result.violation_type:

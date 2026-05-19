@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header, Query, BackgroundTa
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -46,16 +46,17 @@ class ReviewRequest(BaseModel):
     image_descriptions: Optional[List[str]] = Field(None, max_length=5, description="图片描述列表")
     image_data: Optional[List[str]] = Field(None, max_length=5, description="图片base64数据列表")
 
-    @root_validator(skip_on_failure=True)
-    def check_at_least_one_input(cls, values):
-        content = (values.get("content") or "").strip()
-        images = values.get("image_descriptions") or []
-        img_data = values.get("image_data") or []
+    @model_validator(mode='after')
+    def check_at_least_one_input(self):
+        content = (self.content or "").strip()
+        images = self.image_descriptions or []
+        img_data = self.image_data or []
         if not content and not images and not img_data:
             raise ValueError("内容和图片不能同时为空")
-        return values
+        return self
 
-    @validator("image_descriptions")
+    @field_validator("image_descriptions")
+    @classmethod
     def image_descriptions_length(cls, v):
         if v:
             for desc in v:
@@ -69,7 +70,8 @@ class MultiModalReviewRequest(BaseModel):
     image_paths: Optional[List[str]] = Field(None, max_length=5, description="图片文件路径")
     file_paths: Optional[List[str]] = Field(None, max_length=3, description="文件路径(PDF/Word/TXT)")
 
-    @validator("text")
+    @field_validator("text")
+    @classmethod
     def text_must_not_all_empty(cls, v):
         if v is not None:
             return v.strip()
@@ -79,7 +81,8 @@ class MultiModalReviewRequest(BaseModel):
 class BatchReviewRequest(BaseModel):
     items: List[ReviewRequest] = Field(..., min_length=1, max_length=50)
 
-    @validator("items")
+    @field_validator("items")
+    @classmethod
     def items_length(cls, v):
         if len(v) > 50:
             raise ValueError("批量审核最多50条")
@@ -113,6 +116,9 @@ class ReviewResponse(BaseModel):
     expanded_relations: list = []
     violation_types: list = []
     violations: list = []
+    input_hash: Optional[str] = None
+    confidence_source: Optional[dict] = None
+    risk_breakdown: Optional[dict] = None
 
 
 class BatchReviewResponse(BaseModel):
@@ -127,6 +133,7 @@ class HealthResponse(BaseModel):
     uptime_seconds: float
     components: dict
     demo_mode: bool = False
+    default_model: str = ""
 
 
 _start_time = time.time()
@@ -220,6 +227,8 @@ async def lifespan(app: FastAPI):
     def _signal_handler(signum, frame):
         logger.info(f"收到信号 {signum}，开始优雅关闭...")
         _shutdown_event.set()
+        import threading
+        threading.Thread(target=lambda: loop.call_soon_threadsafe(loop.stop), daemon=True).start()
 
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
@@ -291,6 +300,7 @@ async def health_check():
         uptime_seconds=round(time.time() - _start_time, 1),
         components=components,
         demo_mode=not config.has_api_key(),
+        default_model=config.LLM_MODEL,
     )
 
 
@@ -555,6 +565,9 @@ async def review_content(
         expanded_relations=result.expanded_relations or [],
         violation_types=result.violation_types or [],
         violations=violations_list,
+        input_hash=review_data["input_hash"],
+        confidence_source=result.confidence_source,
+        risk_breakdown=result.risk_breakdown,
     )
 
 

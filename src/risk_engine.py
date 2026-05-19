@@ -28,15 +28,19 @@ class RiskAssessment:
     decision: Decision
     risk_factors: List[Dict]
     explanation: str
+    score_breakdown: Dict = None
 
     def to_dict(self):
-        return {
+        d = {
             "risk_score": self.risk_score,
             "risk_level": self.risk_level.value,
             "decision": self.decision.value,
             "risk_factors": self.risk_factors,
             "explanation": self.explanation,
         }
+        if self.score_breakdown:
+            d["score_breakdown"] = self.score_breakdown
+        return d
 
 
 _FALLBACK_SEVERITY = {
@@ -69,7 +73,7 @@ def _get_severity(violation_type_name: str) -> float:
 class RiskEngine:
     def __init__(self):
         self._thresholds = {
-            "auto_pass_max": getattr(config, "RISK_AUTO_PASS_MAX", 0.1),
+            "auto_pass_max": getattr(config, "RISK_AUTO_PASS_MAX", 0.15),
             "human_review_max": getattr(config, "RISK_HUMAN_REVIEW_MAX", 0.7),
         }
 
@@ -81,7 +85,7 @@ class RiskEngine:
         confidence: float,
         rule_hit: bool = False,
     ) -> RiskAssessment:
-        risk_score = self._calculate_risk_score(
+        risk_score, score_breakdown = self._calculate_risk_score_with_breakdown(
             compliant, violation_type, violated_articles, confidence, rule_hit
         )
         risk_level = self._determine_risk_level(risk_score)
@@ -97,7 +101,88 @@ class RiskEngine:
             decision=decision,
             risk_factors=risk_factors,
             explanation=explanation,
+            score_breakdown=score_breakdown,
         )
+
+    def _calculate_risk_score_with_breakdown(
+        self,
+        compliant: str,
+        violation_type: str,
+        violated_articles: List[Dict],
+        confidence: float,
+        rule_hit: bool,
+    ) -> tuple:
+        breakdown = {
+            "formula": "severity×0.5 + article_count×0.1(max0.3) + rule_hit×0.15 + confidence_adj",
+            "components": {},
+            "calculation_steps": [],
+        }
+
+        if compliant == "yes":
+            base_score = 0.1
+            step = f"合规内容: 基础分 = 0.1"
+            if confidence < 0.7:
+                adj = (1.0 - confidence) * 0.3
+                base_score += adj
+                step += f" + 低置信度调整({1.0 - confidence:.2f}×0.3 = {adj:.4f})"
+            breakdown["components"]["base"] = 0.1
+            breakdown["components"]["confidence_penalty"] = base_score - 0.1 if confidence < 0.7 else 0.0
+            breakdown["calculation_steps"].append(step)
+            breakdown["calculation_steps"].append(f"最终风险分 = {min(base_score, 1.0):.4f}")
+            return min(base_score, 1.0), breakdown
+
+        if compliant == "unknown":
+            breakdown["components"]["unknown_default"] = 0.5
+            breakdown["calculation_steps"].append("合规状态未知: 默认风险分 = 0.5")
+            return 0.5, breakdown
+
+        score = 0.0
+
+        violation_types = [v.strip() for v in violation_type.split("、") if v.strip() and v.strip() != "无"]
+        if violation_types:
+            severities = {vt: _get_severity(vt) for vt in violation_types}
+            max_severity = max(severities.values())
+            component_score = max_severity * 0.5
+            score += component_score
+            breakdown["components"]["severity"] = round(component_score, 4)
+            vt_details = ", ".join(f"{vt}={sev:.1f}" for vt, sev in severities.items())
+            breakdown["calculation_steps"].append(
+                f"违规严重度: max({vt_details}) = {max_severity:.1f} → {max_severity:.1f}×0.5 = {component_score:.4f}"
+            )
+        else:
+            breakdown["components"]["severity"] = 0.0
+
+        article_count = len(violated_articles)
+        article_component = min(article_count * 0.1, 0.3)
+        score += article_component
+        breakdown["components"]["article_count"] = round(article_component, 4)
+        breakdown["calculation_steps"].append(
+            f"违规条文数: {article_count}条 × 0.1 = {article_count * 0.1:.4f}, 上限0.3 → {article_component:.4f}"
+        )
+
+        if rule_hit:
+            score += 0.15
+            breakdown["components"]["rule_hit"] = 0.15
+            breakdown["calculation_steps"].append("规则引擎命中: +0.15")
+        else:
+            breakdown["components"]["rule_hit"] = 0.0
+
+        if confidence > 0.8:
+            score += 0.1
+            breakdown["components"]["confidence_adj"] = 0.1
+            breakdown["calculation_steps"].append(f"置信度调整: confidence={confidence:.2f} > 0.8 → +0.1")
+        elif confidence < 0.5:
+            score -= 0.1
+            breakdown["components"]["confidence_adj"] = -0.1
+            breakdown["calculation_steps"].append(f"置信度调整: confidence={confidence:.2f} < 0.5 → -0.1")
+        else:
+            breakdown["components"]["confidence_adj"] = 0.0
+            breakdown["calculation_steps"].append(f"置信度调整: confidence={confidence:.2f} 在[0.5,0.8]区间 → ±0")
+
+        final_score = max(0.0, min(1.0, score))
+        breakdown["calculation_steps"].append(f"汇总: {' + '.join(f'{v:.4f}' for v in breakdown['components'].values() if v != 0)} = {score:.4f} → clamp[0,1] = {final_score:.4f}")
+
+        return final_score, breakdown
 
     def _calculate_risk_score(
         self,

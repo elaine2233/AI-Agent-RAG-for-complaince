@@ -626,24 +626,8 @@ body {
 .risk-gauge {
   position: relative;
   width: 200px;
-  height: 110px;
+  height: 108px;
   overflow: hidden;
-}
-
-.risk-gauge svg { width: 200px; height: 110px; }
-
-.risk-gauge .gauge-bg {
-  fill: none;
-  stroke: var(--slate-200);
-  stroke-width: 16;
-  stroke-linecap: round;
-}
-
-.risk-gauge .gauge-fill {
-  fill: none;
-  stroke-width: 16;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 1s ease;
 }
 
 .risk-gauge-labels {
@@ -1487,7 +1471,7 @@ select.form-control {
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
           <label style="font-size:0.8rem;color:var(--slate-500);white-space:nowrap;">模型:</label>
-          <input type="text" id="modelInput" placeholder="如: qwen3.5-plus" value="qwen3.5-plus" style="flex:1;padding:4px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:0.8rem;">
+          <input type="text" id="modelInput" placeholder="如: qwen3.6-plus" value="" style="flex:1;padding:4px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:0.8rem;">
         </div>
       </div>
     </div>
@@ -1754,19 +1738,82 @@ select.form-control {
       </div>
     </div>
     <div class="page-body">
-      <div class="grid-2">
-        <div class="card">
+      <div class="card">
           <div class="info-section">
             <h3>架构概览</h3>
             <p style="font-size:0.9rem;color:var(--navy-700);line-height:1.7;">
-              本系统采用规则引擎 + LLM 大模型双轨审核架构。用户提交保险营销内容后，系统首先通过规则引擎进行关键词匹配和模式识别，随后调用大语言模型进行语义理解和深度分析，最终综合两路结果给出合规判定。
+              本系统采用规则引擎 + LLM 大模型双轨审核架构，通过 10 步审核管线实现从内容输入到结构化审核结论的完整闭环。
             </p>
-            <div style="margin-top:16px;padding:16px;background:var(--slate-50);border-radius:8px;font-family:monospace;font-size:0.82rem;line-height:1.8;color:var(--navy-600);">
-              用户输入 → 规则引擎(关键词/模式) → LLM语义分析 → 结果融合 → 合规判定<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;命中规则&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;语义违规<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓—————— 综合决策 ——————↓<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;合规 / 违规 / 人工复核
+            <div style="margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;">
+              <div style="background:#eef4fa;border:1.5px solid #3b7dc4;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#3b7dc4;">用户输入</div>
+                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">文本/图片</div>
+              </div>
+              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
+              <div style="background:#fef3c7;border:1.5px solid #d4852b;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#d4852b;">安全校验</div>
+                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">33种安全检测</div>
+              </div>
+              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
+              <div style="background:#eef4fa;border:1.5px solid #3b7dc4;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#3b7dc4;">10步管线</div>
+                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">Rule+LLM协同</div>
+              </div>
+              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
+              <div style="background:#fee2e2;border:1.5px solid #d14353;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#d14353;">风险决策</div>
+                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">3级路由</div>
+              </div>
+              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
+              <div style="background:#d1fae5;border:1.5px solid #2d8a7f;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#2d8a7f;">审核结论</div>
+                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">结构化输出</div>
+              </div>
+            </div>
+            <div style="margin-top:14px;padding:12px 16px;background:var(--slate-50);border-radius:8px;">
+              <div style="font-size:0.76rem;font-weight:700;color:var(--navy-700);margin-bottom:8px;">10步审核管线</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+                <span style="background:#eef4fa;border:1px solid #3b7dc4;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#3b7dc4;">① Extract</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#fef3c7;border:1px solid #d4852b;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d4852b;">② RuleCheck</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#eef4fa;border:1px solid #3b7dc4;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#3b7dc4;">③ RAG</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#fef3c7;border:1px solid #d4852b;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d4852b;">④ Rerank</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#d1fae5;border:1px solid #2d8a7f;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#2d8a7f;">⑤ Expand</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#eef4fa;border:1px solid #3b7dc4;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#3b7dc4;">⑥ LLM</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#d1fae5;border:1px solid #2d8a7f;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#2d8a7f;">⑦ Format</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#fee2e2;border:1px solid #d14353;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d14353;">⑧ Validate</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#ede9fe;border:1px solid #7b5ea7;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#7b5ea7;">⑨ CrossCheck</span>
+                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+                <span style="background:#fee2e2;border:1px solid #d14353;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d14353;">⑩ RiskAssess</span>
+              </div>
+              <div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
+                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3b7dc4;vertical-align:middle;margin-right:3px;"></span>AI/LLM</span>
+                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d4852b;vertical-align:middle;margin-right:3px;"></span>规则/排序</span>
+                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#2d8a7f;vertical-align:middle;margin-right:3px;"></span>知识扩展</span>
+                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d14353;vertical-align:middle;margin-right:3px;"></span>安全/校验</span>
+                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#7b5ea7;vertical-align:middle;margin-right:3px;"></span>增强</span>
+              </div>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:140px;padding:10px 12px;background:#fef3c7;border-radius:6px;border-left:3px solid #d4852b;">
+                <div style="font-size:0.72rem;font-weight:700;color:#d4852b;">Rule+LLM 协同</div>
+                <div style="font-size:0.64rem;color:var(--navy-600);margin-top:3px;line-height:1.5;">规则命中后不跳过LLM，而是注入Prompt继续检查深层违规</div>
+              </div>
+              <div style="flex:1;min-width:140px;padding:10px 12px;background:#fee2e2;border-radius:6px;border-left:3px solid #d14353;">
+                <div style="font-size:0.72rem;font-weight:700;color:#d14353;">风险决策路由</div>
+                <div style="font-size:0.64rem;color:var(--navy-600);margin-top:3px;line-height:1.5;">&lt;0.1 自动通过 · 0.1~0.7 人工复核 · ≥0.7 自动拦截</div>
+              </div>
+              <div style="flex:1;min-width:140px;padding:10px 12px;background:#d1fae5;border-radius:6px;border-left:3px solid #2d8a7f;">
+                <div style="font-size:0.72rem;font-weight:700;color:#2d8a7f;">韧性降级</div>
+                <div style="font-size:0.64rem;color:var(--navy-600);margin-top:3px;line-height:1.5;">LLM熔断→规则引擎兜底 · 向量检索失败→关键词匹配</div>
+              </div>
             </div>
           </div>
         </div>
@@ -1775,12 +1822,14 @@ select.form-control {
             <h3>技术栈</h3>
             <table class="tech-table">
               <tr><td>后端框架</td><td>FastAPI (Python 3.11+)</td></tr>
-              <tr><td>大语言模型</td><td>通义千问 (qwen3.5-plus)</td></tr>
+              <tr><td>大语言模型</td><td>通义千问 Qwen 系列</td></tr>
+              <tr><td>后备模型</td><td>qwen3.6-flash (熔断切换)</td></tr>
+              <tr><td>嵌入模型</td><td>text-embedding-v3 (1024维)</td></tr>
               <tr><td>规则引擎</td><td>自定义关键词 + 正则匹配</td></tr>
-              <tr><td>数据库</td><td>SQLite</td></tr>
-              <tr><td>向量存储</td><td>ChromaDB (法规向量检索)</td></tr>
+              <tr><td>数据库</td><td>SQLite (WAL模式)</td></tr>
+              <tr><td>向量存储</td><td>ChromaDB (HNSW索引)</td></tr>
               <tr><td>前端</td><td>原生 HTML/CSS/JS</td></tr>
-              <tr><td>认证</td><td>API Key</td></tr>
+              <tr><td>认证</td><td>API Key + PBKDF2密码哈希</td></tr>
               <tr><td>部署</td><td>Uvicorn</td></tr>
             </table>
           </div>
@@ -1790,14 +1839,13 @@ select.form-control {
         <div class="info-section">
           <h3>安全特性</h3>
           <ul class="info-list">
-            <li>API Key 认证机制，防止未授权访问</li>
-            <li>JWT Token 会话管理，支持过期刷新</li>
-            <li>输入内容脱敏处理，不记录原始敏感数据</li>
-            <li>审核日志完整记录，支持审计追溯</li>
+              <li>API Key 认证 + PBKDF2-SHA256 密码哈希（后端预留，Demo 无需登录）</li>
+              <li>输入安全检测：Prompt 注入（25种）+ XSS（5种）+ SQL 注入（3种），共 33 种攻击模式识别</li>
+              <li>输入内容脱敏处理，不记录原始敏感数据</li>
+            <li>审核日志完整记录（HMAC签名防篡改），支持审计追溯</li>
             <li>人工复核操作留痕，确保可追溯性</li>
             <li>法规条款版本化管理，支持历史回溯</li>
-            <li>模型调用频率限制，防止滥用</li>
-            <li>HTTPS 传输加密，保障数据安全</li>
+            <li>模型调用频率限制（滑动窗口），防止滥用</li>
           </ul>
         </div>
       </div>
@@ -1935,6 +1983,7 @@ const EXAMPLE_TEXTS = [
 let isRuleEngineMode = false;
 let isDemoMode = false;
 let backendReachable = true;
+let defaultModelName = '';
 const BASE_URL = window.location.port === '3000' ? 'http://localhost:7861' : '';
 let historyData = [];
 let historySortField = 'id';
@@ -2064,7 +2113,7 @@ function showToast(message, type = 'info') {
 }
 
 async function apiCall(method, url, body = null) {
-  const headers = { 'Content-Type': 'application/json', 'X-Model': document.getElementById('modelInput')?.value || 'qwen3.5-plus' };
+  const headers = { 'Content-Type': 'application/json', 'X-Model': document.getElementById('modelInput')?.value || defaultModelName };
   const apiKey = document.getElementById('apiKeyInput').value;
   if (apiKey) headers['X-API-Key'] = apiKey;
 
@@ -2330,6 +2379,70 @@ function toggleViolationAccordion(index) {
   }
 }
 
+function buildConfidenceSourceHtml(cs) {
+  if (!cs) return '';
+  const raw = cs.llm_raw != null ? (cs.llm_raw * 100).toFixed(0) + '%' : '—';
+  const final = cs.final != null ? (cs.final * 100).toFixed(0) + '%' : '—';
+  const adjCount = cs.adjustments ? cs.adjustments.length : 0;
+  let html = `<div style="width:100%;margin-top:10px;border-top:1px solid var(--slate-100);padding-top:8px;font-size:0.72rem;color:var(--slate-500);line-height:1.6;">`;
+  html += `<div style="font-weight:600;color:var(--slate-600);margin-bottom:4px;">📊 置信度来源</div>`;
+  html += `<div>LLM原始输出: <strong>${raw}</strong></div>`;
+  if (adjCount > 0) {
+    cs.adjustments.forEach(a => {
+      const fromPct = (a.from * 100).toFixed(0);
+      const toPct = (a.to * 100).toFixed(0);
+      const delta = a.delta > 0 ? '+' + (a.delta * 100).toFixed(0) + '%' : (a.delta * 100).toFixed(0) + '%';
+      const stepLabel = a.step === 'validate' ? 'Validate' : a.step === 'crosscheck' ? 'CrossCheck' : a.step;
+      html += `<div style="color:var(--amber-600);">↓ ${stepLabel}: ${fromPct}% → ${toPct}% (${delta}) <span style="color:var(--slate-400);">${a.reason}</span></div>`;
+    });
+  }
+  if (adjCount === 0) {
+    html += `<div style="color:var(--green-600);">✓ 无后续调整，LLM原始值即为最终值</div>`;
+  }
+  html += `<div style="font-weight:600;margin-top:2px;">最终置信度: <strong>${final}</strong></div>`;
+  html += `</div>`;
+  return html;
+}
+
+function buildRiskBreakdownHtml(rb) {
+  if (!rb) return '';
+  let html = `<div style="width:100%;margin-top:10px;border-top:1px solid var(--slate-100);padding-top:8px;font-size:0.72rem;color:var(--slate-500);line-height:1.6;">`;
+  html += `<div style="font-weight:600;color:var(--slate-600);margin-bottom:4px;">📐 评分计算</div>`;
+  html += `<div style="font-family:monospace;background:var(--slate-50);padding:4px 8px;border-radius:4px;margin-bottom:6px;font-size:0.68rem;">${rb.formula || ''}</div>`;
+  if (rb.components) {
+    const compLabels = {
+      severity: '违规严重度',
+      article_count: '违规条文数',
+      rule_hit: '规则引擎命中',
+      confidence_adj: '置信度调整',
+      base: '基础分',
+      confidence_penalty: '低置信度惩罚',
+      unknown_default: '未知默认分',
+    };
+    Object.entries(rb.components).forEach(([k, v]) => {
+      if (v === 0 && k !== 'confidence_adj') return;
+      const label = compLabels[k] || k;
+      const val = typeof v === 'number' ? v.toFixed(4) : v;
+      const bar = typeof v === 'number' ? Math.min(Math.abs(v) * 200, 100) : 0;
+      const barColor = v > 0 ? 'var(--red-400)' : v < 0 ? 'var(--green-400)' : 'var(--slate-200)';
+      html += `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;">`;
+      html += `<span style="min-width:72px;">${label}</span>`;
+      html += `<div style="flex:1;height:6px;background:var(--slate-100);border-radius:3px;overflow:hidden;"><div style="width:${bar}%;height:100%;background:${barColor};border-radius:3px;"></div></div>`;
+      html += `<span style="min-width:48px;text-align:right;font-weight:600;">${val}</span>`;
+      html += `</div>`;
+    });
+  }
+  if (rb.calculation_steps && rb.calculation_steps.length > 0) {
+    html += `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--slate-200);">`;
+    rb.calculation_steps.forEach(step => {
+      html += `<div style="margin:1px 0;">→ ${step}</div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
 function renderReviewResult(result) {
   const area = document.getElementById('reviewResultArea');
   const isCompliant = result.compliant === 'yes';
@@ -2401,9 +2514,21 @@ function renderReviewResult(result) {
   const confOffset = circumference - (circumference * result.confidence);
 
   const riskPct = result.risk_score;
-  const riskColor = riskPct > 0.9 ? 'var(--red-700)' : riskPct > 0.7 ? 'var(--red-500)' : riskPct > 0.4 ? 'var(--amber-500)' : 'var(--green-500)';
-  const gaugeCircumference = Math.PI * 80;
-  const gaugeOffset = gaugeCircumference - (gaugeCircumference * riskPct);
+  const riskColor = riskPct > 0.9 ? '#991b1b' : riskPct > 0.7 ? '#ef4444' : riskPct > 0.4 ? '#f59e0b' : '#22c55e';
+  const riskDeg = (riskPct * 180).toFixed(1);
+  const endAngle = riskPct * Math.PI;
+  const endCapLeft = Math.round(100 - 80 * Math.cos(endAngle) - 8);
+  const endCapTop = Math.round(100 - 80 * Math.sin(endAngle) - 8);
+  let gaugeCapsHtml = '';
+  if (riskPct >= 0.99) {
+    gaugeCapsHtml += `<div style="position:absolute;left:172px;top:92px;width:16px;height:16px;border-radius:50%;background:${riskColor};z-index:2;"></div>`;
+  } else {
+    gaugeCapsHtml += `<div style="position:absolute;left:172px;top:92px;width:16px;height:16px;border-radius:50%;background:#e2e8f0;z-index:2;"></div>`;
+  }
+  gaugeCapsHtml += `<div style="position:absolute;left:12px;top:92px;width:16px;height:16px;border-radius:50%;background:${riskPct > 0.01 ? riskColor : '#e2e8f0'};z-index:2;"></div>`;
+  if (riskPct > 0.01 && riskPct < 0.99) {
+    gaugeCapsHtml += `<div style="position:absolute;left:${endCapLeft}px;top:${endCapTop}px;width:16px;height:16px;border-radius:50%;background:${riskColor};z-index:3;"></div>`;
+  }
 
   let suggestionsHtml = '';
   if (result.suggestions) {
@@ -2455,17 +2580,17 @@ function renderReviewResult(result) {
             </svg>
             <div class="confidence-value">${confidencePct}%</div>
           </div>
+          ${buildConfidenceSourceHtml(result.confidence_source)}
         </div>
 
         <div class="card" style="width:100%;">
           <div class="card-title">风险评分</div>
           <div class="risk-gauge-wrap">
             <div class="risk-gauge">
-              <svg viewBox="0 0 200 110">
-                <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100"/>
-                <path class="gauge-fill" d="M 20 100 A 80 80 0 0 1 180 100"
-                  style="stroke:${riskColor};stroke-dasharray:${gaugeCircumference};stroke-dashoffset:${gaugeOffset};"/>
-              </svg>
+              <div style="width:176px;height:176px;border-radius:50%;position:relative;margin:0 auto;top:12px;background:conic-gradient(from 270deg, ${riskColor} 0deg, ${riskColor} ${riskDeg}deg, #e2e8f0 ${riskDeg}deg, #e2e8f0 180deg, transparent 180deg);">
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:144px;height:144px;border-radius:50%;background:white;"></div>
+              </div>
+              ${gaugeCapsHtml}
             </div>
             <div class="risk-gauge-labels">
               <span>低风险</span><span>高风险</span>
@@ -2475,6 +2600,7 @@ function renderReviewResult(result) {
             </div>
             <div style="font-size:1.1rem;font-weight:700;margin-top:6px;color:${riskColor};">${(riskPct * 100).toFixed(0)}分</div>
           </div>
+          ${buildRiskBreakdownHtml(result.risk_breakdown)}
         </div>
       </div>
 
@@ -3501,7 +3627,7 @@ function renderModelStatus(stats) {
   const status = stats.model_status || 'active';
   const isDemo = status === 'demo';
   const isActive = status === 'active';
-  const modelName = isDemo ? '规则引擎（Demo）' : (document.getElementById('modelInput')?.value || 'qwen3.5-plus');
+  const modelName = isDemo ? '规则引擎（Demo）' : (document.getElementById('modelInput')?.value || defaultModelName);
   const latency = stats.avg_latency || stats.avg_review_latency || 0;
   const latencyText = latency > 0 ? latency + 'ms' : '—';
   const statusLabel = isDemo ? '未配置API Key · 仅关键词匹配' : (isActive ? '运行正常' : '异常');
@@ -4658,6 +4784,12 @@ async function checkBackendHealth() {
         backendReachable = true;
         document.getElementById('backendErrorBanner').style.display = 'none';
         isDemoMode = !!data.demo_mode;
+        if (data.default_model && !document.getElementById('modelInput').value) {
+          document.getElementById('modelInput').value = data.default_model;
+        }
+        if (data.default_model) {
+          defaultModelName = data.default_model;
+        }
         const components = data.components || {};
         const ragStatus = components.rag_engine ? components.rag_engine.status : 'unknown';
         const useVector = components.rag_engine ? components.rag_engine.use_vector : false;
@@ -4698,7 +4830,7 @@ async function testConnection() {
       const msgWithEmbedding = resp.message.replace('，但向量化失败', `，Embedding模型: ${embModel}，但向量化失败`);
       showToast('✅ ' + msgWithEmbedding, 'success');
       localStorage.setItem('dashscope_api_key', apiKey);
-      const modelName = document.getElementById('modelInput')?.value || 'qwen3.5-plus';
+      const modelName = document.getElementById('modelInput')?.value || defaultModelName;
       const modelStatusEl = document.getElementById('modelStatus');
       if (modelStatusEl) {
         modelStatusEl.innerHTML = `
