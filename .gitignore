@@ -1,6 +1,11 @@
-/data
+.env
+data/user_config.json
+__pycache__/
 *.pyc
-start.sh
-实操考题_候选人.docx
+data/insurance_review.db
+data/vector_store/
+data/db_backups/
 /.trae
 /coreview_docs
+/data
+start.sh
