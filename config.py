@@ -27,7 +27,7 @@ _logger = logging.getLogger(__name__)
 
 
 def load_user_config():
-    global DASHSCOPE_API_KEY, LLM_MODEL, EXTRACT_MODEL, REASON_MODEL, CROSSCHECK_MODEL, AUTHOR_NAME
+    global DASHSCOPE_API_KEY, LLM_MODEL, EXTRACT_MODEL, REASON_MODEL, CROSSCHECK_MODEL
     if not os.path.exists(USER_CONFIG_PATH):
         return
     try:
@@ -40,8 +40,6 @@ def load_user_config():
             EXTRACT_MODEL = saved["llm_model"]
             REASON_MODEL = saved["llm_model"]
             CROSSCHECK_MODEL = saved["llm_model"]
-        if saved.get("author_name"):
-            AUTHOR_NAME = saved["author_name"]
         _logger.info(f"已从 {USER_CONFIG_PATH} 加载用户配置")
     except Exception as e:
         _logger.warning(f"加载用户配置失败: {e}")
