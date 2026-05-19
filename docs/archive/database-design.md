@@ -201,10 +201,43 @@ erDiagram
         TEXT created_at
     }
 
+    regulation_chunks {
+        INTEGER id PK
+        TEXT doc_name
+        TEXT chapter
+        TEXT article_number
+        TEXT article_text
+        TEXT chunk_id
+        TEXT content_hash
+        TEXT source_format
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    clause_relations {
+        INTEGER id PK
+        TEXT from_doc
+        TEXT from_article
+        TEXT to_doc
+        TEXT to_article
+        TEXT relation_type
+        REAL confidence
+        TEXT evidence_text
+        TEXT source
+        INTEGER is_verified
+        INTEGER verified_by
+        TEXT verified_at
+        TEXT notes
+        TEXT created_at
+        TEXT updated_at
+    }
+
     users ||--o{ review_records : "user_id"
     users ||--o{ review_feedback : "user_id"
     users ||--o{ violation_feedback : "user_id"
     users ||--o{ review_modifications : "user_id"
+    users ||--o{ audit_events : "user_id"
+    users ||--o{ eval_results : "run_by"
     review_records ||--o{ review_feedback : "review_id"
     review_records ||--o{ review_violations : "review_id"
     review_records ||--o{ violation_feedback : "review_id"
@@ -213,6 +246,9 @@ erDiagram
     violation_types ||--o{ clause_type_mappings : "violation_type_id"
     violation_types ||--o{ review_violations : "violation_type_id"
     violation_types ||--o{ violation_feedback : "violation_type_id"
+    regulation_versions ||--o{ regulation_chunks : "doc_name"
+    regulation_chunks ||--o{ clause_type_mappings : "doc_name + article"
+    regulation_chunks ||--o{ clause_relations : "from_doc + from_article"
 ```
 
 ---
@@ -373,7 +409,32 @@ risk_score > 0.7 → auto_block（自动拦截）
 
 ---
 
-### 3.5 audit_events — 审计事件表
+### 3.5 regulation_chunks — 法规条款分块表
+
+存储法规文档按条款拆分后的分块数据，是 RAG 检索的基本单元。
+
+| 列名 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `id` | INTEGER | PK, AUTOINCREMENT | — | 分块唯一标识 |
+| `doc_name` | TEXT | NOT NULL | — | 所属法规文档名称 |
+| `chapter` | TEXT | NOT NULL | `''` | 章节标题 |
+| `article_number` | TEXT | NOT NULL | — | 条款编号（如"第十二条"） |
+| `article_text` | TEXT | NOT NULL | `''` | 条款正文内容 |
+| `chunk_id` | TEXT | NOT NULL | — | 向量化分块 ID（对应 ChromaDB） |
+| `content_hash` | TEXT | NOT NULL | `''` | 内容哈希，用于变更检测 |
+| `source_format` | TEXT | NOT NULL | `''` | 来源格式（docx/pdf/txt） |
+| `created_at` | TEXT | NOT NULL | `datetime('now')` | 创建时间 |
+| `updated_at` | TEXT | NOT NULL | `datetime('now')` | 更新时间 |
+
+**唯一约束**：`UNIQUE(doc_name, article_number)` — 同一文档的同一条款号只保留一条记录。
+
+**索引**：
+- `idx_chunks_doc` — 按 `doc_name` 查询某法规的所有条款
+- `idx_chunks_article` — 按 `(doc_name, article_number)` 精确定位条款
+
+---
+
+### 3.6 audit_events — 审计事件表
 
 记录系统关键操作的审计日志，用于安全追溯与合规审计。
 
@@ -397,7 +458,7 @@ risk_score > 0.7 → auto_block（自动拦截）
 
 ---
 
-### 3.6 violation_types — 违规类型表
+### 3.7 violation_types — 违规类型表
 
 存储违规类型的层级分类体系，支持两级树形结构（L1 大类 → L2 子类）。
 
@@ -446,7 +507,7 @@ risk_score > 0.7 → auto_block（自动拦截）
 
 ---
 
-### 3.7 clause_type_mappings — 条款类型映射表
+### 3.8 clause_type_mappings — 条款类型映射表
 
 存储法规条款与违规类型的映射关系，建立"法规条文 ↔ 违规类型"的桥梁。
 
@@ -470,7 +531,7 @@ risk_score > 0.7 → auto_block（自动拦截）
 
 ---
 
-### 3.8 review_violations — 审查违规关联表
+### 3.9 review_violations — 审查违规关联表
 
 存储审查记录与违规类型的关联关系，替代 `review_records.violation_type` 的多值字符串方式，实现规范化的多对多存储。
 
@@ -503,7 +564,7 @@ risk_score > 0.7 → auto_block（自动拦截）
 
 ---
 
-### 3.9 violation_feedback — 违规类型反馈表
+### 3.10 violation_feedback — 违规类型反馈表
 
 存储用户对审查记录中具体违规类型的反馈，支持细粒度的违规判定质量评估与校准。
 
@@ -530,7 +591,7 @@ risk_score > 0.7 → auto_block（自动拦截）
 
 ---
 
-### 3.10 review_modifications — 人工复审修改记录表
+### 3.11 review_modifications — 人工复审修改记录表
 
 记录人工复审过程中对审查结果的详细修改，支持完整的修改追溯与审计。
 
@@ -590,7 +651,7 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 
 ---
 
-### 3.11 eval_results — 评估结果表
+### 3.12 eval_results — 评估结果表
 
 存储审核系统效果评估的运行结果，支持历史对比与趋势分析。
 
@@ -633,6 +694,54 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 
 ---
 
+### 3.13 clause_relations — 条款关联关系表
+
+存储法规条款之间的关联关系，支持条款关系图扩展（ExpandRelations 步骤），确保 LLM 获取完整法规上下文。
+
+| 列名 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `id` | INTEGER | PK, AUTOINCREMENT | — | 关联唯一标识 |
+| `from_doc` | TEXT | NOT NULL | — | 源条款文档名 |
+| `from_article` | TEXT | NOT NULL | — | 源条款编号 |
+| `to_doc` | TEXT | NOT NULL | — | 目标条款文档名 |
+| `to_article` | TEXT | NOT NULL | — | 目标条款编号 |
+| `relation_type` | TEXT | NOT NULL | — | 关系类型（见下表） |
+| `confidence` | REAL | NOT NULL | `1.0` | 关系置信度 [0.0, 1.0] |
+| `evidence_text` | TEXT | NOT NULL | `''` | 关系依据文本 |
+| `source` | TEXT | NOT NULL | `'regex'` | 来源：`regex`（正则提取）/ `llm`（LLM 推理）/ `manual`（人工标注） |
+| `is_verified` | INTEGER | NOT NULL | `0` | 是否已人工验证：0=否, 1=是 |
+| `verified_by` | INTEGER | — | NULL | 验证人用户 ID |
+| `verified_at` | TEXT | — | NULL | 验证时间 |
+| `notes` | TEXT | NOT NULL | `''` | 备注 |
+| `created_at` | TEXT | NOT NULL | `datetime('now')` | 创建时间 |
+| `updated_at` | TEXT | NOT NULL | `datetime('now')` | 更新时间 |
+
+**唯一约束**：`UNIQUE(from_doc, from_article, to_doc, to_article, relation_type)` — 同一对条款间同一类型关系唯一。
+
+**relation_type 取值**：
+
+| relation_type | 中文含义 | 说明 |
+|---------------|---------|------|
+| `reference` | 引用 | 条款引用其他法规的条文 |
+| `exception` | 例外 | 条款中的但书/例外条款 |
+| `supplement` | 补充 | 条款补充说明其他条文 |
+| `definition` | 定义 | 条款定义术语供其他条文引用 |
+| `conflict` | 冲突 | 条款间存在矛盾或需特别适用规则 |
+| `prerequisite` | 前提 | 条款适用需满足的前置条件 |
+| `consequence` | 后果 | 违反条款的法律后果 |
+| `amendment` | 修订 | 条款对其他条文的修改/替代 |
+| `application` | 适用 | 条款适用范围指向 |
+
+**数据来源**：
+
+- `regex`：系统启动时通过正则模式从法规原文自动提取
+- `llm`：LLM 推理发现的隐含关系
+- `manual`：人工标注的高置信关系
+
+**启动时清理**：系统初始化时自动删除无效记录（`to_article` 为空或自引用）。
+
+---
+
 ## 4. 索引
 
 ### 4.1 索引清单
@@ -665,6 +774,13 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 | `idx_eval_results_mode` | eval_results | `mode` | 按评估模式查询 |
 | `idx_eval_results_active` | eval_results | `is_active` | 查询活跃评估记录 |
 | `idx_eval_results_created` | eval_results | `created_at` | 按时间排序与范围查询 |
+| `idx_chunks_doc` | regulation_chunks | `doc_name` | 按法规名称查询条款 |
+| `idx_chunks_article` | regulation_chunks | `doc_name, article_number` | 精确定位条款（复合索引） |
+| `idx_clause_relations_from` | clause_relations | `from_doc, from_article` | 按源条款查关联 |
+| `idx_clause_relations_to` | clause_relations | `to_doc, to_article` | 按目标条款反查关联 |
+| `idx_clause_relations_type` | clause_relations | `relation_type` | 按关系类型筛选 |
+| `idx_clause_relations_source` | clause_relations | `source` | 按来源筛选 |
+| `idx_clause_relations_confidence` | clause_relations | `confidence` | 按置信度筛选 |
 
 ### 4.2 索引设计说明
 
@@ -679,7 +795,7 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 
 ## 5. 迁移历史
 
-当前 Schema 版本: **6**（通过 `PRAGMA user_version` 管理）
+当前 Schema 版本: **8**（通过 `PRAGMA user_version` 管理）
 
 > **开发阶段暂不维护迁移历史，待投入真实数据后再启用。**
 
@@ -734,7 +850,7 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 
 ### 7.1 当前分类覆盖
 
-当前 L1 大类（5 个）: 用语违规、收益违规、产品违规、代言违规、销售违规
+当前 L1 大类（5 个）: 虚假宣传、资质违规、销售行为违规、信息披露违规、信息保护违规
 
 当前 L2 子类（11 个）: 绝对化用语、收益承诺、夸大收益、产品混淆、无资质代言、诱导销售、隐瞒信息、风险提示不足、信息保护、其他违规
 
@@ -757,7 +873,7 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 | 适当性违规 | — | 向风险不匹配的投资者推荐产品 |
 | 反洗钱违规 | — | 未履行客户身份识别义务 |
 
-**结论**: 当前 6 L1 + 11 L2 覆盖所有保险营销现行法规要求。扩展至其他金融产品时需评估新增适当性违规与反洗钱违规。
+**结论**: 当前 5 L1 + 11 L2 覆盖所有保险营销现行法规要求。扩展至其他金融产品时需评估新增适当性违规与反洗钱违规。
 
 ---
 

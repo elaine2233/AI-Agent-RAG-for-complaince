@@ -1135,7 +1135,7 @@ Few-Shot 示例用于提升 LLM 审核判定的准确性和一致性，通过向
 
 **Step 1 - Extract (信息提取)**:
 - 输入: `"买保险就选XX，稳赚不赔，年化收益5%！"`
-- LLM调用: model=qwen3.5-35b-a3b, system_prompt=EXTRACT_SYSTEM_PROMPT
+- LLM调用: model=qwen3.6-plus, system_prompt=EXTRACT_SYSTEM_PROMPT
 - 输出: `{"claims": ["稳赚不赔", "年化收益5%"], "keywords": ["稳赚不赔", "收益", "年化"], "has_return_promise": true, "has_absolute_language": false}`
 
 **Step 2 - RuleCheck (规则预检)**:
@@ -1172,7 +1172,7 @@ Few-Shot 示例用于提升 LLM 审核判定的准确性和一致性，通过向
     - RAG检索的法规上下文: Top5+相邻条文（约8-12条）
     - Few-Shot案例: 2条"收益承诺"的历史正确判定
     - **规则引擎预检结果(rule_hint)**: "规则引擎已命中关键词: 稳赚不赔→收益承诺, 年化收益→夸大收益。请重点审核这些违规类型，同时检查是否存在其他隐含违规。"
-- LLM推理: qwen3.5-35b-a3b CoT推理+Few-Shot
+- LLM推理: qwen3.6-plus CoT推理+Few-Shot
 ```json
 {
   "compliant": "no",
@@ -1210,7 +1210,7 @@ Few-Shot 示例用于提升 LLM 审核判定的准确性和一致性，通过向
 - 逐条验证引用的条款是否存在于法规库 → ✅ 全部存在
 
 **Step 9 - CrossCheck (交叉验证)**:
-- qwen3.5-35b-a3b复核: "引用条款与输入语义相关，推理逻辑自洽" → passed=true
+- qwen3.6-plus复核: "引用条款与输入语义相关，推理逻辑自洽" → passed=true
 
 **Step 10 - RiskAssess (风险评估)**:
 - risk_score = severity(1.0)×0.5 + article_count(4)×0.15 + rule_hit(0.2) + confidence(0.92)×0.15 = 0.5+0.6+0.2+0.138 = 0.938

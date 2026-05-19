@@ -15,7 +15,7 @@
 | PdfParser | PDF解析器 | 提取文本层/表格/图片，按条款结构分割 |
 | DocxParser | Word解析器 | 提取段落/表格/图片，按条款结构分割 |
 | DocParser | 旧版Word解析器 | 通过LibreOffice转换后按DocxParser处理 |
-| ImageParser | 图片解析器 | 使用多模态模型(qwen3.5-35b-a3b)提取图片文字 |
+| ImageParser | 图片解析器 | 使用多模态模型(qwen3.6-plus)提取图片文字 |
 | DocumentProcessor | 文档处理器 | 统一调度解析器+分块策略 |
 | RAGEngine | 检索引擎 | 向量化+存储+检索法规条文 |
 | Reranker | 重排序器 | 对检索结果重新排序+上下文扩展 |
@@ -54,11 +54,11 @@
 | .doc | python-doc (antiword) | ✅ | ✅ | 需系统安装antiword |
 | .txt | 直接读取 | ✅ | ✅ | 最简单 |
 | .md | 直接读取+层级解析 | ✅ | ✅ | 保留标题层级 |
-| .jpg/.png/.gif/.bmp | 多模态模型(qwen3.5-35b-a3b)提取 | ✅ | ✅ | 图片送入多模态模型提取文字和理解内容 |
+| .jpg/.png/.gif/.bmp | 多模态模型(qwen3.6-plus)提取 | ✅ | ✅ | 图片送入多模态模型提取文字和理解内容 |
 
 **关键说明**：
 - 法规原件为文本型PDF/DOCX/DOC/TXT/MD时，直接提取文字，不需要OCR或多模态模型
-- 扫描型PDF在Demo中不支持，生产环境需同时使用OCR引擎（如PaddleOCR）和多模态模型（如qwen3.5-35b-a3b）两步处理
+- 扫描型PDF在Demo中不支持，生产环境需同时使用OCR引擎（如PaddleOCR）和多模态模型（如qwen3.6-plus）两步处理
 - 混合型PDF中文本层可正常提取，但嵌入的图片和图表在Demo中被跳过
 
 #### 3.2.2 扫描件PDF的特殊处理
@@ -94,7 +94,7 @@ if low_density_pages / page_count > 0.5:
 ```
 扫描件PDF
   → Step 1: OCR提取文字（PaddleOCR等OCR引擎）→ 获得结构化文字
-  → Step 2: 提取PDF中的图片 → 多模态模型(qwen3.5-35b-a3b)理解图片内容
+  → Step 2: 提取PDF中的图片 → 多模态模型(qwen3.6-plus)理解图片内容
   → Step 3: 合并OCR文字 + 多模态模型图片描述 → 完整文档内容
   → Step 4: 分块（_split_sections()）→ 后续处理
 ```
@@ -177,11 +177,11 @@ article_match = re.match(r"^第([一二三四五六七八九十百零〇]+条)\s
 | 文本+图片 | ✅ (多模态模型) | ✅ (多模态模型) | 文本直接使用+图片多模态模型提取 |
 | 文件上传 | ❌ | ✅ | Demo环境始终不支持文件上传，仅支持文本输入 |
 
-**关键区分**：系统统一使用多模态模型（默认qwen3.5-35b-a3b）处理文本和图片，不再区分纯文本模型和VLM。前端可切换模型，切换后所有步骤（文本提取、图片理解、语义审核、交叉复核）均使用用户指定的模型。Demo环境统一使用qwen3.5-35b-a3b，生产环境可根据不同模型特点选型。OCR仅用于生产环境的扫描件PDF文字提取，与多模态模型是互补关系。
+**关键区分**：系统统一使用多模态模型（默认qwen3.6-plus）处理文本和图片，不再区分纯文本模型和VLM。前端可切换模型，切换后所有步骤（文本提取、图片理解、语义审核、交叉复核）均使用用户指定的模型。Demo环境统一使用qwen3.6-plus，生产环境可根据不同模型特点选型。OCR仅用于生产环境的扫描件PDF文字提取，与多模态模型是互补关系。
 
 多模态模型与传统OCR的能力对比：
 
-| 能力 | 传统OCR | 多模态模型 (qwen3.5-35b-a3b) |
+| 能力 | 传统OCR | 多模态模型 (qwen3.6-plus) |
 |------|---------|---------------------|
 | 提取图片中的文字 | ✅ | ✅ |
 | 理解图片描绘的内容 | ❌ | ✅ 例如"这是一张展示保证收益的宣传图" |
@@ -703,21 +703,21 @@ Demo 模式使用固定 Top-K=5，可能遗漏低排名条款中的违规。这�
 
 | 步骤 | 模型 | 角色 | temperature | top_p | max_tokens |
 |------|------|------|------------|-------|------------|
-| Extract | qwen3.5-35b-a3b | PRIMARY | 0.1 | 0.8 | 8192 |
-| Extract | qwen3.5-flash-2026-02-23 | FALLBACK | 0.1 | 0.8 | 8192 |
-| Reason | qwen3.5-35b-a3b | PRIMARY | 0.1 | 0.8 | 8192 |
-| Reason | qwen3.5-flash-2026-02-23 | FALLBACK | 0.1 | 0.8 | 8192 |
-| CrossCheck | qwen3.5-35b-a3b | PRIMARY | 0.1 | 0.8 | 8192 |
-| CrossCheck | qwen3.5-flash-2026-02-23 | FALLBACK | 0.1 | 0.8 | 8192 |
-| 条文标注 | qwen3.5-35b-a3b | PRIMARY | 0.1 | 0.8 | 8192 |
-| 条文标注 | qwen3.5-flash-2026-02-23 | FALLBACK | 0.1 | 0.8 | 8192 |
+| Extract | qwen3.6-plus | PRIMARY | 0.1 | 0.8 | 8192 |
+| Extract | qwen3.6-flash | FALLBACK | 0.1 | 0.8 | 8192 |
+| Reason | qwen3.6-plus | PRIMARY | 0.1 | 0.8 | 8192 |
+| Reason | qwen3.6-flash | FALLBACK | 0.1 | 0.8 | 8192 |
+| CrossCheck | qwen3.6-plus | PRIMARY | 0.1 | 0.8 | 8192 |
+| CrossCheck | qwen3.6-flash | FALLBACK | 0.1 | 0.8 | 8192 |
+| 条文标注 | qwen3.6-plus | PRIMARY | 0.1 | 0.8 | 8192 |
+| 条文标注 | qwen3.6-flash | FALLBACK | 0.1 | 0.8 | 8192 |
 
 所有参数均可通过环境变量配置，详见config.py。
 
 ### 8.2 重试与熔断
 
 - **LLM调用**: 首次失败后等待1秒重试1次，仍失败则切换下一个模型
-- **模型Failover**: qwen3.5-35b-a3b → qwen3.5-flash-2026-02-23（按priority排序）
+- **模型Failover**: qwen3.6-plus → qwen3.6-flash（按priority排序）
 - **每模型独立熔断器**: failure_threshold=3, recovery_timeout=20s
 - **Embedding调用**: 3次重试，指数退避(1s→2s→4s)+随机抖动
 - **Reranker**: 3次重试，失败降级到规则重排
@@ -1179,10 +1179,10 @@ def intent_detection(input_text: str, violation_keywords: list, product_keywords
 | 维度 | 说明 |
 |------|------|
 | 输入格式 | 原始营销内容文本（字符串），可能包含图片（经多模态模型转文本后合并） |
-| 处理逻辑 | 调用qwen3.5-35b-a3b对输入内容进行要素提取，识别：claims（声明/主张）、keywords（关键词）、has_return_promise（是否含收益承诺）、has_absolute_language（是否含绝对化用语）。Prompt要求LLM以JSON格式输出结构化要素 |
+| 处理逻辑 | 调用qwen3.6-plus对输入内容进行要素提取，识别：claims（声明/主张）、keywords（关键词）、has_return_promise（是否含收益承诺）、has_absolute_language（是否含绝对化用语）。Prompt要求LLM以JSON格式输出结构化要素 |
 | 输出格式 | `{claims: [...], keywords: [...], has_return_promise: bool, has_absolute_language: bool}` |
 | 错误处理 | LLM调用失败时降级为基于关键词的简单提取（正则匹配常见模式）；JSON解析失败时使用默认空值兜底 |
-| Demo vs 生产 | 有API Key时使用qwen3.5-35b-a3b；生产使用多Key轮转+熔断降级，超长内容自动分块提取 |
+| Demo vs 生产 | 有API Key时使用qwen3.6-plus；生产使用多Key轮转+熔断降级，超长内容自动分块提取 |
 
 ### 12.2 ② RuleCheck — 规则预检
 
@@ -1233,9 +1233,9 @@ def intent_detection(input_text: str, violation_keywords: list, product_keywords
 | 维度 | 说明 |
 |------|------|
 | 输入格式 | 原始文本 + Extract要素 + RuleCheck命中结果 + Rerank排序后的法规chunks + Few-Shot示例 |
-| 处理逻辑 | 构造CoT Prompt：注入系统角色约束+法规上下文+规则命中提示(rule_hint)+Few-Shot示例，调用qwen3.5-35b-a3b进行推理。LLM输出包含compliant判定、violation_type、violated_articles（含条文引用和违反原因）、confidence、reasoning、suggestions |
+| 处理逻辑 | 构造CoT Prompt：注入系统角色约束+法规上下文+规则命中提示(rule_hint)+Few-Shot示例，调用qwen3.6-plus进行推理。LLM输出包含compliant判定、violation_type、violated_articles（含条文引用和违反原因）、confidence、reasoning、suggestions |
 | 输出格式 | `{compliant: "yes"/"no", violation_type: str, violated_articles: [{doc_name, article_number, violation_reason}]（article_text由Validate步骤从RAG数据库填充）, confidence: float, reasoning: str, suggestions: str}` |
-| 错误处理 | LLM调用失败时按priority切换模型（qwen3.5-35b-a3b→qwen3.5-flash-2026-02-23）；JSON解析失败时尝试修复常见格式错误（括号补全、截断处理、控制字符清理、多余逗号、缺少引号）；熔断器OPEN时跳过此步骤降级为纯规则引擎结果 |
+| 错误处理 | LLM调用失败时按priority切换模型（qwen3.6-plus→qwen3.6-flash）；JSON解析失败时尝试修复常见格式错误（括号补全、截断处理、控制字符清理、多余逗号、缺少引号）；熔断器OPEN时跳过此步骤降级为纯规则引擎结果 |
 | Demo vs Production | 无API Key时降级为规则引擎；生产使用多Key轮转+速率控制+独立熔断器，Prompt版本管理+自动A/B测试 |
 
 **JSON修复策略**：当LLM输出被截断导致JSON不完整时，采用反向扫描策略——从字符串末尾向前查找最后一个有效的截断点（如`}`、`]`、`"`等JSON结构边界），在该点截断后补全缺失的括号，尽可能恢复部分可解析的JSON内容。
@@ -1431,7 +1431,7 @@ def generate_cache_key(input_content: str, model_config: dict) -> str:
     "risk_score": 0.85,
     "risk_level": "high",
     "suggestions": "删除绝对化用语...",
-    "model_used": "qwen3.5-35b-a3b",
+    "model_used": "qwen3.6-plus",
     "latency_ms": 2340
 }
 ```

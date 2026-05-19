@@ -48,7 +48,7 @@ flowchart TB
     end
 
     subgraph external [外部系统]
-        LLM[LLM API<br/>qwen3.5-35b-a3b<br/>DashScope API]
+        LLM[LLM API<br/>qwen3.6-plus<br/>DashScope API]
         DB[SQLite DB<br/>WAL模式<br/>单文件持久化]
         REG[法规文件<br/>PDF/DOCX/DOC<br/>本地文件系统]
     end
@@ -69,7 +69,7 @@ flowchart TB
 | 业务人员 | Web浏览器 → FastAPI + 纯HTML前端 | 提交营销内容审核，查看审核结论 |
 | 合规审核员 | Web浏览器 → FastAPI + 纯HTML前端 | 查看待审队列，执行人工override |
 | 系统管理员 | Web浏览器 → FastAPI + 纯HTML前端 | 管理违规类型，运行效果评估 |
-| LLM API (qwen3.5-35b-a3b) | HTTPS REST → DashScope | 调用推理/提取/复核，单API Key直连（支持用户X-API-Key转发至DashScope） |
+| LLM API (qwen3.6-plus) | HTTPS REST → DashScope | 调用推理/提取/复核，单API Key直连（支持用户X-API-Key转发至DashScope） |
 | SQLite DB | 本地文件读写 | 审核记录/用户/法规版本等持久化 |
 | 法规文件 | 本地文件系统读取 | PDF/DOCX/DOC格式法规文档 |
 
@@ -105,13 +105,13 @@ flowchart TB
         end
 
         subgraph data [数据层]
-            SQLITEDB[SQLite DB<br/>WAL模式<br/>insurance_review.db<br/>12张表 schema v8]
+            SQLITEDB[SQLite DB<br/>WAL模式<br/>insurance_review.db<br/>13张表 schema v8]
             VECTOR[向量存储<br/>ChromaDB PersistentClient<br/>text-embedding-v3<br/>1024维]
             REGS[法规文件<br/>本地文件系统<br/>data/regulations/]
         end
 
         subgraph extdep [外部依赖]
-            LLMDEP[LLM API 外部服务<br/>qwen3.5-35b-a3b<br/>DashScope 单API Key]
+            LLMDEP[LLM API 外部服务<br/>qwen3.6-plus<br/>DashScope 单API Key]
             AUDIT[审计日志 本地文件<br/>JSONL+HMAC 日切轮转 90天保留]
             CONFIG[配置数据 本地文件<br/>data/prompt_versions/<br/>data/violation_types/<br/>.env / config.py]
         end
@@ -162,11 +162,11 @@ flowchart LR
     INPUT[审核请求输入] --> E1
 
     subgraph pipeline [10步审核Workflow Pipeline]
-        E1[① Extract<br/>要素提取<br/>qwen3.5-35b-a3b] --> E2[② RuleCheck<br/>规则预检<br/>关键词匹配]
+        E1[① Extract<br/>要素提取<br/>qwen3.6-plus] --> E2[② RuleCheck<br/>规则预检<br/>关键词匹配]
         E2 --> E3[③ RAGRetrieve<br/>向量+关键词双模检索<br/>Top20]
         E3 --> E4[④ Rerank<br/>Top20→Top5<br/>+相邻扩展<br/>有Key用Cross-Encoder/无Key规则重排]
         E4 --> E5[⑤ ExpandRelations<br/>条款关联扩展]
-        E5 --> E6[⑥ LLMReason<br/>CoT推理<br/>qwen3.5-35b-a3b<br/>注入规则命中结果]
+        E5 --> E6[⑥ LLMReason<br/>CoT推理<br/>qwen3.6-plus<br/>注入规则命中结果]
         E6 --> E7[⑦ Format<br/>结构化归一化<br/>LLM结果为主体<br/>规则参考注入+降级兜底]
         E7 --> E8[⑧ Validate<br/>幻觉检测<br/>引用条文交叉验证]
         E8 --> E9[⑨ CrossCheck<br/>API Key缺失时跳过]
@@ -177,7 +177,7 @@ flowchart LR
     E9 --> LLMGW
 
     subgraph llmgw [LLM Gateway]
-        QF[qwen3.5-35b-a3b<br/>PRIMARY] --> CB1[CircuitBreaker]
+        QF[qwen3.6-plus<br/>PRIMARY] --> CB1[CircuitBreaker]
     end
 
     E10 --> OUTPUT[审核结论输出]
@@ -187,12 +187,12 @@ flowchart LR
 
 | 步骤 | 组件 | 职责 | 使用模型 |
 |------|------|------|---------|
-| ① | Extract | 从营销内容中提取关键要素（声明、关键词、风险披露等） | qwen3.5-35b-a3b |
+| ① | Extract | 从营销内容中提取关键要素（声明、关键词、风险披露等） | qwen3.6-plus |
 | ② | RuleCheck | 关键词预检，命中确定性违规时注入LLM Prompt | 规则引擎（无LLM） |
 | ③ | RAGRetrieve | 向量+关键词双模检索，召回Top20相关法规条文 | ChromaDB |
 | ④ | Rerank | Top20重排为Top5，扩展相邻条款上下文 | 有Key用Cross-Encoder，无Key降级规则重排 |
 | ⑤ | ExpandRelations | 条款关联扩展，基于条款映射数据库检索关联条款 | 数据库查询 |
-| ⑥ | LLMReason | CoT推理审核，注入规则命中结果+Few-Shot+法规上下文 | qwen3.5-35b-a3b |
+| ⑥ | LLMReason | CoT推理审核，注入规则命中结果+Few-Shot+法规上下文 | qwen3.6-plus |
 | ⑦ | Format | 以LLM结果为主体，归一化结构+规则参考注入+降级兜底+数据清洗 | 无（逻辑处理） |
 | ⑧ | Validate | 幻觉检测，LLM引用条文与法规库逐条交叉验证 | 无（逻辑处理） |
 | ⑨ | CrossCheck | API Key缺失时跳过 | — |
@@ -227,7 +227,7 @@ sequenceDiagram
         Sec-->>User: 拒绝请求
     else 未命中
         Sec->>E1: 继续审核
-        E1->>E1: qwen3.5-35b-a3b要素提取
+        E1->>E1: qwen3.6-plus要素提取
         Note right of E1: 输出: claims, keywords,<br/>has_return_promise, has_absolute_language
         E1->>E2: extracted keywords
         E2->>E2: 关键词匹配
@@ -242,7 +242,7 @@ sequenceDiagram
         E5->>E5: 基于条款映射数据库扩展关联条款
         Note right of E5: 输出: 扩展后法规上下文<br/>含关联条款
         E5->>E6: 扩展后法规上下文
-        E6->>E6: qwen3.5-35b-a3b CoT推理 + Few-Shot + rule_hint
+        E6->>E6: qwen3.6-plus CoT推理 + Few-Shot + rule_hint
         Note right of E6: 输出: compliant="no",<br/>violation_type="收益承诺、夸大收益"
         E6->>E7: LLM审核结果
         E7->>E7: 结构化归一化+降级兜底（LLM结果为主体，规则引擎参考注入，非合并/并集）
@@ -291,7 +291,7 @@ Demo版本相对于生产版本存在以下简化，详细差异请参考 [demo-
 | Few-Shot | JSON文件存储，无淘汰机制 | 自动质量淘汰+容量上限 |
 | RAG检索 | 向量/关键词单路召回 | 向量+BM25混合检索+Query Rewriting |
 | Reranker | 有Key用Cross-Encoder，无Key降级规则重排 | Cross-Encoder重排服务+规则重排降级 |
-| 多模态 | 多模态模型图片审核(qwen3.5-35b-a3b，图片以base64 data URL通过OpenAI Vision格式在Extract步骤直接传入) | 多模态视觉理解+图片独立审核 |
+| 多模态 | 多模态模型图片审核(qwen3.6-plus，图片以base64 data URL通过OpenAI Vision格式在Extract步骤直接传入) | 多模态视觉理解+图片独立审核 |
 
 ### 6.5 意图识别
 
@@ -345,7 +345,7 @@ flowchart TB
             VIOLATION[violation_types/<br/>违规类型+条款映射]
         end
 
-        EXTERNAL[外部依赖<br/>DashScope API qwen3.5-35b-a3b<br/>需网络访问，无API Key时自动降级为rule-engine（规则引擎兜底）<br/>用户可通过X-API-Key提供自己的DashScope Key]
+        EXTERNAL[外部依赖<br/>DashScope API qwen3.6-plus<br/>需网络访问，无API Key时自动降级为rule-engine（规则引擎兜底）<br/>用户可通过X-API-Key提供自己的DashScope Key]
     end
 
     FASTAPI --> DBFILE
@@ -387,9 +387,9 @@ docker-compose up -d
 
 | 功能 | 有API Key | 无API Key |
 |------|----------|-----------|
-| LLM推理 | qwen3.5-35b-a3b | rule-engine（规则引擎兜底） |
-| 要素提取 | qwen3.5-35b-a3b | 基于关键词的简单提取 |
-| CrossCheck | qwen3.5-35b-a3b复核 | 跳过 |
+| LLM推理 | qwen3.6-plus | rule-engine（规则引擎兜底） |
+| 要素提取 | qwen3.6-plus | 基于关键词的简单提取 |
+| CrossCheck | qwen3.6-plus复核 | 跳过 |
 | 向量检索 | ChromaDB + text-embedding-v3 | 关键词匹配降级（配置API Key后可用向量检索） |
 | 审核结论 | 完整10步Pipeline | 规则引擎预检结果 |
 
@@ -400,7 +400,7 @@ docker-compose up -d
 这意味着：
 - 无API Key时系统降级为规则引擎；用户提供API Key后即可获得完整LLM功能（包括向量检索）
 - 无需在服务端配置 `DASHSCOPE_API_KEY` 环境变量即可使用 LLM 推理能力
-- 无API Key时不启用模型fallback，使用 qwen3.5-35b-a3b
+- 无API Key时不启用模型fallback，使用 qwen3.6-plus
 
 ---
 
@@ -410,7 +410,7 @@ docker-compose up -d
 |------|------|----------|------|
 | 前端 | FastAPI + 纯HTML | — | API服务 + 静态HTML前端 |
 | API | FastAPI | 0.100+ | 异步REST框架，自动文档 |
-| LLM | qwen3.5-35b-a3b | DashScope API | 推理模型（多模态统一） |
+| LLM | qwen3.6-plus | DashScope API | 推理模型（多模态统一） |
 | Embedding | text-embedding-v3 | DashScope API | 1024维中文向量 |
 | 数据库 | SQLite | 3.x (WAL) | 单文件关系数据库 |
 | 向量库 | ChromaDB | 0.4+ | 本地持久化向量存储 |

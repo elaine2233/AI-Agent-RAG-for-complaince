@@ -280,7 +280,7 @@ DeepSeek BA文档建议的多Agent架构：
 
 | 项目 | 方案 | 月成本 |
 |------|------|--------|
-| LLM调用 | DashScope API (qwen3.5-35b-a3b) | ~50-100元（低频测试） |
+| LLM调用 | DashScope API (qwen3.6-plus) | ~50-100元（低频测试） |
 | 向量数据库 | ChromaDB（本地） | 0元 |
 | 关系数据库 | SQLite（本地） | 0元 |
 | 缓存 | 内存缓存 | 0元 |
@@ -291,7 +291,7 @@ DeepSeek BA文档建议的多Agent架构：
 
 | 项目 | 方案 | 月成本估算 |
 |------|------|-----------|
-| LLM调用 | DashScope API (qwen3.5-35b-a3b/max) | ~2000-3000元 |
+| LLM调用 | DashScope API (qwen3.6-plus/max) | ~2000-3000元 |
 | 百炼知识库 | 旗舰版（按量计费） | ~500-1000元 |
 | RDS MySQL | 基础版 | ~300-500元 |
 | Redis | 标准版 | ~200-300元 |

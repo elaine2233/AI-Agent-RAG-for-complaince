@@ -57,7 +57,7 @@ flowchart TB
     end
 
     subgraph external [外部系统]
-        LLM[LLM API 多模型容灾<br/>qwen3.5-35b-a3b / qwen3.5-flash-2026-02-23(后备)<br/>多Key轮转]
+        LLM[LLM API 多模型容灾<br/>qwen3.6-plus / qwen3.6-flash(后备)<br/>多Key轮转]
         PG[PostgreSQL<br/>主从复制<br/>连接池 / 分区表]
         REDIS[Redis<br/>缓存/限流<br/>Session / Rate Limit / Cache / Queue]
         OSS[S3/OSS<br/>法规文件 / 数据库备份 / 审计日志归档]
@@ -92,7 +92,7 @@ flowchart TB
 | 合规审核员 | CDN → React SPA → API Gateway | 专业审核工作台，批量操作+快捷键 |
 | 系统管理员 | CDN → React SPA → API Gateway | 违规类型管理，效果评估，系统配置 |
 | 运维工程师 | Grafana Dashboard | 监控告警，容量规划，故障排查 |
-| LLM API (qwen3.5-35b-a3b/qwen3.5-flash-2026-02-23) | HTTPS REST → DashScope | 多模型容灾，多Key轮转，自动fallback |
+| LLM API (qwen3.6-plus/qwen3.6-flash) | HTTPS REST → DashScope | 多模型容灾，多Key轮转，自动fallback |
 | PostgreSQL | TCP/IP | 主从复制，连接池，分区表 |
 | Redis | TCP/IP | 分布式缓存，限流，会话管理 |
 | Milvus | gRPC | 分布式向量检索，持久化备份 |
@@ -531,9 +531,9 @@ flowchart TB
 ```mermaid
 flowchart TB
     REQ[审核请求] --> QP
-    QP[qwen3.5-35b-a3b<br/>PRIMARY<br/>priority=0] --> CB1[CircuitBreaker<br/>失败5次→OPEN<br/>30s后→HALF-OPEN<br/>成功1次→CLOSED]
+    QP[qwen3.6-plus<br/>PRIMARY<br/>priority=0] --> CB1[CircuitBreaker<br/>失败5次→OPEN<br/>30s后→HALF-OPEN<br/>成功1次→CLOSED]
     CB1 -->|熔断/超时/错误| DS
-    DS[qwen3.5-flash-2026-02-23<br/>FALLBACK<br/>priority=5] --> CB2[CircuitBreaker<br/>同上独立熔断逻辑]
+    DS[qwen3.6-flash<br/>FALLBACK<br/>priority=5] --> CB2[CircuitBreaker<br/>同上独立熔断逻辑]
     CB2 -->|全部熔断| RE
     RE[rule-engine<br/>规则引擎（API Key缺失时兜底）<br/>仅关键词匹配 无LLM调用]
 ```
@@ -653,12 +653,12 @@ flowchart TB
 |------|---------|------|
 | API Gateway | 50ms | 认证+限流+路由 |
 | 安全校验 | 20ms | 正则匹配+输入验证 |
-| ① Extract | 500ms | qwen3.5-35b-a3b轻量提取 |
+| ① Extract | 500ms | qwen3.6-plus轻量提取 |
 | ② RuleCheck | 10ms | 关键词匹配 |
 | ③ RAGRetrieve | 300ms | Milvus向量+BM25混合检索 |
 | ④ Rerank | 200ms | Cross-Encoder重排 |
 | ⑤ ExpandRelations | 50ms | 相邻条款扩展 |
-| ⑥ LLMReason | 1500ms | qwen3.5-35b-a3b CoT推理（主要耗时） |
+| ⑥ LLMReason | 1500ms | qwen3.6-plus CoT推理（主要耗时） |
 | ⑦ Format | 5ms | 结构化归一化 |
 | ⑧ Validate | 10ms | 幻觉检测 |
 | ⑨ CrossCheck | 400ms | 同等模型复核 |
@@ -795,7 +795,7 @@ spec:
 | 前端 | React SPA | 18+ | CDN分发，专业审核工作台 |
 | API网关 | Kong/Nginx | — | 认证+限流+路由+熔断 |
 | 微服务框架 | FastAPI | 0.100+ | 异步REST框架 |
-| LLM | qwen3.5-35b-a3b + qwen3.5-flash-2026-02-23(后备) | DashScope API | 多模型路由+熔断+降级 |
+| LLM | qwen3.6-plus + qwen3.6-flash(后备) | DashScope API | 多模型路由+熔断+降级 |
 | Embedding | text-embedding-v3 | DashScope API | 1024维中文向量 |
 | Reranker | qwen3-rerank | 独立微服务 | Cross-Encoder重排 |
 | 数据库 | PostgreSQL | 15+ | 主从复制+分区表+连接池 |
@@ -839,7 +839,7 @@ spec:
 |------|------|------|---------|
 | 第一层：Rule Engine | 关键词+正则 | 明确违规词快速拦截 | <10ms |
 | 第二层：SLM Risk Classifier | FinBERT/DeBERTa/Qwen2.5-3B微调 | 语义风险意图分类（收益承诺/诱导营销/风险淡化/身份冒充） | <200ms |
-| 第三层：LLM深度推理 | qwen3.5-35b-a3b | CoT推理+隐含语义分析 | 1.5~3s |
+| 第三层：LLM深度推理 | qwen3.6-plus | CoT推理+隐含语义分析 | 1.5~3s |
 
 **实现要点**：
 - SLM使用金融合规领域数据微调，4分类（收益承诺/诱导营销/风险淡化/合规）
@@ -901,7 +901,7 @@ spec:
 
 ### 13.3 CrossCheck悖论修复（Gemini建议，审核质量优化）
 
-**当前问题**：主模型与复核模型均为qwen3.5-35b-a3b，生产环境可配置同级模型复核——使用同能力等级的不同模型进行交叉验证，避免单一模型自圆其说。
+**当前问题**：主模型与复核模型均为qwen3.6-plus，生产环境可配置同级模型复核——使用同能力等级的不同模型进行交叉验证，避免单一模型自圆其说。
 
 **生产方案**：分层CrossCheck策略
 
@@ -909,7 +909,7 @@ spec:
 |------|---------|---------|
 | 规则校验（默认） | 所有审核结果 | 正则+逻辑规则检查：引用条款是否在召回列表中、推理是否包含矛盾词汇、输出格式是否合规 |
 | Self-Consistency | risk_score处于边缘阈值（0.6~0.75） | 同一模型多次采样，检查结论一致性 |
-| 同级模型复核 | risk_score接近拦截线（0.68~0.72） | qwen3.5-flash-2026-02-23作为后备模型进行二次判决 |
+| 同级模型复核 | risk_score接近拦截线（0.68~0.72） | qwen3.6-flash作为后备模型进行二次判决 |
 
 **实现要点**：
 - 默认使用规则校验，成本为零
@@ -968,18 +968,18 @@ spec:
 
 ### 13.7 成本治理与多级模型路由（GPT建议，成本优化）
 
-**当前问题**：所有审核都使用qwen3.5-35b-a3b，Token成本高。
+**当前问题**：所有审核都使用qwen3.6-plus，Token成本高。
 
 **生产方案**：多级模型路由
 
 | 场景 | 模型 | 成本 | 说明 |
 |------|------|------|------|
 | Rule命中（明确违规） | 小模型确认 | 极低 | 关键词命中后仅需小模型确认违规类型 |
-| 简单文本（<500字） | qwen3.5-flash | 低 | 短文本快速审核 |
-| 边界案例/复杂文本 | qwen3.5-35b-a3b | 中 | CoT深度推理 |
-| 高风险复核 | qwen-max/qwen3.5-flash-2026-02-23 | 高 | 仅在边缘风险分数时触发 |
+| 简单文本（<500字） | qwen3.6-flash | 低 | 短文本快速审核 |
+| 边界案例/复杂文本 | qwen3.6-plus | 中 | CoT深度推理 |
+| 高风险复核 | qwen-max/qwen3.6-flash | 高 | 仅在边缘风险分数时触发 |
 
-**预估成本优化**：相比全量qwen3.5-35b-a3b，成本可降低40~60%。
+**预估成本优化**：相比全量qwen3.6-plus，成本可降低40~60%。
 
 ### 13.8 事件驱动架构（GPT建议，系统解耦）
 

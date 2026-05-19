@@ -267,7 +267,7 @@ resp = llm_gateway.generate(
 
 # 查看模型状态
 status = llm_gateway.get_model_status()
-# {"qwen3.5-35b-a3b": {"role": "primary", "circuit_state": "closed", ...}, ...}
+# {"qwen3.6-plus": {"role": "primary", "circuit_state": "closed", ...}, ...}
 ```
 
 ### 3.6 添加新的API端点
@@ -394,7 +394,7 @@ stats = violation_registry.get_violation_feedback_stats()
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `DASHSCOPE_API_KEY` | 空 | 百炼API Key，为空则降级为规则引擎模式 |
-| `LLM_MODEL` | qwen3.5-35b-a3b | LLM主模型名 |
+| `LLM_MODEL` | qwen3.6-plus | LLM主模型名 |
 | `EMBEDDING_MODEL` | text-embedding-v3 | Embedding模型名 |
 | `CHUNK_SIZE` | 500 | 固定分块大小 |
 | `TOP_K` | 5 | RAG检索返回条数 |

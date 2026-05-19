@@ -51,7 +51,7 @@ python api_server.py
 DASHSCOPE_API_KEY=sk-xxx          # 百炼API Key
 
 # 可选（有默认值）
-LLM_MODEL=qwen3.5-35b-a3b               # LLM模型
+LLM_MODEL=qwen3.6-plus               # LLM模型
 EMBEDDING_MODEL=text-embedding-v3  # Embedding模型
 SERVER_PORT=7861                   # API服务端口
 MAX_INPUT_LENGTH=10000             # 最大输入长度

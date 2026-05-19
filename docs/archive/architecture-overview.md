@@ -43,7 +43,7 @@ graph TB
     end
 
     subgraph 外部系统
-        LLM["🤖 LLM API<br/>qwen3.5-35b-a3b / qwen3.5-flash-2026-02-23(后备)"]
+        LLM["🤖 LLM API<br/>qwen3.6-plus / qwen3.6-flash(后备)"]
         REG["📖 法规文档源<br/>监管机构发布的法规文件"]
         MON["📊 Prometheus<br/>监控指标采集"]
     end
@@ -239,8 +239,8 @@ flowchart TB
     subgraph LLM_GW["LLM Gateway 多模型路由"]
         direction TB
         GW_ENTRY["请求入口"]
-        GW_ENTRY --> P1["qwen3.5-35b-a3b<br/>PRIMARY<br/>priority=0"]
-        GW_ENTRY --> P2["qwen3.5-flash-2026-02-23<br/>FALLBACK<br/>priority=5"]
+        GW_ENTRY --> P1["qwen3.6-plus<br/>PRIMARY<br/>priority=0"]
+        GW_ENTRY --> P2["qwen3.6-flash<br/>FALLBACK<br/>priority=5"]
         P1 --> CB1["CircuitBreaker"]
         P2 --> CB2["CircuitBreaker"]
         CB1 --> GW_EXIT["响应"]
@@ -255,7 +255,7 @@ flowchart TB
     VALIDATE --> CROSS_CHK["⑨ CrossCheck<br/>轻量模型复核"]
     CROSS_CHK --> RISK_ASSESS["⑩ RiskAssess<br/>风险评分+决策路由"]
 
-    CROSS_CHK -.->|"调用qwen3.5-35b-a3b"| LLM_GW
+    CROSS_CHK -.->|"调用qwen3.6-plus"| LLM_GW
 
     RISK_ASSESS --> DECISION{"决策路由"}
     DECISION -->|"risk < 0.1"| AUTO_PASS["auto_pass"]
@@ -341,7 +341,7 @@ flowchart TB
     RULE_HIT --> LLM
     RULE_MISS --> LLM
 
-    subgraph LLM["LLM推理 (qwen3.5-35b-a3b)"]
+    subgraph LLM["LLM推理 (qwen3.6-plus)"]
         LLM_HIT["规则已命中：<br/>确认规则结果基础上<br/>继续检查隐含/深层违规"]
         LLM_MISS["规则未命中：<br/>独立进行完整语义审核"]
     end
@@ -377,8 +377,8 @@ flowchart TB
 
 | 角色 | 模型 | 用途 | 优先级 |
 |------|------|------|--------|
-| PRIMARY | qwen3.5-35b-a3b | 推理+提取+CrossCheck复核（多模态统一） | 0（最高） |
-| FALLBACK | qwen3.5-flash-2026-02-23 | 主模型不可用时后备 | 5 |
+| PRIMARY | qwen3.6-plus | 推理+提取+CrossCheck复核（多模态统一） | 0（最高） |
+| FALLBACK | qwen3.6-flash | 主模型不可用时后备 | 5 |
 
 每模型独立CircuitBreaker，全部熔断时降级为 rule-engine（API Key缺失时兜底）。
 
@@ -605,12 +605,12 @@ flowchart TB
 
 ### 4.9 CrossCheck 交叉复核
 
-审核结果(compliant=no) → qwen3.5-35b-a3b复核 → 检查引用条文与输入语义相关性(防过度引用) + 检查推理逻辑自洽性(防自圆其说) + 对低置信度结果标记"建议人工复核"
+审核结果(compliant=no) → qwen3.6-plus复核 → 检查引用条文与输入语义相关性(防过度引用) + 检查推理逻辑自洽性(防自圆其说) + 对低置信度结果标记"建议人工复核"
 
 - 通过 → confidence_adjustment ∈ [-0.1, 0.1]
 - 未通过 → issues追加到reasoning + recommend_human_review
 
-**设计原则**：用qwen3.5-35b-a3b做复核，而非同等重量的模型重复推理，成本仅增加~20%，但可降低漏判约30%。
+**设计原则**：用qwen3.6-plus做复核，而非同等重量的模型重复推理，成本仅增加~20%，但可降低漏判约30%。
 
 **冲突裁决规则**：
 
@@ -736,7 +736,7 @@ sequenceDiagram
     Note over WF: ⑥ LLMReason: CoT推理(注入规则命中结果)
     Note over WF: ⑦ Format: 结构化归一化+降级兜底
     Note over WF: ⑧ Validate: 幻觉检测
-    Note over WF: ⑨ CrossCheck: qwen3.5-35b-a3b复核
+    Note over WF: ⑨ CrossCheck: qwen3.6-plus复核
     Note over WF: ⑩ RiskAssess: risk=0.92→CRITICAL
 
     WF-->>API: {decision: "auto_block",<br/>risk_score: 0.92,<br/>violations: [{violation_type: "绝对化用语", ...}]}
@@ -828,7 +828,7 @@ sequenceDiagram
   "risk_level": "medium",
   "decision": "human_review",
   "review_mode": "rule+llm",
-  "model_used": "qwen3.5-35b-a3b",
+  "model_used": "qwen3.6-plus",
   "regulation_snapshot": {"保险销售行为管理办法": "sha256:abc123..."},
   "crosscheck_passed": true,
   "workflow_steps": [
@@ -1162,7 +1162,7 @@ parser_registry.register(ExcelParser())
 **当前设计**：图片输入和文本输入在Extract步骤之后走完全相同的管线。
 
 1. 前端上传图片后，将图片以base64 data URL格式通过OpenAI Vision格式传入Extract步骤
-2. Extract步骤中，qwen3.5-35b-a3b（多模态统一模型）直接接收图片数据，同时提取文本关键词和图片中的文字/营销信息
+2. Extract步骤中，qwen3.6-plus（多模态统一模型）直接接收图片数据，同时提取文本关键词和图片中的文字/营销信息
 3. 提取的 `keywords` 同时包含文本和图片中的关键术语，用于后续RuleCheck和RAG检索
 4. `image_text` 为图片OCR逐字提取的原文，`image_description` 为图片营销意图的100字符以内摘要
 
@@ -1208,7 +1208,7 @@ parser_registry.register(ExcelParser())
 | 并发控制 | Semaphore + 异步队列 | Semaphore控制并发上限，队列缓冲请求；异步审核结果在_do_review内直接保存DB，review_id随结果返回 |
 | 审计日志 | HMAC签名+日切轮转 | 防篡改+自动清理，满足合规要求 |
 | 违规类型管理 | **动态注册表+L1/L2分级** | 预定义核心类型保证业务一致性，动态扩展适配新法规；条款-类型多对多映射+生效/失效时间支持法规演进 |
-| 交叉复核 | **轻量模型CrossCheck** | 用qwen3.5-35b-a3b对违规结论做交叉验证，成本仅增20%但降低漏判30%；合规内容跳过复核 |
+| 交叉复核 | **轻量模型CrossCheck** | 用qwen3.6-plus对违规结论做交叉验证，成本仅增20%但降低漏判30%；合规内容跳过复核 |
 
 ---
 

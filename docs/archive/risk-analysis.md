@@ -148,7 +148,7 @@
 - ✅ 重试策略（指数退避+随机抖动，最多3次）
 - ✅ 规则引擎兜底（Rule-First架构，规则命中时无需LLM）
 - ✅ AlertManager告警（熔断器打开时critical告警）
-- ✅ LLM Gateway多模型热备（qwen3.5-35b-a3b + qwen3.5-flash-2026-02-23(后备)）
+- ✅ LLM Gateway多模型热备（qwen3.6-plus + qwen3.6-flash(后备)）
 - ✅ 每模型独立熔断器（故障隔离，不影响其他模型）
 - ✅ Demo模式rule-engine兜底（全部熔断时仍可运行）
 
