@@ -74,3 +74,23 @@ python api_server.py
 - 条款关系图：14条正则 + 49条预标注，追踪引用/例外/补充关系
 - 多级降级：LLM→规则引擎、向量→关键词、Cross-Encoder→规则重排
 - 接口抽象：4个核心接口隔离 Demo/生产实现，业务代码零改动
+
+## License
+
+本项目基于 [Apache License 2.0](LICENSE) 开源。
+
+```
+Copyright 2024-2026 AI-Agent-RAG-for-compliance Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
