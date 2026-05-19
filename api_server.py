@@ -878,6 +878,119 @@ async def submit_feedback(
     return {"feedback_id": feedback_id, "message": "反馈已提交，Few-Shot样本已回流"}
 
 
+class EvaluateResponse(BaseModel):
+    precision: float
+    recall: float
+    f1: float
+    accuracy: float
+    total: int
+    true_positives: int
+    true_negatives: int
+    false_positives: int
+    false_negatives: int
+    avg_latency: float
+    test_cases: list = []
+
+
+@app.post("/api/v1/evaluate", response_model=EvaluateResponse, tags=["评估"])
+async def run_evaluation(
+    mode: str = Query("standard", pattern="^(standard|extreme)$"),
+    user: dict = Depends(get_current_user),
+):
+    eval_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval")
+    cases_file = os.path.join(eval_dir, "extreme_test_cases.json" if mode == "extreme" else "test_cases.json")
+
+    if not os.path.exists(cases_file):
+        raise HTTPException(status_code=404, detail=f"测试用例文件不存在: {cases_file}")
+
+    with open(cases_file, "r", encoding="utf-8") as f:
+        test_cases = json.load(f)
+
+    tp = tn = fp = fn = 0
+    total_latency = 0.0
+    case_results = []
+
+    for tc in test_cases:
+        tc_id = tc.get("id", "?")
+        content = tc.get("content", "")
+        expected_compliant = tc.get("expected_compliant", "unknown")
+        expected_violation_types = tc.get("expected_violation_types", [])
+        description = tc.get("description", "")
+
+        start = time.time()
+        try:
+            result = _ensure_agent().review(
+                content=content,
+                client_id=user.get("username", "anonymous"),
+            )
+        except Exception as e:
+            logger.warning(f"评估用例 {tc_id} 执行失败: {e}")
+            result = ReviewResult(
+                compliant="unknown",
+                violation_type="",
+                violated_articles=[],
+                confidence=0.0,
+                reasoning=f"执行失败: {e}",
+                suggestions="",
+            )
+        latency = (time.time() - start) * 1000
+        total_latency += latency
+
+        actual_compliant = result.compliant
+        actual_violation_types = []
+        if result.violation_types:
+            actual_violation_types = [vt.get("violation_type_name", "") for vt in result.violation_types]
+        elif result.violation_type and result.violation_type != "无":
+            actual_violation_types = [v.strip() for v in result.violation_type.split("、") if v.strip()]
+
+        expected_label = "违规" if expected_compliant == "no" else "合规" if expected_compliant == "yes" else "未知"
+        actual_label = "违规" if actual_compliant == "no" else "合规" if actual_compliant == "yes" else "未知"
+
+        if expected_compliant in ("yes", "no") and actual_compliant in ("yes", "no"):
+            if expected_compliant == "no" and actual_compliant == "no":
+                tp += 1
+            elif expected_compliant == "yes" and actual_compliant == "yes":
+                tn += 1
+            elif expected_compliant == "yes" and actual_compliant == "no":
+                fp += 1
+            elif expected_compliant == "no" and actual_compliant == "yes":
+                fn += 1
+
+        pass_status = actual_label == expected_label
+        if expected_compliant == "unknown":
+            pass_status = actual_compliant != "no"
+
+        case_results.append({
+            "id": tc_id,
+            "content": content[:100],
+            "expected": expected_label,
+            "actual": actual_label,
+            "pass": pass_status,
+            "latency_ms": round(latency, 0),
+        })
+
+    total = len(test_cases)
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    accuracy = (tp + tn) / total if total > 0 else 0.0
+    avg_latency = round(total_latency / total, 0) if total > 0 else 0.0
+
+    return EvaluateResponse(
+        precision=round(precision, 4),
+        recall=round(recall, 4),
+        f1=round(f1, 4),
+        accuracy=round(accuracy, 4),
+        total=total,
+        true_positives=tp,
+        true_negatives=tn,
+        false_positives=fp,
+        false_negatives=fn,
+        avg_latency=avg_latency,
+        test_cases=case_results,
+    )
+
+
 @app.get("/api/v1/review/pending", tags=["人工复核"])
 async def get_pending_reviews(
     limit: int = Query(20, ge=1, le=100),
