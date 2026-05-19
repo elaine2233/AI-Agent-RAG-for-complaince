@@ -1646,8 +1646,10 @@ select.form-control {
   border-radius: 16px;
   width: 92vw;
   max-width: 1100px;
-  max-height: 90vh;
-  overflow-y: auto;
+  height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 32px;
   position: relative;
   box-shadow: 0 25px 60px rgba(0,0,0,0.3);
@@ -1676,20 +1678,27 @@ select.form-control {
   border-bottom: 2px solid var(--teal-500);
 }
 .diagram-modal-body {
-  display: flex;
-  justify-content: center;
+  position: relative;
   min-height: 200px;
   overflow: auto;
   cursor: grab;
+  flex: 1;
 }
 .diagram-modal-body:active {
   cursor: grabbing;
 }
+.diagram-modal-body .diagram-scroll-area {
+  min-width: 100%;
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
 .diagram-modal-body svg {
   max-width: none;
   height: auto;
-  transform-origin: center center;
-  transition: transform 0.15s ease;
+  transform-origin: 0 0;
+  transition: none;
 }
 .diagram-modal-toolbar {
   display: flex;
@@ -2224,7 +2233,7 @@ select.form-control {
               <div class="info-pipeline-body" style="display:none;">
                 <p><strong>公式</strong>：<code>severity×0.5 + article_count×0.1(max0.3) + rule_hit×0.15 + confidence_adj</code></p>
                 <p><strong>三级决策</strong>：</p>
-                <p><span style="color:#10b981;font-weight:700;">&lt;0.15 auto_pass</span> · <span style="color:#f59e0b;font-weight:700;">0.15~0.70 human_review</span> · <span style="color:#ef4444;font-weight:700;">≥0.70 auto_block</span></p>
+                <p><span style="color:#10b981;font-weight:700;">&lt;0.1 auto_pass</span> · <span style="color:#f59e0b;font-weight:700;">0.1~0.70 human_review</span> · <span style="color:#ef4444;font-weight:700;">≥0.70 auto_block</span></p>
                 <p><strong>案例结果</strong>："稳赚不赔，年化5%"→风险分1.0，Critical，auto_block。违规：收益承诺+绝对化用语+隐瞒信息+诱导销售</p>
               </div>
             </div>
@@ -2377,7 +2386,7 @@ select.form-control {
                 <span style="font-size:0.58rem;background:#d1fae5;color:#2d8a7f;padding:2px 6px;border-radius:4px;font-weight:600;">HITL</span>
               </div>
               <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">
-                <strong>触发条件</strong>：风险分 0.15~0.70 的审核结果自动进入人工复核队列<br>
+                <strong>触发条件</strong>：风险分 0.1~0.70 的审核结果自动进入人工复核队列<br>
                 <strong>复核内容</strong>：逐条违规判定 agree/disagree + 修改意见<br>
                 <strong>审计追踪</strong>：每次 override 记录 before/after + 修改原因 + 操作人
               </div>
@@ -2446,7 +2455,7 @@ select.form-control {
       <span class="zoom-label" id="diagramZoomLabel">100%</span>
       <button onclick="diagramZoom(0.2)">➕ 放大</button>
       <button onclick="diagramZoom(0)">🔄 重置</button>
-      <span style="font-size:0.66rem;color:var(--navy-400);margin-left:8px;">滚轮缩放 · 拖拽平移</span>
+      <span style="font-size:0.7rem;color:var(--navy-400);margin-left:4px;">按钮缩放 · 拖拽平移 · 滚轮滚动</span>
     </div>
     <div class="diagram-modal-body" id="diagramBody"></div>
   </div>
@@ -5970,6 +5979,31 @@ const DIAGRAMS = {
         TEXT created_at
       }
 
+      regulation_versions {
+        INTEGER id PK
+        TEXT doc_name
+        TEXT version
+        TEXT content_hash
+        INTEGER article_count
+        TEXT effective_date
+        INTEGER is_current
+        TEXT created_at
+        TEXT updated_at
+      }
+
+      regulation_chunks {
+        INTEGER id PK
+        TEXT doc_name
+        TEXT chapter
+        TEXT article_number
+        TEXT article_text
+        TEXT chunk_id
+        TEXT content_hash
+        TEXT source_format
+        TEXT created_at
+        TEXT updated_at
+      }
+
       violation_types {
         TEXT id PK
         TEXT name
@@ -6001,6 +6035,30 @@ const DIAGRAMS = {
         TEXT created_at
       }
 
+      violation_feedback {
+        INTEGER id PK
+        INTEGER review_id FK
+        TEXT violation_type_id FK
+        TEXT feedback_type
+        TEXT comment
+        INTEGER user_id FK
+        TEXT created_at
+      }
+
+      clause_relations {
+        INTEGER id PK
+        TEXT from_doc
+        TEXT from_article
+        TEXT to_doc
+        TEXT to_article
+        TEXT relation_type
+        REAL confidence
+        TEXT evidence_text
+        TEXT source
+        INTEGER is_verified
+        TEXT created_at
+      }
+
       review_modifications {
         INTEGER id PK
         INTEGER review_id FK
@@ -6026,6 +6084,8 @@ const DIAGRAMS = {
         INTEGER false_positives
         INTEGER false_negatives
         REAL avg_latency
+        TEXT case_results
+        TEXT errors
         TEXT model_used
         TEXT run_by
         TEXT created_at
@@ -6037,18 +6097,27 @@ const DIAGRAMS = {
         INTEGER user_id
         TEXT client_id
         TEXT detail
+        TEXT ip_address
         TEXT created_at
       }
 
       users ||--o{ review_records : user_id
       users ||--o{ review_feedback : user_id
+      users ||--o{ violation_feedback : user_id
       users ||--o{ review_modifications : user_id
+      users ||--o{ audit_events : user_id
       review_records ||--o{ review_feedback : review_id
       review_records ||--o{ review_violations : review_id
+      review_records ||--o{ violation_feedback : review_id
       review_records ||--o{ review_modifications : review_id
-      violation_types ||--o{ violation_types : parent_id
+      violation_types ||--o{ violation_types : "parent_id L1→L2"
       violation_types ||--o{ clause_type_mappings : violation_type_id
-      violation_types ||--o{ review_violations : violation_type_id`
+      violation_types ||--o{ review_violations : violation_type_id
+      violation_types ||--o{ violation_feedback : violation_type_id
+      regulation_versions ||--o{ regulation_chunks : doc_name
+      regulation_chunks ||--o{ clause_type_mappings : "doc_name + article"
+      regulation_chunks ||--o{ clause_relations : "from_doc + from_article"
+      users ||--o{ eval_results : "run_by"`
   },
   security: {
     title: '7层纵深防御架构图',
@@ -6073,21 +6142,17 @@ const DIAGRAMS = {
   riskEngine: {
     title: 'Risk Engine 风险评分决策路由图',
     code: `flowchart TB
-      RESULT["审核结果"] --> SCORE["风险评分计算<br/>base=违规严重度<br/>+条文数量加权<br/>+规则命中加成<br/>+置信度调整"]
-      SCORE -->|"risk_score ∈ [0, 1]"| CLASSIFY{"4级风险分类"}
-      CLASSIFY -->|"< 0.1"| LOW["LOW"]
-      CLASSIFY -->|"< 0.7"| MEDIUM["MEDIUM"]
-      CLASSIFY -->|"< 0.9"| HIGH["HIGH"]
-      CLASSIFY -->|"≥ 0.9"| CRITICAL["CRITICAL"]
-
-      LOW -->|"risk < 0.15"| AUTO_PASS["auto_pass<br/>自动通过"]
-      MEDIUM -->|"0.15 ≤ risk < 0.70"| HUMAN_REVIEW["human_review<br/>人工复核"]
-      HIGH -->|"risk ≥ 0.70"| AUTO_BLOCK["auto_block<br/>自动拦截"]
-      CRITICAL --> AUTO_BLOCK
+      RESULT["审核结果"] --> SCORE["风险评分计算<br/>base = 违规严重度<br/>+ 条文数量加权<br/>+ 规则命中加成<br/>+ 置信度调整"]
+      SCORE -->|"risk_score ∈ 0, 1"| SPLIT{"风险分级 + 决策路由"}
+      SPLIT -->|"risk < 0.1"| AUTO_PASS["✅ auto_pass<br/>LOW · 自动通过"]
+      SPLIT -->|"0.1 ≤ risk < 0.7"| HUMAN_REVIEW["👤 human_review<br/>MEDIUM · 人工复核"]
+      SPLIT -->|"0.7 ≤ risk < 0.9"| AUTO_BLOCK["🚫 auto_block<br/>HIGH · 自动拦截"]
+      SPLIT -->|"risk ≥ 0.9"| AUTO_BLOCK2["🚫 auto_block<br/>CRITICAL · 自动拦截"]
 
       style AUTO_PASS fill:#d1fae5,stroke:#065f46
       style HUMAN_REVIEW fill:#fef3c7,stroke:#92400e
-      style AUTO_BLOCK fill:#fee2e2,stroke:#991b1b`
+      style AUTO_BLOCK fill:#fee2e2,stroke:#991b1b
+      style AUTO_BLOCK2 fill:#fee2e2,stroke:#991b1b`
   },
   seqViolation: {
     title: '违规类型管理时序图',
@@ -6159,10 +6224,16 @@ function diagramZoom(delta) {
   if (delta === 0) {
     _diagramZoomLevel = 1;
   } else {
-    _diagramZoomLevel = Math.max(0.3, Math.min(3, _diagramZoomLevel + delta));
+    _diagramZoomLevel = Math.max(0.3, Math.min(5, _diagramZoomLevel + delta));
   }
   const svg = body.querySelector('svg');
-  if (svg) svg.style.transform = `scale(${_diagramZoomLevel})`;
+  if (svg) {
+    svg.style.transform = `scale(${_diagramZoomLevel})`;
+    const origW = parseFloat(svg.dataset.origW) || 800;
+    const origH = parseFloat(svg.dataset.origH) || 600;
+    svg.style.width = (origW * _diagramZoomLevel) + 'px';
+    svg.style.height = (origH * _diagramZoomLevel) + 'px';
+  }
   document.getElementById('diagramZoomLabel').textContent = Math.round(_diagramZoomLevel * 100) + '%';
 }
 
@@ -6184,11 +6255,18 @@ async function showDiagram(key) {
     }
     const id = 'diag-' + key + '-' + Date.now();
     const { svg } = await mermaid.render(id, d.code);
-    body.innerHTML = svg;
+    body.innerHTML = '<div class="diagram-scroll-area">' + svg + '</div>';
     const svgEl = body.querySelector('svg');
     if (svgEl) {
+      const vb = svgEl.viewBox.baseVal;
+      const origW = vb.width || svgEl.getBoundingClientRect().width || 800;
+      const origH = vb.height || svgEl.getBoundingClientRect().height || 600;
+      svgEl.dataset.origW = origW;
+      svgEl.dataset.origH = origH;
+      svgEl.style.transformOrigin = '0 0';
       svgEl.style.transform = `scale(${_diagramZoomLevel})`;
-      svgEl.style.transformOrigin = 'center center';
+      svgEl.style.width = (origW * _diagramZoomLevel) + 'px';
+      svgEl.style.height = (origH * _diagramZoomLevel) + 'px';
     }
   } catch (e) {
     body.innerHTML = '<div style="color:var(--red-500);font-size:0.85rem;">渲染失败: ' + e.message + '</div>';
@@ -6209,16 +6287,12 @@ document.addEventListener('keydown', function(e) {
 (function initDiagramPanZoom() {
   const body = document.getElementById('diagramBody');
   if (!body) return;
-  body.addEventListener('wheel', function(e) {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    diagramZoom(delta);
-  }, { passive: false });
   body.addEventListener('mousedown', function(e) {
     if (e.target.closest('button, a')) return;
     _diagramPanning = true;
     _diagramPanStart = { x: e.clientX, y: e.clientY, scrollLeft: body.scrollLeft, scrollTop: body.scrollTop };
     body.style.cursor = 'grabbing';
+    e.preventDefault();
   });
   document.addEventListener('mousemove', function(e) {
     if (!_diagramPanning) return;
