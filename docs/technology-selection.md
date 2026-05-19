@@ -159,7 +159,7 @@
 **决策理由**：
 - 金融合规审核要求可解释性，黑盒评分不可接受
 - 风险评分 = 违规严重度(0.3-0.9) × 0.5 + 条文数量加权 + 规则命中加成 + 置信度调整
-- 4级风险分类：LOW(<0.3) / MEDIUM(<0.7) / HIGH(<0.9) / CRITICAL(≥0.9)
+- 4级风险分类：LOW(<0.1) / MEDIUM(<0.7) / HIGH(<0.9) / CRITICAL(≥0.9)
 - 3级决策路由：auto_pass / human_review / auto_block
 - 阈值可通过config.py配置（RISK_AUTO_PASS_MAX, RISK_HUMAN_REVIEW_MAX）
 
