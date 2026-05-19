@@ -73,7 +73,7 @@ def _get_severity(violation_type_name: str) -> float:
 class RiskEngine:
     def __init__(self):
         self._thresholds = {
-            "auto_pass_max": getattr(config, "RISK_AUTO_PASS_MAX", 0.15),
+            "auto_pass_max": getattr(config, "RISK_AUTO_PASS_MAX", 0.1),
             "human_review_max": getattr(config, "RISK_HUMAN_REVIEW_MAX", 0.7),
         }
 
