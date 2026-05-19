@@ -1053,7 +1053,7 @@ sequenceDiagram
     API->>Eval: 运行评估
     Eval->>DB: 加载测试用例
     Eval->>Eval: 逐条执行审核+比对预期结果
-    Eval->>DB: 存储评估报告
+    Eval->>DB: 旧结果is_active=0 + INSERT新结果is_active=1<br/>(eval_results表)
     Eval-->>API: 评估完成
     API-->>Admin: 评估任务已提交
 

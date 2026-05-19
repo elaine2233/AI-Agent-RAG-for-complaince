@@ -1,8 +1,8 @@
 # 保险合规审查系统 — 数据库设计文档
 
-**文档版本**: v3.3
-**最后更新**: 2026-05-16 16:18（⚠️ Schema 变更时必须同步更新此日期）
-**对应代码**: `src/database.py` (`_schema_version = 6`)
+**文档版本**: v3.4
+**最后更新**: 2026-05-19（⚠️ Schema 变更时必须同步更新此日期）
+**对应代码**: `src/database.py` (`_schema_version = 8`)
 
 ---
 
@@ -177,6 +177,27 @@ erDiagram
         TEXT modification_reason
         INTEGER is_ai_generated
         INTEGER user_id FK
+        TEXT created_at
+    }
+
+    eval_results {
+        INTEGER id PK
+        TEXT mode
+        INTEGER is_active
+        REAL precision_val
+        REAL recall_val
+        REAL f1_val
+        REAL accuracy_val
+        INTEGER total_cases
+        INTEGER true_positives
+        INTEGER true_negatives
+        INTEGER false_positives
+        INTEGER false_negatives
+        REAL avg_latency
+        TEXT case_results
+        TEXT errors
+        TEXT model_used
+        TEXT run_by
         TEXT created_at
     }
 
@@ -569,6 +590,49 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 
 ---
 
+### 3.11 eval_results — 评估结果表
+
+存储审核系统效果评估的运行结果，支持历史对比与趋势分析。
+
+| 列名 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `id` | INTEGER | PK, AUTOINCREMENT | — | 记录唯一标识 |
+| `mode` | TEXT | NOT NULL | — | 评估模式：`standard`（标准测试集）/ `extreme`（极端用例） |
+| `is_active` | INTEGER | NOT NULL | `1` | 是否为当前活跃记录：1=活跃, 0=已归档 |
+| `precision_val` | REAL | NOT NULL | `0.0` | 精确率 |
+| `recall_val` | REAL | NOT NULL | `0.0` | 召回率 |
+| `f1_val` | REAL | NOT NULL | `0.0` | F1分数 |
+| `accuracy_val` | REAL | NOT NULL | `0.0` | 准确率 |
+| `total_cases` | INTEGER | NOT NULL | `0` | 测试用例总数 |
+| `true_positives` | INTEGER | NOT NULL | `0` | 真阳性数 |
+| `true_negatives` | INTEGER | NOT NULL | `0` | 真阴性数 |
+| `false_positives` | INTEGER | NOT NULL | `0` | 假阳性数 |
+| `false_negatives` | INTEGER | NOT NULL | `0` | 假阴性数 |
+| `avg_latency` | REAL | NOT NULL | `0.0` | 平均审核延迟（毫秒） |
+| `case_results` | TEXT | NOT NULL | `'[]'` | 逐条测试用例结果 JSON 数组 |
+| `errors` | TEXT | NOT NULL | `'[]'` | 错误案例详情 JSON 数组 |
+| `model_used` | TEXT | NOT NULL | `''` | 评估时使用的 LLM 模型标识 |
+| `run_by` | TEXT | NOT NULL | `'anonymous'` | 执行评估的用户标识 |
+| `created_at` | TEXT | NOT NULL | `datetime('now')` | 评估运行时间 |
+
+**活跃记录管理机制**：
+
+每次运行评估时，系统先将同一 `mode` 的旧记录 `is_active` 置为 `0`（软归档），再插入新记录 `is_active=1`。旧记录不删除，保留用于历史趋势对比。
+
+```
+运行评估 → UPDATE eval_results SET is_active=0 WHERE mode=? AND is_active=1
+         → INSERT INTO eval_results (mode, is_active=1, ...)
+```
+
+**API 端点**：
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/evaluate/latest/{mode}` | GET | 获取指定模式的最新活跃评估结果 |
+| `/api/v1/evaluate/history` | GET | 获取评估历史记录列表（支持 `mode` 和 `limit` 参数） |
+
+---
+
 ## 4. 索引
 
 ### 4.1 索引清单
@@ -598,6 +662,9 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 | `idx_violation_feedback_review_id` | violation_feedback | `review_id` | 按审查记录查违规反馈 |
 | `idx_violation_feedback_type_id` | violation_feedback | `violation_type_id` | 按违规类型查反馈 |
 | `idx_violation_feedback_user_id` | violation_feedback | `user_id` | 按用户查违规反馈 |
+| `idx_eval_results_mode` | eval_results | `mode` | 按评估模式查询 |
+| `idx_eval_results_active` | eval_results | `is_active` | 查询活跃评估记录 |
+| `idx_eval_results_created` | eval_results | `created_at` | 按时间排序与范围查询 |
 
 ### 4.2 索引设计说明
 
@@ -606,6 +673,7 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 - `clause_type_mappings` 使用 `(doc_name, article_number)` 复合索引，支持"根据法规条款反查违规类型"的典型查询
 - `is_deleted` 索引确保软删除过滤不触发全表扫描
 - `review_violations` 和 `violation_feedback` 的外键列均建立索引，支持高效的关联查询与反向查询
+- `eval_results` 的 `mode`、`is_active`、`created_at` 三个索引支持"按模式查最新活跃记录"和"历史趋势查询"两种典型访问模式
 
 ---
 
@@ -777,7 +845,7 @@ CREATE TABLE IF NOT EXISTS review_modifications (
 | SQLite 类型 | PostgreSQL 类型 | 注意事项 |
 |-------------|-----------------|----------|
 | `INTEGER` (PK) | `SERIAL` / `BIGSERIAL` | 自增主键改用 SERIAL |
-| `INTEGER` (布尔) | `BOOLEAN` | `is_deleted`, `is_correct`, `is_active`, `is_system`, `is_current`, `is_deprecated` |
+| `INTEGER` (布尔) | `BOOLEAN` | `is_deleted`, `is_correct`, `is_active` (users/eval_results), `is_system`, `is_current`, `is_deprecated` |
 | `TEXT` | `TEXT` / `VARCHAR(n)` | `username` → `VARCHAR(64)`, `role` → `VARCHAR(32)` |
 | `TEXT` (时间) | `TIMESTAMPTZ` | `created_at`, `updated_at` 等时间列 |
 | `TEXT` (JSON) | `JSONB` | `violated_articles`, `threats`, `keywords` |

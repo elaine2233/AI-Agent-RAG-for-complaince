@@ -134,6 +134,7 @@ class HealthResponse(BaseModel):
     components: dict
     demo_mode: bool = False
     default_model: str = ""
+    author_name: str = ""
 
 
 _start_time = time.time()
@@ -291,6 +292,7 @@ async def health_check():
         components=components,
         demo_mode=not config.has_api_key(),
         default_model=config.LLM_MODEL,
+        author_name=config.AUTHOR_NAME,
     )
 
 
@@ -1043,6 +1045,15 @@ async def run_evaluation(
             result = _run_eval_sync(task_id, mode, test_cases, agent, user.get("username", "anonymous"))
             _eval_tasks[task_id]["status"] = "completed"
             _eval_tasks[task_id]["result"] = result
+            try:
+                model_used = x_model.strip() if x_model and x_model.strip() else config.LLM_MODEL
+                _ensure_db().save_eval_result(
+                    mode=mode, result=result,
+                    model_used=model_used,
+                    run_by=user.get("username", "anonymous"),
+                )
+            except Exception as db_err:
+                logger.warning(f"评估结果保存数据库失败: {db_err}")
         except Exception as e:
             _eval_tasks[task_id]["status"] = "failed"
             _eval_tasks[task_id]["result"] = {"error": str(e)}
@@ -1060,6 +1071,21 @@ async def get_eval_status(task_id: str, user: dict = Depends(get_current_user)):
     if not task:
         raise HTTPException(status_code=404, detail="评估任务不存在")
     return task
+
+
+@app.get("/api/v1/evaluate/latest/{mode}", tags=["评估"])
+async def get_latest_eval(mode: str, user: dict = Depends(get_current_user)):
+    if mode not in ("standard", "extreme"):
+        raise HTTPException(status_code=400, detail="mode 必须为 standard 或 extreme")
+    result = _ensure_db().get_latest_eval_result(mode)
+    if not result:
+        return {"found": False}
+    return {"found": True, "result": result}
+
+
+@app.get("/api/v1/evaluate/history", tags=["评估"])
+async def get_eval_history(mode: Optional[str] = None, limit: int = 10, user: dict = Depends(get_current_user)):
+    return _ensure_db().get_eval_history(mode=mode, limit=min(limit, 50))
 
 
 @app.get("/api/v1/review/pending", tags=["人工复核"])

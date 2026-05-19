@@ -211,6 +211,30 @@ CREATE TABLE IF NOT EXISTS review_modifications (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_review_modifications_review_id ON review_modifications(review_id);
+
+CREATE TABLE IF NOT EXISTS eval_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mode TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    precision_val REAL NOT NULL DEFAULT 0.0,
+    recall_val REAL NOT NULL DEFAULT 0.0,
+    f1_val REAL NOT NULL DEFAULT 0.0,
+    accuracy_val REAL NOT NULL DEFAULT 0.0,
+    total_cases INTEGER NOT NULL DEFAULT 0,
+    true_positives INTEGER NOT NULL DEFAULT 0,
+    true_negatives INTEGER NOT NULL DEFAULT 0,
+    false_positives INTEGER NOT NULL DEFAULT 0,
+    false_negatives INTEGER NOT NULL DEFAULT 0,
+    avg_latency REAL NOT NULL DEFAULT 0.0,
+    case_results TEXT NOT NULL DEFAULT '[]',
+    errors TEXT NOT NULL DEFAULT '[]',
+    model_used TEXT NOT NULL DEFAULT '',
+    run_by TEXT NOT NULL DEFAULT 'anonymous',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_eval_results_mode ON eval_results(mode);
+CREATE INDEX IF NOT EXISTS idx_eval_results_active ON eval_results(is_active);
+CREATE INDEX IF NOT EXISTS idx_eval_results_created ON eval_results(created_at);
 """
 
 
@@ -916,6 +940,56 @@ class Database:
             return {"status": "healthy", "db_path": self.db_path}
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
+
+    def save_eval_result(self, mode: str, result: dict, model_used: str = "", run_by: str = "anonymous") -> int:
+        conn = self._get_conn()
+        conn.execute("UPDATE eval_results SET is_active = 0 WHERE mode = ? AND is_active = 1", (mode,))
+        cur = conn.execute(
+            """INSERT INTO eval_results
+            (mode, is_active, precision_val, recall_val, f1_val, accuracy_val,
+             total_cases, true_positives, true_negatives, false_positives, false_negatives,
+             avg_latency, case_results, errors, model_used, run_by)
+            VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (mode, result.get("precision", 0), result.get("recall", 0), result.get("f1", 0),
+             result.get("accuracy", 0), result.get("total", 0),
+             result.get("true_positives", 0), result.get("true_negatives", 0),
+             result.get("false_positives", 0), result.get("false_negatives", 0),
+             result.get("avg_latency", 0),
+             json.dumps(result.get("test_cases", []), ensure_ascii=False),
+             json.dumps(result.get("errors", []), ensure_ascii=False),
+             model_used, run_by)
+        )
+        conn.commit()
+        return cur.lastrowid
+
+    def get_latest_eval_result(self, mode: str) -> Optional[Dict]:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM eval_results WHERE mode = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1",
+            (mode,)
+        ).fetchone()
+        if not row:
+            return None
+        cols = [d[0] for d in conn.execute("SELECT * FROM eval_results LIMIT 0").description]
+        data = dict(zip(cols, row))
+        data["case_results"] = json.loads(data.get("case_results", "[]"))
+        data["errors"] = json.loads(data.get("errors", "[]"))
+        return data
+
+    def get_eval_history(self, mode: str = None, limit: int = 10) -> List[Dict]:
+        conn = self._get_conn()
+        if mode:
+            rows = conn.execute(
+                "SELECT id, mode, is_active, precision_val, recall_val, f1_val, accuracy_val, total_cases, avg_latency, model_used, run_by, created_at FROM eval_results WHERE mode = ? ORDER BY created_at DESC LIMIT ?",
+                (mode, limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, mode, is_active, precision_val, recall_val, f1_val, accuracy_val, total_cases, avg_latency, model_used, run_by, created_at FROM eval_results ORDER BY created_at DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+        cols = [d[0] for d in conn.execute("SELECT id, mode, is_active, precision_val, recall_val, f1_val, accuracy_val, total_cases, avg_latency, model_used, run_by, created_at FROM eval_results LIMIT 0").description]
+        return [dict(zip(cols, row)) for row in rows]
 
     def _save_review_violations_in_txn(self, conn, review_id: int, violation_types: List[Dict]):
         valid_ids = {r[0] for r in conn.execute("SELECT id FROM violation_types").fetchall()}

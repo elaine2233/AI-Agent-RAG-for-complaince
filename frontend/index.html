@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
 :root {
   --navy-900: #0f172a;
@@ -1412,6 +1413,314 @@ select.form-control {
   color: var(--slate-400);
   text-align: center;
 }
+.info-toc-link {
+  display: block;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--navy-600);
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all var(--transition-fast);
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+.info-toc-link:hover {
+  background: var(--slate-100);
+  color: var(--teal-700);
+}
+.info-toc-link.active {
+  background: var(--teal-50);
+  color: var(--teal-700);
+  font-weight: 600;
+  border-left: 3px solid var(--teal-500);
+}
+.info-section-block {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--slate-200);
+}
+.info-section-block:last-child {
+  border-bottom: none;
+}
+.info-section-title {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--navy-800);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--teal-500);
+  display: inline-block;
+}
+.info-desc {
+  font-size: 0.78rem;
+  color: var(--navy-600);
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+.info-constraint-card {
+  padding: 12px 14px;
+  background: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: box-shadow var(--transition-fast);
+}
+.info-constraint-card:hover {
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+.info-layer-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--white);
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  transition: all var(--transition-fast);
+}
+.info-layer-card:hover {
+  border-color: var(--teal-400);
+  box-shadow: 0 2px 8px rgba(20,184,166,0.1);
+}
+.info-layer-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--teal-500), var(--teal-600));
+  color: var(--white);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.info-step-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border: 1px solid;
+}
+.info-pipeline-step {
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: var(--white);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  overflow: hidden;
+}
+.info-pipeline-step:hover {
+  border-color: var(--teal-400);
+  box-shadow: 0 2px 6px rgba(20,184,166,0.08);
+}
+.info-pipeline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.info-pipeline-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--white);
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.info-pipeline-toggle {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: var(--slate-400);
+  transition: transform var(--transition-fast);
+}
+.info-pipeline-step.open .info-pipeline-toggle {
+  transform: rotate(90deg);
+}
+.info-pipeline-body {
+  padding: 0 14px 12px 46px;
+  font-size: 0.72rem;
+  color: var(--navy-600);
+  line-height: 1.7;
+}
+.info-pipeline-body p {
+  margin-bottom: 4px;
+}
+.info-dim {
+  font-size: 0.66rem !important;
+  color: var(--slate-400) !important;
+  font-style: italic;
+  margin-top: 6px !important;
+  padding-top: 4px;
+  border-top: 1px dashed var(--slate-200);
+}
+.info-decision-card {
+  padding: 10px 14px;
+  background: var(--white);
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  transition: all var(--transition-fast);
+}
+.info-decision-card:hover {
+  border-color: var(--teal-400);
+  box-shadow: 0 2px 6px rgba(20,184,166,0.08);
+}
+.info-resilience-card {
+  padding: 12px 14px;
+  background: var(--white);
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  transition: all var(--transition-fast);
+}
+.info-resilience-card:hover {
+  border-color: var(--amber-400);
+  box-shadow: 0 2px 6px rgba(245,158,11,0.1);
+}
+.info-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+.info-compare-table th {
+  background: var(--navy-800);
+  color: var(--white);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+.info-compare-table th:first-child {
+  border-radius: 6px 0 0 0;
+}
+.info-compare-table th:last-child {
+  border-radius: 0 6px 0 0;
+}
+.info-compare-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--slate-200);
+  color: var(--navy-600);
+  line-height: 1.5;
+}
+.info-compare-table tr:hover td {
+  background: var(--slate-50);
+}
+.info-diagram-btn {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--teal-700);
+  background: var(--teal-50);
+  border: 1px solid var(--teal-400);
+  border-radius: 6px;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all var(--transition-fast);
+}
+.info-diagram-btn:hover {
+  background: var(--teal-100);
+  border-color: var(--teal-500);
+}
+.diagram-modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15,23,42,0.85);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(4px);
+}
+.diagram-modal.open {
+  display: flex;
+}
+.diagram-modal-content {
+  background: var(--white);
+  border-radius: 16px;
+  width: 92vw;
+  max-width: 1100px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px;
+  position: relative;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+}
+.diagram-modal-close {
+  position: absolute;
+  top: 16px; right: 20px;
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  color: var(--navy-500);
+  cursor: pointer;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+.diagram-modal-close:hover {
+  color: var(--red-500);
+}
+.diagram-modal-title {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--navy-800);
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--teal-500);
+}
+.diagram-modal-body {
+  display: flex;
+  justify-content: center;
+  min-height: 200px;
+  overflow: auto;
+  cursor: grab;
+}
+.diagram-modal-body:active {
+  cursor: grabbing;
+}
+.diagram-modal-body svg {
+  max-width: none;
+  height: auto;
+  transform-origin: center center;
+  transition: transform 0.15s ease;
+}
+.diagram-modal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  background: var(--slate-50);
+  border-radius: 8px;
+}
+.diagram-modal-toolbar button {
+  background: var(--white);
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: var(--navy-700);
+  transition: all var(--transition-fast);
+}
+.diagram-modal-toolbar button:hover {
+  background: var(--teal-50);
+  border-color: var(--teal-400);
+  color: var(--teal-700);
+}
+.diagram-modal-toolbar .zoom-label {
+  font-size: 0.72rem;
+  color: var(--navy-500);
+  min-width: 40px;
+  text-align: center;
+}
 </style>
 </head>
 <body>
@@ -1443,6 +1752,8 @@ select.form-control {
   </nav>
   <div class="sidebar-footer" style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.06);">
     <div style="font-size:0.7rem;color:var(--slate-400);">v2.0.0</div>
+    <div style="margin-top:6px;font-size:0.68rem;color:var(--slate-400);">Designed & Built by</div>
+    <div id="authorName" style="font-size:0.82rem;font-weight:700;color:var(--teal-400);margin-top:1px;"></div>
   </div>
 </aside>
 
@@ -1737,117 +2048,387 @@ select.form-control {
         <div class="page-header-sub">了解系统架构与技术细节</div>
       </div>
     </div>
-    <div class="page-body">
-      <div class="card">
-          <div class="info-section">
-            <h3>架构概览</h3>
-            <p style="font-size:0.9rem;color:var(--navy-700);line-height:1.7;">
-              本系统采用规则引擎 + LLM 大模型双轨审核架构，通过 10 步审核管线实现从内容输入到结构化审核结论的完整闭环。
-            </p>
-            <div style="margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;">
-              <div style="background:#eef4fa;border:1.5px solid #3b7dc4;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
-                <div style="font-size:0.72rem;font-weight:700;color:#3b7dc4;">用户输入</div>
-                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">文本/图片</div>
-              </div>
-              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
-              <div style="background:#fef3c7;border:1.5px solid #d4852b;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
-                <div style="font-size:0.72rem;font-weight:700;color:#d4852b;">安全校验</div>
-                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">33种安全检测</div>
-              </div>
-              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
-              <div style="background:#eef4fa;border:1.5px solid #3b7dc4;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
-                <div style="font-size:0.72rem;font-weight:700;color:#3b7dc4;">10步管线</div>
-                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">Rule+LLM协同</div>
-              </div>
-              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
-              <div style="background:#fee2e2;border:1.5px solid #d14353;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
-                <div style="font-size:0.72rem;font-weight:700;color:#d14353;">风险决策</div>
-                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">3级路由</div>
-              </div>
-              <div style="color:var(--navy-400);font-size:1.1rem;">→</div>
-              <div style="background:#d1fae5;border:1.5px solid #2d8a7f;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
-                <div style="font-size:0.72rem;font-weight:700;color:#2d8a7f;">审核结论</div>
-                <div style="font-size:0.62rem;color:#5c6370;margin-top:2px;">结构化输出</div>
-              </div>
+    <div class="page-body" style="display:flex;gap:0;">
+      <nav id="infoToc" style="width:200px;flex-shrink:0;position:sticky;top:0;align-self:flex-start;border-right:1px solid var(--gray-200);padding-right:16px;">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--navy-700);margin-bottom:12px;padding-left:8px;">目录</div>
+        <a href="#info-sec1" class="info-toc-link active" onclick="infoScrollTo('info-sec1',event)">系统定位</a>
+        <a href="#info-sec2" class="info-toc-link" onclick="infoScrollTo('info-sec2',event)">六层架构</a>
+        <a href="#info-sec3" class="info-toc-link" onclick="infoScrollTo('info-sec3',event)">10步管线</a>
+        <a href="#info-sec4" class="info-toc-link" onclick="infoScrollTo('info-sec4',event)">韧性设计</a>
+        <a href="#info-sec5" class="info-toc-link" onclick="infoScrollTo('info-sec5',event)">安全防护</a>
+        <a href="#info-sec6" class="info-toc-link" onclick="infoScrollTo('info-sec6',event)">数据管理</a>
+        <a href="#info-sec7" class="info-toc-link" onclick="infoScrollTo('info-sec7',event)">质量保障</a>
+        <a href="#info-sec8" class="info-toc-link" onclick="infoScrollTo('info-sec8',event)">技术栈 & 演进</a>
+      </nav>
+      <div id="infoContent" style="flex:1;overflow-y:auto;max-height:calc(100vh - 120px);padding-left:24px;scroll-behavior:smooth;">
+
+        <section id="info-sec1" class="info-section-block">
+          <h3 class="info-section-title">系统定位</h3>
+          <p class="info-desc">基于 <strong>LLM + RAG</strong> 的金融保险营销内容合规审核系统，采用 <strong>Rule-First + Workflow</strong> 架构。规则引擎做关键词预检，LLM 始终执行完整语义审核，两者结果合并输出。10 步流水线驱动审核，Risk Engine 评分决定三级处置。</p>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;">
+            <div class="info-constraint-card" style="border-left:3px solid var(--red-500);">
+              <div style="font-size:0.78rem;font-weight:700;color:var(--red-600);">约束1：零漏判</div>
+              <div style="font-size:0.68rem;color:var(--navy-600);margin-top:4px;line-height:1.5;">一条违规漏过去 = 监管处罚。宁可误报不可漏报，但误报太多人工复核成本爆炸</div>
             </div>
-            <div style="margin-top:14px;padding:12px 16px;background:var(--slate-50);border-radius:8px;">
-              <div style="font-size:0.76rem;font-weight:700;color:var(--navy-700);margin-bottom:8px;">10步审核管线</div>
-              <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
-                <span style="background:#eef4fa;border:1px solid #3b7dc4;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#3b7dc4;">① Extract</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#fef3c7;border:1px solid #d4852b;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d4852b;">② RuleCheck</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#eef4fa;border:1px solid #3b7dc4;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#3b7dc4;">③ RAG</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#fef3c7;border:1px solid #d4852b;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d4852b;">④ Rerank</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#d1fae5;border:1px solid #2d8a7f;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#2d8a7f;">⑤ Expand</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#eef4fa;border:1px solid #3b7dc4;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#3b7dc4;">⑥ LLM</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#d1fae5;border:1px solid #2d8a7f;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#2d8a7f;">⑦ Format</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#fee2e2;border:1px solid #d14353;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d14353;">⑧ Validate</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#ede9fe;border:1px solid #7b5ea7;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#7b5ea7;">⑨ CrossCheck</span>
-                <span style="color:var(--navy-300);font-size:0.7rem;">→</span>
-                <span style="background:#fee2e2;border:1px solid #d14353;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-weight:600;color:#d14353;">⑩ RiskAssess</span>
-              </div>
-              <div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
-                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3b7dc4;vertical-align:middle;margin-right:3px;"></span>AI/LLM</span>
-                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d4852b;vertical-align:middle;margin-right:3px;"></span>规则/排序</span>
-                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#2d8a7f;vertical-align:middle;margin-right:3px;"></span>知识扩展</span>
-                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d14353;vertical-align:middle;margin-right:3px;"></span>安全/校验</span>
-                <span style="font-size:0.64rem;color:var(--navy-500);"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#7b5ea7;vertical-align:middle;margin-right:3px;"></span>增强</span>
-              </div>
+            <div class="info-constraint-card" style="border-left:3px solid var(--amber-500);">
+              <div style="font-size:0.78rem;font-weight:700;color:var(--amber-600);">约束2：法规有隐含逻辑</div>
+              <div style="font-size:0.68rem;color:var(--navy-600);margin-top:4px;line-height:1.5;">"禁止+例外"逻辑向量检索无法捕捉，传统RAG只做语义检索会断章取义</div>
             </div>
-            <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
-              <div style="flex:1;min-width:140px;padding:10px 12px;background:#fef3c7;border-radius:6px;border-left:3px solid #d4852b;">
-                <div style="font-size:0.72rem;font-weight:700;color:#d4852b;">Rule+LLM 协同</div>
-                <div style="font-size:0.64rem;color:var(--navy-600);margin-top:3px;line-height:1.5;">规则命中后不跳过LLM，而是注入Prompt继续检查深层违规</div>
-              </div>
-              <div style="flex:1;min-width:140px;padding:10px 12px;background:#fee2e2;border-radius:6px;border-left:3px solid #d14353;">
-                <div style="font-size:0.72rem;font-weight:700;color:#d14353;">风险决策路由</div>
-                <div style="font-size:0.64rem;color:var(--navy-600);margin-top:3px;line-height:1.5;">&lt;0.1 自动通过 · 0.1~0.7 人工复核 · ≥0.7 自动拦截</div>
-              </div>
-              <div style="flex:1;min-width:140px;padding:10px 12px;background:#d1fae5;border-radius:6px;border-left:3px solid #2d8a7f;">
-                <div style="font-size:0.72rem;font-weight:700;color:#2d8a7f;">韧性降级</div>
-                <div style="font-size:0.64rem;color:var(--navy-600);margin-top:3px;line-height:1.5;">LLM熔断→规则引擎兜底 · 向量检索失败→关键词匹配</div>
-              </div>
+            <div class="info-constraint-card" style="border-left:3px solid var(--teal-500);">
+              <div style="font-size:0.78rem;font-weight:700;color:var(--teal-600);">约束3：Demo/生产双场景</div>
+              <div style="font-size:0.68rem;color:var(--navy-600);margin-top:4px;line-height:1.5;">同一套代码：30秒零配置启动 vs 生产99.9%可用性</div>
             </div>
           </div>
-        </div>
-        <div class="card">
-          <div class="info-section">
-            <h3>技术栈</h3>
-            <table class="tech-table">
-              <tr><td>后端框架</td><td>FastAPI (Python 3.11+)</td></tr>
-              <tr><td>大语言模型</td><td>通义千问 Qwen 系列</td></tr>
-              <tr><td>后备模型</td><td>qwen3.6-flash (熔断切换)</td></tr>
-              <tr><td>嵌入模型</td><td>text-embedding-v3 (1024维)</td></tr>
-              <tr><td>规则引擎</td><td>自定义关键词 + 正则匹配</td></tr>
-              <tr><td>数据库</td><td>SQLite (WAL模式)</td></tr>
-              <tr><td>向量存储</td><td>ChromaDB (HNSW索引)</td></tr>
-              <tr><td>前端</td><td>原生 HTML/CSS/JS</td></tr>
-              <tr><td>认证</td><td>API Key + PBKDF2密码哈希</td></tr>
-              <tr><td>部署</td><td>Uvicorn</td></tr>
+        </section>
+
+        <section id="info-sec2" class="info-section-block">
+          <h3 class="info-section-title">六层解耦架构</h3>
+          <button class="info-diagram-btn" onclick="showDiagram('arch')">📐 架构图</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+            <div class="info-layer-card"><div class="info-layer-num">L6</div><div><div style="font-weight:700;font-size:0.78rem;">展示层</div><div style="font-size:0.66rem;color:var(--navy-500);margin-top:2px;">FastAPI + 纯 HTML SPA</div></div></div>
+            <div class="info-layer-card"><div class="info-layer-num">L5</div><div><div style="font-weight:700;font-size:0.78rem;">网关层</div><div style="font-size:0.66rem;color:var(--navy-500);margin-top:2px;">认证 / 限流 / 安全校验 / CORS</div></div></div>
+            <div class="info-layer-card"><div class="info-layer-num">L4</div><div><div style="font-weight:700;font-size:0.78rem;">业务层</div><div style="font-size:0.66rem;color:var(--navy-500);margin-top:2px;">ReviewAgent 编排 + 异步队列</div></div></div>
+            <div class="info-layer-card"><div class="info-layer-num">L3</div><div><div style="font-weight:700;font-size:0.78rem;">AI 能力层</div><div style="font-size:0.66rem;color:var(--navy-500);margin-top:2px;">RAG + LLM Gateway + 规则引擎 + Reranker + Risk Engine</div></div></div>
+            <div class="info-layer-card"><div class="info-layer-num">L2</div><div><div style="font-weight:700;font-size:0.78rem;">数据处理层</div><div style="font-size:0.66rem;color:var(--navy-500);margin-top:2px;">多格式解析 / 4种分块策略 / 向量化</div></div></div>
+            <div class="info-layer-card"><div class="info-layer-num">L1</div><div><div style="font-weight:700;font-size:0.78rem;">基础设施层</div><div style="font-size:0.66rem;color:var(--navy-500);margin-top:2px;">SQLite + ChromaDB + 熔断器 + 审计日志</div></div></div>
+          </div>
+          <div style="margin-top:12px;padding:10px 14px;background:var(--slate-50);border-radius:8px;">
+            <div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);margin-bottom:6px;">核心抽象接口</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <code style="font-size:0.66rem;background:#eef4fa;border:1px solid #3b7dc4;color:#3b7dc4;padding:2px 8px;border-radius:4px;">ReviewStorage</code>
+              <code style="font-size:0.66rem;background:#eef4fa;border:1px solid #3b7dc4;color:#3b7dc4;padding:2px 8px;border-radius:4px;">VectorStore</code>
+              <code style="font-size:0.66rem;background:#eef4fa;border:1px solid #3b7dc4;color:#3b7dc4;padding:2px 8px;border-radius:4px;">LLMProvider</code>
+              <code style="font-size:0.66rem;background:#eef4fa;border:1px solid #3b7dc4;color:#3b7dc4;padding:2px 8px;border-radius:4px;">DocumentParser</code>
+            </div>
+            <div style="font-size:0.64rem;color:var(--navy-500);margin-top:6px;">Demo 用 SQLite → 生产切 PostgreSQL，业务代码零改动</div>
+          </div>
+          <div style="margin-top:12px;">
+            <div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);margin-bottom:8px;">Demo vs 生产关键差异</div>
+            <table class="info-compare-table">
+              <tr><th>维度</th><th>Demo</th><th>生产</th></tr>
+              <tr><td>数据库</td><td>SQLite WAL</td><td>PostgreSQL 主从 + 连接池</td></tr>
+              <tr><td>向量库</td><td>ChromaDB 本地</td><td>Milvus 分布式集群</td></tr>
+              <tr><td>AI层</td><td>单模型直连，CrossCheck可跳过</td><td>LLM Gateway 多模型路由+熔断</td></tr>
+              <tr><td>缓存</td><td>进程内 LRU</td><td>Redis Cluster</td></tr>
+              <tr><td>安全</td><td>内存限流 60/min</td><td>WAF + Redis限流 + KMS + HTTPS</td></tr>
+              <tr><td>部署</td><td>python api_server.py</td><td>K8s + HPA + 蓝绿部署</td></tr>
             </table>
           </div>
-        </div>
-      </div>
-      <div class="card mt-24">
-        <div class="info-section">
-          <h3>安全特性</h3>
-          <ul class="info-list">
-              <li>API Key 认证 + PBKDF2-SHA256 密码哈希（后端预留，Demo 无需登录）</li>
-              <li>输入安全检测：Prompt 注入（25种）+ XSS（5种）+ SQL 注入（3种），共 33 种攻击模式识别</li>
-              <li>输入内容脱敏处理，不记录原始敏感数据</li>
-            <li>审核日志完整记录（HMAC签名防篡改），支持审计追溯</li>
-            <li>人工复核操作留痕，确保可追溯性</li>
-            <li>法规条款版本化管理，支持历史回溯</li>
-            <li>模型调用频率限制（滑动窗口），防止滥用</li>
-          </ul>
-        </div>
+        </section>
+
+        <section id="info-sec3" class="info-section-block">
+          <h3 class="info-section-title">10步审核管线</h3>
+          <button class="info-diagram-btn" onclick="showDiagram('pipeline')">📐 流程图</button>
+          <button class="info-diagram-btn" onclick="showDiagram('seqReview')">🕐 时序图</button>
+          <button class="info-diagram-btn" onclick="showDiagram('riskEngine')">📊 风险决策图</button>
+          <p class="info-desc">整个审核流程是严格的流水线，每步按固定顺序执行。贯穿案例：<strong style="color:var(--red-500);">"买保险就选 XX，稳赚不赔，年化收益 5%！"</strong></p>
+          <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+            <span class="info-step-tag" style="background:#eef4fa;border-color:#3b7dc4;color:#3b7dc4;">① Extract</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#fef3c7;border-color:#d4852b;color:#d4852b;">② RuleCheck</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#eef4fa;border-color:#3b7dc4;color:#3b7dc4;">③ RAG检索</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#fef3c7;border-color:#d4852b;color:#d4852b;">④ Rerank</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#d1fae5;border-color:#2d8a7f;color:#2d8a7f;">⑤ Expand</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#eef4fa;border-color:#3b7dc4;color:#3b7dc4;">⑥ LLM推理</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#d1fae5;border-color:#2d8a7f;color:#2d8a7f;">⑦ Format</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#fee2e2;border-color:#d14353;color:#d14353;">⑧ Validate</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#ede9fe;border-color:#7b5ea7;color:#7b5ea7;">⑨ CrossCheck</span><span style="color:var(--navy-300);font-size:0.7rem;">→</span>
+            <span class="info-step-tag" style="background:#fee2e2;border-color:#d14353;color:#d14353;">⑩ RiskAssess</span>
+          </div>
+          <div style="margin-top:14px;" id="pipelineDetails">
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#3b7dc4;">1</span><span style="font-weight:700;font-size:0.78rem;">信息提取 Extract</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：从文案中提取关键要素</p>
+                <p><strong>案例</strong>："稳赚不赔"→绝对化声明，"年化收益5%"→收益相关声明，无风险披露</p>
+                <p><strong>图片输入</strong>：自动转JPG+3倍放大→多模态模型提取文字和描述→与文本走相同管线</p>
+                <p class="info-dim">Demo简化：API Key缺失时降级为关键词提取</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#d4852b;">2</span><span style="font-weight:700;font-size:0.78rem;">规则预检 Rule Check</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：关键词库快速预筛查</p>
+                <p><strong>案例</strong>："稳赚不赔"→命中绝对化用语，"年化收益"→命中夸大收益</p>
+                <p><strong style="color:var(--red-500);">关键决策：规则命中 ≠ 跳过LLM</strong> — 规则命中后结果注入LLM Prompt，告诉LLM"已发现关键词违规，请继续检查更深层问题"</p>
+                <p><strong>为什么</strong>：一段文案可能同时存在关键词违规和语义隐含违规。"未来稳稳的幸福"没触发任何关键词，但保险语境下构成对确定性的暗示</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#3b7dc4;">3</span><span style="font-weight:700;font-size:0.78rem;">RAG 检索</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：文案+关键词拼成查询语句→ChromaDB向量检索Top-20相关法规</p>
+                <p><strong>技术</strong>：HNSW索引 + 余弦距离，嵌入模型 text-embedding-v3（1024维）</p>
+                <p class="info-dim">生产升级：向量+BM25多路召回+RRF融合+Query Rewriting查询改写</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#d4852b;">4</span><span style="font-weight:700;font-size:0.78rem;">重排序 Rerank</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：Top-20→精排Top-5+相邻条文</p>
+                <p><strong>有Key</strong>：qwen3-rerank Cross-Encoder语义精排→Top-5</p>
+                <p><strong>无Key</strong>：降级规则重排（字符重叠+关键词加权）</p>
+                <p><strong>相邻条文召回</strong>：Top-5每条自动召回前后条文，0.7折扣权重。为什么？法规条文不孤立，一条的意思可能依赖上下文定义条款</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#2d8a7f;">5</span><span style="font-weight:700;font-size:0.78rem;">条款关联扩展 Expand Relations</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：沿条款关系图扩展出相关的引用条文</p>
+                <p><strong>9种关系类型</strong>：引用（"依照第X条"）、例外（"除……外"）、补充、定义、冲突、前提、后果、修订、适用</p>
+                <p><strong>案例</strong>：第十九条"调整价格应公告"+但书"费率浮动区间内除外"→不追踪例外=所有调价都判违规</p>
+                <p class="info-dim">Demo：正则自动提取+49条预标注数据；生产：LLM驱动法规知识图谱</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#3b7dc4;">6</span><span style="font-weight:700;font-size:0.78rem;">LLM 深度推理</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：所有上下文拼装成Prompt→大模型CoT推理→违规类型+条文+推理过程</p>
+                <p><strong>Prompt拼装</strong>：原始文案 + RAG条文 + 关联条文 + 规则预检结果(rule_hint) + Few-Shot案例</p>
+                <p><strong>模型</strong>：qwen3.6-plus（主推理）→ qwen3.6-flash（后备，熔断切换）→ rule-engine（无Key兜底）</p>
+                <p><strong>选Qwen理由</strong>：金融合规数据不出境 + 中文法规语义理解最优</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#2d8a7f;">7</span><span style="font-weight:700;font-size:0.78rem;">结构化归一化 Format</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：LLM推理结果→标准化数据，四件事：</p>
+                <p>① 归一化：各种格式→标准violations数组</p>
+                <p>② 规则参考注入：LLM未提规则命中→reasoning前缀[规则引擎参考命中]</p>
+                <p>③ 降级兜底：LLM失败+规则命中→规则引擎结果；都失败→unknown</p>
+                <p>④ 数据清洗：compliant→yes/no/unknown，confidence→0~1</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#d14353;">8</span><span style="font-weight:700;font-size:0.78rem;">幻觉检测 Validate</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：LLM可能编造不存在的法规条文→逐条去法规库交叉验证</p>
+                <p>找到 → 保留</p>
+                <p>找不到 + 规则引擎有命中 → 降级规则条文，置信度上限0.7</p>
+                <p>找不到 + 规则也没命中 → 违规降级"未知"，置信度上限0.4</p>
+                <p><strong>为什么</strong>：多级降级策略确保即使LLM幻觉最严重，系统仍给出有依据的审核结论</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#7b5ea7;">9</span><span style="font-weight:700;font-size:0.78rem;">交叉复核 CrossCheck</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>做什么</strong>：独立轻量模型对审核结论做复核</p>
+                <p>检查：引用条文与输入内容的语义相关性 + 推理逻辑自洽性</p>
+                <p>输出：passed / issues / confidence_adjustment(±0.1)</p>
+                <p><strong>冲突裁决</strong>：主模型说违规+复核说合规→保留主模型降低置信度；主模型说合规+复核说违规→降级人工复核</p>
+                <p><strong>成本效益</strong>：成本仅增20%，降低约30%漏判</p>
+                <p class="info-dim">Demo：API Key缺失时直接跳过</p>
+              </div>
+            </div>
+            <div class="info-pipeline-step" onclick="togglePipelineDetail(this)">
+              <div class="info-pipeline-header"><span class="info-pipeline-num" style="background:#d14353;">10</span><span style="font-weight:700;font-size:0.78rem;">风险评估 Risk Assess</span><span class="info-pipeline-toggle">▶</span></div>
+              <div class="info-pipeline-body" style="display:none;">
+                <p><strong>公式</strong>：<code>severity×0.5 + article_count×0.1(max0.3) + rule_hit×0.15 + confidence_adj</code></p>
+                <p><strong>三级决策</strong>：</p>
+                <p><span style="color:#10b981;font-weight:700;">&lt;0.15 auto_pass</span> · <span style="color:#f59e0b;font-weight:700;">0.15~0.70 human_review</span> · <span style="color:#ef4444;font-weight:700;">≥0.70 auto_block</span></p>
+                <p><strong>案例结果</strong>："稳赚不赔，年化5%"→风险分1.0，Critical，auto_block。违规：收益承诺+绝对化用语+隐瞒信息+诱导销售</p>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--navy-700);margin-bottom:8px;">五个关键设计决策</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div class="info-decision-card"><div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);">Rule + LLM 协同</div><div style="font-size:0.64rem;color:var(--navy-500);margin-top:3px;">规则命中注入Prompt，既保留确定性又发现深层问题。纯规则无法检测语义隐含违规</div></div>
+              <div class="info-decision-card"><div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);">10步流水线</div><div style="font-size:0.64rem;color:var(--navy-500);margin-top:3px;">每步可观测、可调试、可独立优化。端到端出了问题无法定位，无法局部降级</div></div>
+              <div class="info-decision-card"><div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);">轻量模型CrossCheck</div><div style="font-size:0.64rem;color:var(--navy-500);margin-top:3px;">成本仅增20%，降低30%漏判。金融场景一次漏判代价远超20%API费用</div></div>
+              <div class="info-decision-card"><div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);">条款关系图</div><div style="font-size:0.64rem;color:var(--navy-500);margin-top:3px;">"禁止+例外"逻辑向量检索无法捕捉。关系图确保LLM拿到完整法规上下文</div></div>
+              <div class="info-decision-card" style="grid-column:span 2;"><div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);">Demo/生产分离，接口隔离</div><div style="font-size:0.64rem;color:var(--navy-500);margin-top:3px;">四个核心接口换实现不改逻辑。Demo 30秒启动验证核心假设，生产99.9%可用</div></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="info-sec4" class="info-section-block">
+          <h3 class="info-section-title">韧性设计</h3>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;">
+            <div class="info-resilience-card">
+              <div style="font-size:0.78rem;font-weight:700;color:var(--amber-600);">熔断器</div>
+              <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.5;">LLM/Embedding独立熔断。连续失败5次→打开→快速失败。半开→试探→成功则恢复</div>
+            </div>
+            <div class="info-resilience-card">
+              <div style="font-size:0.78rem;font-weight:700;color:var(--teal-600);">重试机制</div>
+              <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.5;">可恢复错误（超时、限流）→指数退避+随机抖动。最大重试次数、退避系数可配置</div>
+            </div>
+            <div class="info-resilience-card">
+              <div style="font-size:0.78rem;font-weight:700;color:var(--red-600);">多级降级</div>
+              <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.5;">向量检索失败→关键词匹配<br>LLM API失败→规则引擎<br>重排序失败→规则重排</div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:12px 16px;background:linear-gradient(135deg,#eef4fa,#d1fae5);border-radius:8px;">
+            <div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);margin-bottom:6px;">LLM 降级链</div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="background:#3b7dc4;color:white;padding:4px 12px;border-radius:6px;font-size:0.7rem;font-weight:600;">qwen3.6-plus</span>
+              <span style="color:var(--navy-400);">熔断/超时 →</span>
+              <span style="background:#d4852b;color:white;padding:4px 12px;border-radius:6px;font-size:0.7rem;font-weight:600;">qwen3.6-flash</span>
+              <span style="color:var(--navy-400);">无Key →</span>
+              <span style="background:#2d8a7f;color:white;padding:4px 12px;border-radius:6px;font-size:0.7rem;font-weight:600;">rule-engine</span>
+              <span style="font-size:0.64rem;color:var(--navy-500);margin-left:8px;">（永不失败）</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="info-sec5" class="info-section-block">
+          <h3 class="info-section-title">安全防护 — 7层纵深防御</h3>
+          <button class="info-diagram-btn" onclick="showDiagram('security')">📐 安全架构图</button>
+          <table class="info-compare-table" style="margin-top:12px;">
+            <tr><th>层</th><th>职责</th><th>Demo</th><th>生产</th></tr>
+            <tr><td>L1</td><td>网络层</td><td>❌ 无</td><td>✅ WAF + CDN + DDoS</td></tr>
+            <tr><td>L2</td><td>API网关</td><td>⚠️ 内存限流60/min</td><td>✅ 滑动窗口+IP白名单+CORS</td></tr>
+            <tr><td>L3</td><td>认证</td><td>⚠️ 单一admin角色</td><td>✅ OAuth2.0+JWT+RBAC</td></tr>
+            <tr><td>L4</td><td>输入校验</td><td>✅ XSS(5)+SQLi(3)</td><td>✅ 相同</td></tr>
+            <tr><td>L5</td><td>Prompt注入检测</td><td>✅ 25种模式</td><td>✅ 相同+持续更新</td></tr>
+            <tr><td>L6</td><td>LLM安全Prompt</td><td>✅ 角色约束+Schema</td><td>✅ 相同+敏感信息过滤</td></tr>
+            <tr><td>L7</td><td>输出校验</td><td>⚠️ CrossCheck可跳过</td><td>✅ CrossCheck+脱敏</td></tr>
+          </table>
+          <div style="margin-top:10px;padding:10px 14px;background:#fef3c7;border-radius:8px;">
+            <div style="font-size:0.72rem;font-weight:700;color:#d4852b;margin-bottom:4px;">Prompt注入检测 — 25种模式</div>
+            <div style="font-size:0.64rem;color:var(--navy-600);line-height:1.6;">覆盖：角色劫持（"你现在是一个"）、指令覆盖（"ignore previous instructions"）、系统提示词泄露、模板注入（${{）、编码绕过等5大类，中英文双语</div>
+          </div>
+          <div style="margin-top:8px;font-size:0.66rem;color:var(--navy-500);">审计日志：HMAC-SHA256签名防篡改，每日轮转，90天自动清理</div>
+        </section>
+
+        <section id="info-sec6" class="info-section-block">
+          <h3 class="info-section-title">数据与知识管理</h3>
+          <button class="info-diagram-btn" onclick="showDiagram('dataflow')">📐 数据流图</button>
+          <button class="info-diagram-btn" onclick="showDiagram('seqRegulation')">🕐 入库时序图</button>
+          <button class="info-diagram-btn" onclick="showDiagram('seqViolation')">🕐 类型管理时序图</button>
+          <div style="margin-top:8px;padding:10px 16px;background:linear-gradient(135deg,#eef4fa,#f0fdfa);border-radius:8px;">
+            <div style="font-size:0.72rem;color:var(--navy-700);line-height:1.6;">
+              <strong>数据生命周期闭环</strong>：法规入库 → 违规分类 → 审核引用 → 人工反馈 → 知识沉淀 → 自动改善。四条数据流不是独立的，而是通过 <strong>Human-in-the-Loop</strong> 形成闭环——人工的每一次 override 都沉淀为 Few-Shot 样本，让系统越用越准。
+            </div>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+              <span style="background:#2d8a7f;color:white;padding:3px 10px;border-radius:12px;font-size:0.64rem;font-weight:600;">📚 入库</span>
+              <span style="color:var(--navy-400);font-size:0.7rem;">→</span>
+              <span style="background:#7b5ea7;color:white;padding:3px 10px;border-radius:12px;font-size:0.64rem;font-weight:600;">🏷️ 分类</span>
+              <span style="color:var(--navy-400);font-size:0.7rem;">→</span>
+              <span style="background:#3b7dc4;color:white;padding:3px 10px;border-radius:12px;font-size:0.64rem;font-weight:600;">🔍 审核</span>
+              <span style="color:var(--navy-400);font-size:0.7rem;">→</span>
+              <span style="background:#d4852b;color:white;padding:3px 10px;border-radius:12px;font-size:0.64rem;font-weight:600;">🔄 反馈</span>
+              <span style="color:var(--navy-400);font-size:0.7rem;">→</span>
+              <span style="font-size:0.64rem;color:var(--teal-600);font-weight:600;">🔁 闭环</span>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="info-resilience-card" style="border-left:3px solid #3b7dc4;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="font-size:0.74rem;font-weight:700;color:#3b7dc4;">🔍 审核主流程</div>
+                  <span style="font-size:0.58rem;background:#eef4fa;color:#3b7dc4;padding:2px 6px;border-radius:4px;font-weight:600;">核心链路</span>
+                </div>
+                <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">用户提交文案 → 10步管线处理 → 审核结论+风险评级 → 三级处置(auto_pass / human_review / auto_block) → 人工复核(可选) → 结果归档</div>
+                <div style="font-size:0.62rem;color:var(--navy-500);margin-top:3px;">详见"10步审核管线"章节</div>
+              </div>
+              <div class="info-resilience-card" style="border-left:3px solid #2d8a7f;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="font-size:0.74rem;font-weight:700;color:#2d8a7f;">📚 法规管理流</div>
+                  <span style="font-size:0.58rem;background:#d1fae5;color:#2d8a7f;padding:2px 6px;border-radius:4px;font-weight:600;">LLM辅助标注+人工审批</span>
+                </div>
+                <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">上传法规文件 → 格式识别(PDF/Word/TXT) → DocumentParser解析 → 按条款拆分 → LLM辅助标注(违规类型+严重度) → <strong>管理员审批</strong> → 向量化(text-embedding-v3) → ChromaDB索引 → 条款关系提取(9种关系类型) → 关系图更新</div>
+                <div style="font-size:0.62rem;color:var(--navy-500);margin-top:3px;">法规库：《保险销售行为管理办法》《互联网保险业务监管办法》《金融产品网络营销管理办法》· 83条条文 · 51条关系 · 209条映射</div>
+              </div>
+              <div class="info-resilience-card" style="border-left:3px solid #d4852b;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="font-size:0.74rem;font-weight:700;color:#d4852b;">🔄 反馈学习流</div>
+                  <span style="font-size:0.58rem;background:#fef3c7;color:#d4852b;padding:2px 6px;border-radius:4px;font-weight:600;">HITL闭环</span>
+                </div>
+                <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">人工复核override → 差异检测(原结论 vs 人工判定) → 自动生成Few-Shot样本(文案+正确结论+推理) → 样本库(每类≤10条，全局≤100条) → 低分淘汰 → 下次同类审核注入Prompt → LLM输出质量提升</div>
+                <div style="font-size:0.62rem;color:var(--navy-500);margin-top:3px;">人工反馈 → 知识沉淀 → 自动改善，越用越准</div>
+              </div>
+              <div class="info-resilience-card" style="border-left:3px solid #7b5ea7;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="font-size:0.74rem;font-weight:700;color:#7b5ea7;">🏷️ 违规类型流</div>
+                  <span style="font-size:0.58rem;background:#ede9fe;color:#7b5ea7;padding:2px 6px;border-radius:4px;font-weight:600;">规则+LLM共享体系</span>
+                </div>
+                <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">违规类型定义(5 L1 → 11 L2) → 关键词库绑定 → 严重度+修改建议 → 法规条文映射(209条) → 规则引擎加载 → LLM Prompt注入(violation_types描述) → 审核结果引用 → 人工可增删改类型 → 实时生效</div>
+                <div style="font-size:0.62rem;color:var(--navy-500);margin-top:3px;">5 L1：虚假宣传/资质违规/销售行为违规/信息披露违规/信息保护违规 · 11 L2 · 规则引擎和LLM共享同一套体系</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="info-sec7" class="info-section-block">
+          <h3 class="info-section-title">质量保障体系</h3>
+          <button class="info-diagram-btn" onclick="showDiagram('seqReviewOverride')">🕐 复核时序图</button>
+          <button class="info-diagram-btn" onclick="showDiagram('seqEval')">📊 评估时序图</button>
+          <div style="margin-top:8px;padding:10px 16px;background:linear-gradient(135deg,#fef3c7,#f0fdfa);border-radius:8px;">
+            <div style="font-size:0.72rem;color:var(--navy-700);line-height:1.6;">
+              <strong>三层质量保障</strong>：自动化评估（量化指标） → 人工复核（HITL纠正） → 反馈学习（闭环改善）。不是上线就完事，而是持续度量、持续改进。
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+            <div class="info-resilience-card" style="border-left:3px solid #3b7dc4;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-size:0.74rem;font-weight:700;color:#3b7dc4;">📊 自动化评估</div>
+                <span style="font-size:0.58rem;background:#eef4fa;color:#3b7dc4;padding:2px 6px;border-radius:4px;font-weight:600;">CI/CD就绪</span>
+              </div>
+              <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">
+                <strong>标准评估</strong>：30个标注用例（合规/违规各半），度量 Precision / Recall / F1 / Accuracy<br>
+                <strong>极限测试</strong>：25个边界用例（Prompt注入、角色劫持、XSS/SQL注入、语义隐含违规、边界用例）<br>
+                <strong>指标体系</strong>：TP/TN/FP/FN 混淆矩阵 + 平均延迟 + 逐用例通过/失败明细
+              </div>
+              <div style="font-size:0.62rem;color:var(--navy-500);margin-top:3px;">结果持久化到数据库，支持历史对比 · 可集成 CI Pipeline 自动回归</div>
+            </div>
+            <div class="info-resilience-card" style="border-left:3px solid #2d8a7f;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-size:0.74rem;font-weight:700;color:#2d8a7f;">✋ 人工复核</div>
+                <span style="font-size:0.58rem;background:#d1fae5;color:#2d8a7f;padding:2px 6px;border-radius:4px;font-weight:600;">HITL</span>
+              </div>
+              <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">
+                <strong>触发条件</strong>：风险分 0.15~0.70 的审核结果自动进入人工复核队列<br>
+                <strong>复核内容</strong>：逐条违规判定 agree/disagree + 修改意见<br>
+                <strong>审计追踪</strong>：每次 override 记录 before/after + 修改原因 + 操作人
+              </div>
+              <div style="font-size:0.62rem;color:var(--navy-500);margin-top:3px;">不是黑箱——每个判定都可追溯、可质疑、可纠正</div>
+            </div>
+            <div class="info-resilience-card" style="border-left:3px solid #d4852b;grid-column:span 2;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-size:0.74rem;font-weight:700;color:#d4852b;">🔄 评估驱动的持续改进</div>
+                <span style="font-size:0.58rem;background:#fef3c7;color:#d4852b;padding:2px 6px;border-radius:4px;font-weight:600;">闭环</span>
+              </div>
+              <div style="font-size:0.66rem;color:var(--navy-600);margin-top:4px;line-height:1.6;">
+                评估发现 FP 偏高 → 调整 risk_score 阈值或 Prompt 合规判断标准 → 重新评估验证 → 指标改善<br>
+                评估发现 FN 偏高 → 扩展关键词库或增加 Few-Shot 样本 → 重新评估验证 → 指标改善<br>
+                人工 override 数据 → 自动生成 Few-Shot → 下次评估自动体现改善效果<br>
+                <strong>关键设计</strong>：评估结果持久化 + 历史对比，每次改动可量化验证，不做盲改
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="info-sec8" class="info-section-block">
+          <h3 class="info-section-title">技术栈 & 演进路线</h3>
+          <button class="info-diagram-btn" onclick="showDiagram('dbSchema')">🗄️ 数据库ER图</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div>
+              <table class="info-compare-table">
+                <tr><th>组件</th><th>选型</th></tr>
+                <tr><td>大模型</td><td>通义千问 Qwen 系列</td></tr>
+                <tr><td>后备模型</td><td>qwen3.6-flash（熔断切换）</td></tr>
+                <tr><td>嵌入模型</td><td>text-embedding-v3，1024维</td></tr>
+                <tr><td>向量库</td><td>ChromaDB，HNSW索引</td></tr>
+                <tr><td>数据库</td><td>SQLite（WAL模式）</td></tr>
+                <tr><td>后端</td><td>FastAPI</td></tr>
+                <tr><td>前端</td><td>纯 HTML/CSS/JS SPA</td></tr>
+                <tr><td>可观测性</td><td>Prometheus + 健康检查</td></tr>
+              </table>
+            </div>
+            <div>
+              <div style="font-size:0.72rem;font-weight:700;color:var(--navy-700);margin-bottom:6px;">演进路线</div>
+              <div style="font-size:0.66rem;color:var(--navy-600);line-height:1.8;">
+                <strong style="color:var(--red-500);">P0 上线前</strong>：PostgreSQL迁移 + Milvus部署 + 多Key轮转 + TLS/OAuth2.0/KMS + 监控部署 + K8s容器化<br>
+                <strong style="color:var(--amber-500);">P1 上线后1月</strong>：独立Reranker服务 + RBAC增强 + HITL工作台(React) + CrossCheck增强 + BM25混合检索 + 图文一致性校验<br>
+                <strong style="color:var(--teal-500);">P2 迭代优化</strong>：SLM语义规则引擎 + DAG并行流水线 + 法规知识图谱 + Few-Shot自动管理 + AI评估平台 + 模型漂移监控
+              </div>
+              <div style="margin-top:8px;padding:8px 12px;background:#d1fae5;border-radius:6px;">
+                <div style="font-size:0.64rem;color:#2d8a7f;font-weight:600;">SLA：99.9%可用性 | RPO 1h | RTO 15min | P95 &lt;3s</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
   </div>
@@ -1855,6 +2436,21 @@ select.form-control {
 </main>
 
 <div class="toast-container" id="toastContainer"></div>
+
+<div id="diagramModal" class="diagram-modal" onclick="closeDiagram(event)">
+  <div class="diagram-modal-content" onclick="event.stopPropagation()">
+    <button class="diagram-modal-close" onclick="closeDiagram()">&times;</button>
+    <div class="diagram-modal-title" id="diagramTitle"></div>
+    <div class="diagram-modal-toolbar">
+      <button onclick="diagramZoom(-0.2)">➖ 缩小</button>
+      <span class="zoom-label" id="diagramZoomLabel">100%</span>
+      <button onclick="diagramZoom(0.2)">➕ 放大</button>
+      <button onclick="diagramZoom(0)">🔄 重置</button>
+      <span style="font-size:0.66rem;color:var(--navy-400);margin-left:8px;">滚轮缩放 · 拖拽平移</span>
+    </div>
+    <div class="diagram-modal-body" id="diagramBody"></div>
+  </div>
+</div>
 
 <script>
 const FALLBACK_REVIEW_RESULT = {
@@ -3422,6 +4018,39 @@ function exportHistory() {
 let _evalRunning = false;
 let _evalResults = { standard: null, extreme: null };
 
+async function loadSavedEvalResults() {
+  for (const mode of ['standard', 'extreme']) {
+    try {
+      const resp = await apiCall('GET', `/api/v1/evaluate/latest/${mode}`);
+      if (resp && resp.found && resp.result) {
+        const r = resp.result;
+        _evalResults[mode] = {
+          mode: r.mode,
+          precision: r.precision_val,
+          recall: r.recall_val,
+          f1: r.f1_val,
+          accuracy: r.accuracy_val,
+          total: r.total_cases,
+          true_positives: r.true_positives,
+          true_negatives: r.true_negatives,
+          false_positives: r.false_positives,
+          false_negatives: r.false_negatives,
+          avg_latency: r.avg_latency,
+          test_cases: r.case_results || [],
+          errors: r.errors || [],
+          _saved: true,
+          _run_time: r.created_at,
+          _model_used: r.model_used,
+        };
+      }
+    } catch (e) {}
+  }
+  if (_evalResults.standard || _evalResults.extreme) {
+    const activeTab = _evalResults.standard ? 'standard' : 'extreme';
+    renderEvalResults(_evalResults[activeTab], activeTab);
+  }
+}
+
 async function runEvaluation(type) {
   if (_evalRunning) {
     showToast('评估正在运行中，请等待完成', 'warning');
@@ -3568,9 +4197,16 @@ function renderEvalResults(result, type) {
     `;
   }
 
+  let savedInfoHtml = '';
+  if (result._saved && result._run_time) {
+    const runTime = result._run_time.replace('T', ' ').replace('Z', '').substring(0, 19);
+    savedInfoHtml = `<div style="font-size:0.75rem;color:var(--navy-500);margin-bottom:8px;">🕐 运行时间: ${runTime}${result._model_used ? ' · 模型: ' + result._model_used : ''}</div>`;
+  }
+
   document.getElementById('evalDetail').innerHTML = `
     ${extremeInfoHtml}
     <div class="card-title">评估详情 — ${type === 'standard' ? '标准评估' : '极限测试'}</div>
+    ${savedInfoHtml}
     <div class="grid-3 mt-12">
       <div style="text-align:center;padding:12px;">
         <div style="font-size:1.5rem;font-weight:700;color:var(--navy-900);">${result.total}</div>
@@ -4907,6 +5543,10 @@ async function checkBackendHealth() {
         if (data.default_model) {
           defaultModelName = data.default_model;
         }
+        if (data.author_name) {
+          const authorEl = document.getElementById('authorName');
+          if (authorEl) authorEl.textContent = data.author_name;
+        }
         const components = data.components || {};
         const ragStatus = components.rag_engine ? components.rag_engine.status : 'unknown';
         const useVector = components.rag_engine ? components.rag_engine.use_vector : false;
@@ -5070,7 +5710,529 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   checkBackendHealth();
   loadViolationTypesFromAPI();
+  loadSavedEvalResults();
 });
+
+function togglePipelineDetail(el) {
+  const body = el.querySelector('.info-pipeline-body');
+  if (!body) return;
+  const isOpen = el.classList.contains('open');
+  if (isOpen) {
+    el.classList.remove('open');
+    body.style.display = 'none';
+  } else {
+    el.classList.add('open');
+    body.style.display = 'block';
+  }
+}
+
+function infoScrollTo(id, event) {
+  if (event) event.preventDefault();
+  const container = document.getElementById('infoContent');
+  const target = document.getElementById(id);
+  if (!container || !target) return;
+  container.scrollTo({ top: target.offsetTop - container.offsetTop - 10, behavior: 'smooth' });
+  document.querySelectorAll('#infoToc .info-toc-link').forEach(a => a.classList.remove('active'));
+  const link = document.querySelector(`#infoToc .info-toc-link[href="#${id}"]`);
+  if (link) link.classList.add('active');
+}
+
+(function initInfoScrollSpy() {
+  const container = document.getElementById('infoContent');
+  if (!container) return;
+  const sections = ['info-sec1','info-sec2','info-sec3','info-sec4','info-sec5','info-sec6','info-sec7','info-sec8'];
+  container.addEventListener('scroll', function() {
+    const scrollTop = container.scrollTop + 20;
+    let activeId = sections[0];
+    for (const id of sections) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      if (el.offsetTop - container.offsetTop <= scrollTop) {
+        activeId = id;
+      }
+    }
+    document.querySelectorAll('#infoToc .info-toc-link').forEach(a => a.classList.remove('active'));
+    const link = document.querySelector(`#infoToc .info-toc-link[href="#${activeId}"]`);
+    if (link) link.classList.add('active');
+  });
+})();
+
+const DIAGRAMS = {
+  arch: {
+    title: '六层解耦架构图',
+    code: `graph TB
+      L6["🖥️ L6 展示层<br/>FastAPI + 纯 HTML SPA"] --> L5["🚪 L5 网关层<br/>认证 / 限流 / 安全校验 / CORS"]
+      L5 --> L4["💼 L4 业务服务层<br/>ReviewAgent 编排 + 异步队列"]
+      L4 --> L3["🧠 L3 AI 能力层<br/>RAG + LLM Gateway + 规则引擎 + Reranker + Risk Engine"]
+      L3 --> L2["⚙️ L2 数据处理层<br/>多格式解析 / 4种分块策略 / 向量化"]
+      L2 --> L1["🏗️ L1 基础设施层<br/>SQLite + ChromaDB + 熔断器 + 审计日志"]
+      L4 -.->|直接访问| L1
+      L3 -.->|直接访问| L1
+
+      style L6 fill:#3b7dc4,color:#fff
+      style L5 fill:#d4852b,color:#fff
+      style L4 fill:#2d8a7f,color:#fff
+      style L3 fill:#7b5ea7,color:#fff
+      style L2 fill:#3b7dc4,color:#fff
+      style L1 fill:#64748b,color:#fff`
+  },
+  pipeline: {
+    title: '10步审核管线流程图',
+    code: `flowchart LR
+      INPUT(["📝 审核输入"]) --> E1["① Extract<br/>信息提取"]
+      E1 --> E2["② RuleCheck<br/>规则预检"]
+      E2 --> E3["③ RAG检索<br/>向量召回Top-20"]
+      E3 --> E4["④ Rerank<br/>精排Top-5+相邻"]
+      E4 --> E5["⑤ Expand<br/>条款关联扩展"]
+      E5 --> E6["⑥ LLM推理<br/>CoT深度分析"]
+      E6 --> E7["⑦ Format<br/>结构化归一化"]
+      E7 --> E8["⑧ Validate<br/>幻觉检测"]
+      E8 --> E9["⑨ CrossCheck<br/>交叉复核"]
+      E9 --> E10["⑩ RiskAssess<br/>风险评估"]
+      E10 --> PASS(["✅ auto_pass"])
+      E10 --> REVIEW(["👤 human_review"])
+      E10 --> BLOCK(["🚫 auto_block"])
+
+      style INPUT fill:#f1f5f9,stroke:#475569,color:#1e293b
+      style E1 fill:#3b7dc4,color:#fff
+      style E2 fill:#d4852b,color:#fff
+      style E3 fill:#3b7dc4,color:#fff
+      style E4 fill:#d4852b,color:#fff
+      style E5 fill:#2d8a7f,color:#fff
+      style E6 fill:#3b7dc4,color:#fff
+      style E7 fill:#2d8a7f,color:#fff
+      style E8 fill:#d14353,color:#fff
+      style E9 fill:#7b5ea7,color:#fff
+      style E10 fill:#d14353,color:#fff
+      style PASS fill:#dcfce7,stroke:#16a34a,color:#16a34a
+      style REVIEW fill:#fef3c7,stroke:#d97706,color:#92400e
+      style BLOCK fill:#fee2e2,stroke:#dc2626,color:#dc2626`
+  },
+  dataflow: {
+    title: '四条数据流 — HITL闭环',
+    code: `flowchart TB
+      subgraph REG["📚 法规管理流"]
+        R1["法规文档上传"] --> R2["多格式解析"]
+        R2 --> R3["按条款拆分"]
+        R3 --> R4["LLM辅助标注"]
+        R4 --> R5["管理员审批 ✋"]
+        R5 --> R6["向量化 → ChromaDB"]
+        R6 --> R7["条款关系提取"]
+      end
+
+      subgraph VT["🏷️ 违规类型流"]
+        V1["5 L1 → 11 L2 定义"] --> V2["关键词+严重度绑定"]
+        V2 --> V3["209条法规映射"]
+        V3 --> V4["规则引擎加载"]
+        V3 --> V5["LLM Prompt注入"]
+      end
+
+      subgraph REV["🔍 审核主流程"]
+        S1["用户提交文案"] --> S2["10步管线"]
+        S2 --> S3["审核结论+风险评级"]
+        S3 --> S4["三级处置"]
+        S4 --> S5["人工复核 ✋"]
+      end
+
+      subgraph FB["🔄 反馈学习流"]
+        F1["人工override ✋"] --> F2["差异检测"]
+        F2 --> F3["Few-Shot样本生成"]
+        F3 --> F4["样本库·低分淘汰"]
+      end
+
+      R7 -->|法规条文| V3
+      V4 -->|规则预检| S2
+      V5 -->|violation_types| S2
+      R6 -->|RAG检索| S2
+      S5 -->|override| F1
+      F4 -->|注入Prompt| S2
+
+      style REG fill:#f0fdfa,stroke:#2d8a7f,color:#1e293b
+      style VT fill:#f5f3ff,stroke:#7b5ea7,color:#1e293b
+      style REV fill:#eef4fa,stroke:#3b7dc4,color:#1e293b
+      style FB fill:#fef3c7,stroke:#d4852b,color:#1e293b`
+  },
+  seqReview: {
+    title: '审核流程时序图',
+    code: `sequenceDiagram
+      actor User as 业务人员
+      participant API as FastAPI REST
+      participant Sec as SecurityCheck
+      participant WF as WorkflowEngine(10步)
+
+      User->>API: POST /api/v1/review {text}
+      API->>Sec: 安全校验(25种模式)
+      Sec-->>API: 校验通过
+      API->>WF: 启动10步Pipeline
+
+      Note over WF: ① Extract: 要素提取
+      Note over WF: ② RuleCheck: 关键词预检
+      Note over WF: ③ RAG: 向量检索Top-20
+      Note over WF: ④ Rerank: 精排Top-5+相邻
+      Note over WF: ⑤ Expand: 条款关联扩展
+      Note over WF: ⑥ LLM: CoT深度推理
+      Note over WF: ⑦ Format: 结构化归一化
+      Note over WF: ⑧ Validate: 幻觉检测
+      Note over WF: ⑨ CrossCheck: 交叉复核
+      Note over WF: ⑩ RiskAssess: 风险评估
+
+      WF-->>API: {decision, risk_score, violations}
+      API-->>User: 审核结论+违规详情+修改建议`
+  },
+  seqRegulation: {
+    title: '法规入库时序图',
+    code: `sequenceDiagram
+      actor Admin as 合规管理员
+      participant API as FastAPI REST
+      participant Parser as DocParser
+      participant Chunk as ChunkStrategy
+      participant Annotate as LLM辅助标注
+      participant Approve as 管理员审批
+      participant Index as ChromaDB
+
+      Admin->>API: POST /api/v1/regulations/upload
+      API->>Parser: 多格式解析(PDF/Word/TXT)
+      Parser-->>API: ParsedDocument
+      API->>Chunk: 分块策略(Article/Chapter)
+      Chunk-->>API: Chunks[条款项]
+      API->>Annotate: LLM辅助标注(违规类型+严重度)
+      Annotate-->>API: 标注结果
+      API-->>Admin: 标注完成，待审批
+
+      Admin->>Approve: 审批标注结果(确认/修正)
+      Approve-->>API: 审批通过
+      API->>Index: Embedding向量化+索引构建
+      Index-->>API: 索引构建完成
+      API-->>Admin: 法规入库成功`
+  },
+  seqReviewOverride: {
+    title: '人工复核与Few-Shot回流时序图',
+    code: `sequenceDiagram
+      actor Reviewer as 合规审核员
+      participant API as FastAPI REST
+      participant Queue as PendingQueue
+      participant Override as Override操作
+      participant FewShot as Few-Shot回流
+
+      Reviewer->>API: GET /api/v1/review/pending
+      API->>Queue: 查询human_review状态
+      Queue-->>API: 待审列表
+      API-->>Reviewer: 展示待审队列
+
+      Reviewer->>API: GET /api/v1/review/{id}
+      API-->>Reviewer: 审核详情(原文+违规条款+风险评分)
+
+      Reviewer->>API: POST /api/v1/review/{id}/override
+      Note right of Reviewer: {decision, comment}
+      API->>Override: 记录override(before/after)
+      Override->>FewShot: 自动生成Few-Shot样本
+      Note over FewShot: 文案+正确结论+推理
+      FewShot-->>Override: 样本已存入few_shots.json
+      Override-->>API: override完成
+      API-->>Reviewer: 操作成功`
+  },
+  dbSchema: {
+    title: '数据库ER关系图',
+    code: `erDiagram
+      users {
+        INTEGER id PK
+        TEXT username UK
+        TEXT password_hash
+        TEXT role
+        TEXT api_key UK
+        INTEGER is_active
+        TEXT created_at
+      }
+
+      review_records {
+        INTEGER id PK
+        INTEGER user_id FK
+        TEXT input_content
+        TEXT compliant
+        TEXT violation_type
+        REAL confidence
+        TEXT reasoning
+        TEXT suggestions
+        REAL latency_ms
+        TEXT decision
+        REAL risk_score
+        TEXT risk_level
+        TEXT model_used
+        TEXT created_at
+      }
+
+      review_feedback {
+        INTEGER id PK
+        INTEGER review_id FK
+        INTEGER user_id FK
+        INTEGER is_correct
+        TEXT comment
+        TEXT created_at
+      }
+
+      violation_types {
+        TEXT id PK
+        TEXT name
+        INTEGER level
+        TEXT parent_id
+        REAL severity
+        TEXT keywords
+        TEXT suggestions
+        TEXT status
+        TEXT created_at
+      }
+
+      clause_type_mappings {
+        TEXT id PK
+        TEXT violation_type_id FK
+        TEXT doc_name
+        TEXT article_number
+        TEXT mapping_logic
+        TEXT created_at
+      }
+
+      review_violations {
+        INTEGER id PK
+        INTEGER review_id FK
+        TEXT violation_type_id FK
+        TEXT violated_articles
+        TEXT reasoning
+        TEXT source
+        TEXT created_at
+      }
+
+      review_modifications {
+        INTEGER id PK
+        INTEGER review_id FK
+        TEXT modification_type
+        TEXT before_value
+        TEXT after_value
+        TEXT modification_reason
+        INTEGER user_id FK
+        TEXT created_at
+      }
+
+      eval_results {
+        INTEGER id PK
+        TEXT mode
+        INTEGER is_active
+        REAL precision_val
+        REAL recall_val
+        REAL f1_val
+        REAL accuracy_val
+        INTEGER total_cases
+        INTEGER true_positives
+        INTEGER true_negatives
+        INTEGER false_positives
+        INTEGER false_negatives
+        REAL avg_latency
+        TEXT model_used
+        TEXT run_by
+        TEXT created_at
+      }
+
+      audit_events {
+        INTEGER id PK
+        TEXT event_type
+        INTEGER user_id
+        TEXT client_id
+        TEXT detail
+        TEXT created_at
+      }
+
+      users ||--o{ review_records : user_id
+      users ||--o{ review_feedback : user_id
+      users ||--o{ review_modifications : user_id
+      review_records ||--o{ review_feedback : review_id
+      review_records ||--o{ review_violations : review_id
+      review_records ||--o{ review_modifications : review_id
+      violation_types ||--o{ violation_types : parent_id
+      violation_types ||--o{ clause_type_mappings : violation_type_id
+      violation_types ||--o{ review_violations : violation_type_id`
+  },
+  security: {
+    title: '7层纵深防御架构图',
+    code: `graph LR
+      REQ["📨 请求"] --> L1
+      L1["🛡️ L1: WAF/CDN<br/>网络层防护"] --> L2
+      L2["🚪 L2: API网关<br/>限流 + CORS白名单"] --> L3
+      L3["🔑 L3: 认证<br/>RBAC + API Key过期检查"] --> L4
+      L4["✅ L4: 输入校验<br/>XSS / SQL注入 / 控制字符"] --> L5
+      L5["🤖 L5: Prompt注入检测<br/>25种攻击模式识别"] --> L6
+      L6["🔒 L6: LLM安全Prompt<br/>角色约束 + 输出格式限定"] --> L7
+      L7["📤 L7: 输出校验<br/>JSON Schema + 幻觉检测"]
+
+      style L1 fill:#fee2e2,stroke:#991b1b
+      style L2 fill:#fef3c7,stroke:#92400e
+      style L3 fill:#fef9c3,stroke:#854d0e
+      style L4 fill:#ecfccb,stroke:#3f6212
+      style L5 fill:#d1fae5,stroke:#065f46
+      style L6 fill:#dbeafe,stroke:#1e40af
+      style L7 fill:#ede9fe,stroke:#5b21b6`
+  },
+  riskEngine: {
+    title: 'Risk Engine 风险评分决策路由图',
+    code: `flowchart TB
+      RESULT["审核结果"] --> SCORE["风险评分计算<br/>base=违规严重度<br/>+条文数量加权<br/>+规则命中加成<br/>+置信度调整"]
+      SCORE -->|"risk_score ∈ [0, 1]"| CLASSIFY{"4级风险分类"}
+      CLASSIFY -->|"< 0.1"| LOW["LOW"]
+      CLASSIFY -->|"< 0.7"| MEDIUM["MEDIUM"]
+      CLASSIFY -->|"< 0.9"| HIGH["HIGH"]
+      CLASSIFY -->|"≥ 0.9"| CRITICAL["CRITICAL"]
+
+      LOW -->|"risk < 0.15"| AUTO_PASS["auto_pass<br/>自动通过"]
+      MEDIUM -->|"0.15 ≤ risk < 0.70"| HUMAN_REVIEW["human_review<br/>人工复核"]
+      HIGH -->|"risk ≥ 0.70"| AUTO_BLOCK["auto_block<br/>自动拦截"]
+      CRITICAL --> AUTO_BLOCK
+
+      style AUTO_PASS fill:#d1fae5,stroke:#065f46
+      style HUMAN_REVIEW fill:#fef3c7,stroke:#92400e
+      style AUTO_BLOCK fill:#fee2e2,stroke:#991b1b`
+  },
+  seqViolation: {
+    title: '违规类型管理时序图',
+    code: `sequenceDiagram
+      actor Admin as 系统管理员
+      participant API as FastAPI REST
+      participant VR as ViolationRegistry
+      participant DB as SQLite
+
+      Admin->>API: GET /api/v1/violation-types
+      API->>VR: 查询所有违规类型
+      VR->>DB: SELECT from violation_types
+      DB-->>VR: 类型列表(L1+L2)
+      VR-->>API: 类型数据
+      API-->>Admin: 展示违规类型管理界面
+
+      Admin->>API: POST /api/v1/violation-types
+      Note right of Admin: {name, severity, level, parent}
+      API->>VR: 创建新违规类型
+      VR->>DB: INSERT violation_type
+      DB-->>VR: 创建成功
+      VR-->>API: 新类型已创建
+      API-->>Admin: 类型创建成功
+
+      Admin->>API: PUT /api/v1/violation-types/{id}/deprecate
+      API->>VR: 废弃违规类型
+      VR->>DB: UPDATE expiration_date
+      DB-->>VR: 废弃成功
+      VR-->>API: 类型已废弃
+      API-->>Admin: 类型已标记为废弃`
+  },
+  seqEval: {
+    title: '效果评估时序图',
+    code: `sequenceDiagram
+      actor Admin as 系统管理员
+      participant API as FastAPI REST
+      participant Eval as Evaluator
+      participant DB as SQLite
+
+      Admin->>API: POST /api/v1/evaluate/run
+      Note right of Admin: {mode: "standard"}
+      API->>Eval: 运行评估
+      Eval->>DB: 加载测试用例
+      Eval->>Eval: 逐条执行审核+比对预期
+      Eval->>DB: 旧结果is_active=0
+      Eval->>DB: INSERT新结果is_active=1
+      Eval-->>API: 评估完成
+      API-->>Admin: 返回评估指标
+
+      Admin->>API: GET /api/v1/evaluate/latest/standard
+      API->>DB: 查询is_active=1的记录
+      DB-->>API: 最新评估结果
+      API-->>Admin: 展示Precision/Recall/F1
+
+      Admin->>API: GET /api/v1/evaluate/history
+      API->>DB: 查询历史评估记录
+      DB-->>API: 历史列表
+      API-->>Admin: 展示趋势对比`
+  }
+};
+
+let _mermaidReady = false;
+let _diagramZoomLevel = 1;
+let _diagramPanning = false;
+let _diagramPanStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
+
+function diagramZoom(delta) {
+  const body = document.getElementById('diagramBody');
+  if (delta === 0) {
+    _diagramZoomLevel = 1;
+  } else {
+    _diagramZoomLevel = Math.max(0.3, Math.min(3, _diagramZoomLevel + delta));
+  }
+  const svg = body.querySelector('svg');
+  if (svg) svg.style.transform = `scale(${_diagramZoomLevel})`;
+  document.getElementById('diagramZoomLabel').textContent = Math.round(_diagramZoomLevel * 100) + '%';
+}
+
+async function showDiagram(key) {
+  const d = DIAGRAMS[key];
+  if (!d) return;
+  const modal = document.getElementById('diagramModal');
+  document.getElementById('diagramTitle').textContent = d.title;
+  const body = document.getElementById('diagramBody');
+  body.innerHTML = '<div style="color:var(--navy-500);font-size:0.9rem;">渲染中...</div>';
+  _diagramZoomLevel = 1;
+  document.getElementById('diagramZoomLabel').textContent = '100%';
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  try {
+    if (!_mermaidReady && typeof mermaid !== 'undefined') {
+      mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+      _mermaidReady = true;
+    }
+    const id = 'diag-' + key + '-' + Date.now();
+    const { svg } = await mermaid.render(id, d.code);
+    body.innerHTML = svg;
+    const svgEl = body.querySelector('svg');
+    if (svgEl) {
+      svgEl.style.transform = `scale(${_diagramZoomLevel})`;
+      svgEl.style.transformOrigin = 'center center';
+    }
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--red-500);font-size:0.85rem;">渲染失败: ' + e.message + '</div>';
+  }
+}
+
+function closeDiagram(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById('diagramModal');
+  modal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeDiagram();
+});
+
+(function initDiagramPanZoom() {
+  const body = document.getElementById('diagramBody');
+  if (!body) return;
+  body.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    diagramZoom(delta);
+  }, { passive: false });
+  body.addEventListener('mousedown', function(e) {
+    if (e.target.closest('button, a')) return;
+    _diagramPanning = true;
+    _diagramPanStart = { x: e.clientX, y: e.clientY, scrollLeft: body.scrollLeft, scrollTop: body.scrollTop };
+    body.style.cursor = 'grabbing';
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!_diagramPanning) return;
+    body.scrollLeft = _diagramPanStart.scrollLeft - (e.clientX - _diagramPanStart.x);
+    body.scrollTop = _diagramPanStart.scrollTop - (e.clientY - _diagramPanStart.y);
+  });
+  document.addEventListener('mouseup', function() {
+    if (_diagramPanning) {
+      _diagramPanning = false;
+      const body = document.getElementById('diagramBody');
+      if (body) body.style.cursor = 'grab';
+    }
+  });
+})();
 </script>
 </body>
 </html>

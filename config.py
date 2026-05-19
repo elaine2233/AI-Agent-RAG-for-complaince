@@ -10,6 +10,7 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compati
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen3.6-plus")
 LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "qwen3.6-flash")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
+AUTHOR_NAME = os.getenv("AUTHOR_NAME", "")
 VECTOR_STORE_DIR = os.getenv("VECTOR_STORE_DIR", "./data/vector_store")
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "100"))
@@ -26,7 +27,7 @@ _logger = logging.getLogger(__name__)
 
 
 def load_user_config():
-    global DASHSCOPE_API_KEY, LLM_MODEL, EXTRACT_MODEL, REASON_MODEL, CROSSCHECK_MODEL
+    global DASHSCOPE_API_KEY, LLM_MODEL, EXTRACT_MODEL, REASON_MODEL, CROSSCHECK_MODEL, AUTHOR_NAME
     if not os.path.exists(USER_CONFIG_PATH):
         return
     try:
@@ -39,6 +40,8 @@ def load_user_config():
             EXTRACT_MODEL = saved["llm_model"]
             REASON_MODEL = saved["llm_model"]
             CROSSCHECK_MODEL = saved["llm_model"]
+        if saved.get("author_name"):
+            AUTHOR_NAME = saved["author_name"]
         _logger.info(f"已从 {USER_CONFIG_PATH} 加载用户配置")
     except Exception as e:
         _logger.warning(f"加载用户配置失败: {e}")

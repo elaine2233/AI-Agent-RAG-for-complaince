@@ -1645,6 +1645,7 @@ def generate_cache_key(input_content: str, model_config: dict) -> str:
 | review_violations | 审核记录-违规类型关联表，记录每次审核的具体违规类型 |
 | violation_feedback | 违规类型级别反馈表，支持逐类型反馈 |
 | review_modifications | 审核结果修改记录表，记录人工Override操作 |
+| eval_results | 评估结果表，存储审核效果评估运行结果，支持历史对比与趋势分析 |
 
 **注意**：系统无独立`api_keys`表。API Key作为`users`表的列存储（`api_key` + `api_key_created_at` + `api_key_expires_at`），与用户记录一对一关联。
 

@@ -105,7 +105,7 @@ flowchart TB
         end
 
         subgraph data [数据层]
-            SQLITEDB[SQLite DB<br/>WAL模式<br/>insurance_review.db<br/>11张表 schema v6]
+            SQLITEDB[SQLite DB<br/>WAL模式<br/>insurance_review.db<br/>12张表 schema v8]
             VECTOR[向量存储<br/>ChromaDB PersistentClient<br/>text-embedding-v3<br/>1024维]
             REGS[法规文件<br/>本地文件系统<br/>data/regulations/]
         end
