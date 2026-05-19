@@ -939,6 +939,7 @@ class ReviewAgent:
         client_id: str = "anonymous",
         model_name: str = None,
         api_key: str = None,
+        skip_cache: bool = False,
     ) -> ReviewResult:
         start_time = time.time()
 
@@ -1013,11 +1014,12 @@ class ReviewAgent:
         if image_paths:
             cache_key_content += "\n[图片文件]" + "|".join(sorted(image_paths))
         cache_key = hashlib.sha256(cache_key_content.encode()).hexdigest()
-        cached = review_cache.get(cache_key)
-        if cached is not None:
-            if PROMETHEUS_AVAILABLE and CACHE_HITS:
-                CACHE_HITS.labels(cache_type="review").inc()
-            return cached
+        if not skip_cache:
+            cached = review_cache.get(cache_key)
+            if cached is not None:
+                if PROMETHEUS_AVAILABLE and CACHE_HITS:
+                    CACHE_HITS.labels(cache_type="review").inc()
+                return cached
         if PROMETHEUS_AVAILABLE and CACHE_MISSES:
             CACHE_MISSES.labels(cache_type="review").inc()
 

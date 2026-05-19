@@ -3419,29 +3419,125 @@ function exportHistory() {
   showToast('导出成功', 'success');
 }
 
+let _evalRunning = false;
+let _evalResults = { standard: null, extreme: null };
+
 async function runEvaluation(type) {
-  const btnId = type === 'standard' ? 'evalStandardBtn' : 'evalExtremeBtn';
-  const btn = document.getElementById(btnId);
-  btn.disabled = true;
-  btn.textContent = '运行中...';
+  if (_evalRunning) {
+    showToast('评估正在运行中，请等待完成', 'warning');
+    return;
+  }
+  _evalRunning = true;
+
+  const stdBtn = document.getElementById('evalStandardBtn');
+  const extBtn = document.getElementById('evalExtremeBtn');
+  stdBtn.disabled = true;
+  extBtn.disabled = true;
+
+  const btn = type === 'standard' ? stdBtn : extBtn;
+  const label = type === 'standard' ? '标准评估' : '极限测试';
+
+  document.getElementById('evalEmpty').style.display = 'none';
+  document.getElementById('evalResults').style.display = 'block';
+  document.getElementById('evalMetrics').innerHTML = '';
+  document.getElementById('evalDetail').innerHTML = `
+    <div style="text-align:center;padding:40px 20px;">
+      <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
+      <div style="font-size:1rem;font-weight:600;margin-bottom:8px;">正在提交${label}任务...</div>
+      <div style="font-size:0.85rem;color:var(--text2);">每个用例约需5-15秒，预计3-8分钟完成</div>
+    </div>
+  `;
+  document.getElementById('evalTestCases').style.display = 'none';
 
   try {
-    let result;
-    const url = type === 'standard' ? '/api/v1/evaluate' : '/api/v1/evaluate?mode=extreme';
-    result = await apiCall('POST', url, {});
+    const url = '/api/v1/evaluate?mode=' + type;
+    const submitResp = await apiCall('POST', url, {});
+    const taskId = submitResp.task_id;
+    const total = submitResp.total || 30;
 
-    renderEvalResults(result, type);
+    const dots = ['.', '..', '...'];
+    let dotIdx = 0;
+    const progressTimer = setInterval(() => {
+      btn.textContent = '运行中' + dots[dotIdx % 3];
+      dotIdx++;
+    }, 500);
+
+    let completed = false;
+    while (!completed) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const status = await apiCall('GET', '/api/v1/evaluate/' + taskId);
+        if (status.status === 'completed') {
+          completed = true;
+          _evalResults[type] = status.result;
+          clearInterval(progressTimer);
+          renderEvalResults(status.result, type);
+        } else if (status.status === 'failed') {
+          completed = true;
+          clearInterval(progressTimer);
+          throw new Error(status.result?.error || '评估执行失败');
+        } else {
+          const prog = status.progress || 0;
+          document.getElementById('evalDetail').innerHTML = `
+            <div style="text-align:center;padding:40px 20px;">
+              <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
+              <div style="font-size:1rem;font-weight:600;margin-bottom:8px;">${label}运行中... ${prog}/${total}</div>
+              <div style="width:60%;margin:12px auto;height:8px;background:var(--gray-200);border-radius:4px;overflow:hidden;">
+                <div style="width:${Math.round(prog/total*100)}%;height:100%;background:var(--teal-500);border-radius:4px;transition:width 0.3s;"></div>
+              </div>
+              <div style="font-size:0.85rem;color:var(--text2);">遇到API限流会自动等待重试，无需手动操作</div>
+            </div>
+          `;
+        }
+      } catch (pollErr) {
+        if (pollErr.message && !pollErr.message.includes('404')) {
+          throw pollErr;
+        }
+      }
+    }
   } catch (e) {
-    showToast('评估失败: ' + e.message, 'error');
+    let detail = e.message;
+    if (detail.includes('404')) {
+      detail = type === 'extreme'
+        ? '极限测试用例文件不存在，请确认 eval/extreme_test_cases.json 文件存在'
+        : '标准测试用例文件不存在，请确认 eval/test_cases.json 文件存在';
+    }
+    showToast('评估失败: ' + detail, 'error');
+    document.getElementById('evalDetail').innerHTML = '';
+    document.getElementById('evalEmpty').style.display = '';
+    document.getElementById('evalResults').style.display = 'none';
   } finally {
-    btn.disabled = false;
-    btn.textContent = type === 'standard' ? '▶ 运行标准评估' : '⚡ 运行极限测试';
+    _evalRunning = false;
+    stdBtn.disabled = false;
+    extBtn.disabled = false;
+    stdBtn.textContent = '▶ 运行标准评估';
+    extBtn.textContent = '⚡ 运行极限测试';
   }
 }
 
 function renderEvalResults(result, type) {
   document.getElementById('evalEmpty').style.display = 'none';
   document.getElementById('evalResults').style.display = 'block';
+
+  const hasStd = _evalResults.standard !== null;
+  const hasExt = _evalResults.extreme !== null;
+  let tabBarHtml = '';
+  if (hasStd || hasExt) {
+    tabBarHtml = `<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--gray-200);">
+      ${hasStd ? `<button onclick="switchEvalTab('standard')" id="evalTabStandard" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-weight:600;font-size:0.9rem;border-bottom:2px solid ${type==='standard'?'var(--teal-500)':'transparent'};color:${type==='standard'?'var(--teal-600)':'var(--text2)'};margin-bottom:-2px;">📊 标准评估</button>` : ''}
+      ${hasExt ? `<button onclick="switchEvalTab('extreme')" id="evalTabExtreme" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-weight:600;font-size:0.9rem;border-bottom:2px solid ${type==='extreme'?'var(--teal-500)':'transparent'};color:${type==='extreme'?'var(--teal-600)':'var(--text2)'};margin-bottom:-2px;">⚡ 极限测试</button>` : ''}
+    </div>`;
+  }
+
+  const metricsEl = document.getElementById('evalMetrics');
+  if (!metricsEl.previousElementSibling || !metricsEl.previousElementSibling.classList.contains('eval-tab-bar')) {
+    const tabBarDiv = document.createElement('div');
+    tabBarDiv.className = 'eval-tab-bar';
+    tabBarDiv.innerHTML = tabBarHtml;
+    metricsEl.parentNode.insertBefore(tabBarDiv, metricsEl);
+  } else {
+    metricsEl.previousElementSibling.innerHTML = tabBarHtml;
+  }
 
   document.getElementById('evalMetrics').innerHTML = `
     <div class="metric-card teal">
@@ -3515,11 +3611,25 @@ function renderEvalResults(result, type) {
   `;
 
   const testCases = result.test_cases || [];
+  const errors = result.errors || [];
   if (testCases.length > 0) {
     const passCount = testCases.filter(tc => tc.pass).length;
     const testCasesCard = document.getElementById('evalTestCases');
     testCasesCard.style.display = 'block';
+
+    let errorsHtml = '';
+    if (errors.length > 0) {
+      errorsHtml = `
+        <div style="margin-bottom:12px;padding:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
+          <div style="font-weight:600;color:#dc2626;margin-bottom:6px;">⚠ ${errors.length} 个用例执行出错</div>
+          ${errors.map(e => `<div style="font-size:0.85rem;color:#7f1d1d;margin-bottom:2px;">• ${e.id}: ${e.error}</div>`).join('')}
+          <div style="font-size:0.8rem;color:#991b1b;margin-top:6px;">提示：请检查 API Key 是否有效、模型配额是否充足</div>
+        </div>
+      `;
+    }
+
     testCasesCard.innerHTML = `
+      ${errorsHtml}
       <div class="card-title">测试用例详情 (${passCount}/${testCases.length} 通过)</div>
       <table class="test-case-table">
         <thead>
@@ -3546,6 +3656,13 @@ function renderEvalResults(result, type) {
     `;
   } else {
     document.getElementById('evalTestCases').style.display = 'none';
+  }
+}
+
+function switchEvalTab(type) {
+  const result = _evalResults[type];
+  if (result) {
+    renderEvalResults(result, type);
   }
 }
 

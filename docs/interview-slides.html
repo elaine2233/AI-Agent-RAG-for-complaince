@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>保险营销内容智能审核系统 — 面试演示</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/black.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #0a0e1a;
+  --bg-card: rgba(15, 25, 50, 0.85);
+  --accent-cyan: #00d4ff;
+  --accent-teal: #0ff0b3;
+  --accent-red: #ff3366;
+  --accent-amber: #ffaa00;
+  --accent-purple: #a855f7;
+  --text-primary: #e8ecf4;
+  --text-secondary: #8899b8;
+  --text-dim: #4a5a78;
+  --border-glow: rgba(0, 212, 255, 0.15);
+  --gradient-main: linear-gradient(135deg, #00d4ff 0%, #0ff0b3 100%);
+  --gradient-danger: linear-gradient(135deg, #ff3366 0%, #ffaa00 100%);
+  --gradient-purple: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+}
+
+.reveal {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 400;
+  color: var(--text-primary);
+  background: var(--bg-deep);
+}
+
+.reveal .slides { text-align: left; }
+
+.reveal .slides section {
+  padding: 40px 60px;
+}
+
+.reveal h1, .reveal h2, .reveal h3 {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 900;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  text-shadow: none;
+}
+
+.reveal h1 {
+  font-size: 2.8em;
+  background: var(--gradient-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+}
+
+.reveal h2 {
+  font-size: 1.8em;
+  color: var(--accent-cyan);
+  margin-bottom: 0.6em;
+  position: relative;
+  padding-bottom: 0.3em;
+}
+
+.reveal h2::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: var(--gradient-main);
+  border-radius: 2px;
+}
+
+.reveal h3 {
+  font-size: 1.3em;
+  color: var(--text-primary);
+  margin-top: 0.8em;
+}
+
+.reveal p, .reveal li {
+  font-size: 0.85em;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.reveal strong {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.reveal em {
+  color: var(--accent-amber);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.reveal code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8em;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--accent-teal);
+}
+
+.reveal pre {
+  background: rgba(10, 14, 26, 0.9);
+  border: 1px solid var(--border-glow);
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 0 30px rgba(0, 212, 255, 0.05);
+}
+
+.reveal pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.75em;
+  line-height: 1.7;
+}
+
+.reveal blockquote {
+  border-left: 3px solid var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.05);
+  padding: 12px 20px;
+  border-radius: 0 8px 8px 0;
+  font-style: normal;
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+
+.reveal table {
+  font-size: 0.72em;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 0.5em;
+}
+
+.reveal th {
+  background: rgba(0, 212, 255, 0.12);
+  color: var(--accent-cyan);
+  font-weight: 600;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 2px solid rgba(0, 212, 255, 0.2);
+  font-size: 0.95em;
+}
+
+.reveal td {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: var(--text-secondary);
+}
+
+.reveal tr:hover td {
+  background: rgba(0, 212, 255, 0.03);
+}
+
+.reveal ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.reveal ul li {
+  position: relative;
+  padding-left: 1.4em;
+  margin-bottom: 0.4em;
+}
+
+.reveal ul li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--accent-teal);
+  font-weight: bold;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glow);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 12px 0;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.card-title {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card p, .card li {
+  font-size: 0.78em;
+}
+
+.glow-box {
+  background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(15,240,179,0.08) 100%);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 10px 0;
+}
+
+.danger-box {
+  background: linear-gradient(135deg, rgba(255,51,102,0.08) 0%, rgba(255,170,0,0.08) 100%);
+  border: 1px solid rgba(255, 51, 102, 0.2);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 10px 0;
+}
+
+.purple-box {
+  background: linear-gradient(135deg, rgba(168,85,247,0.08) 0%, rgba(99,102,241,0.08) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 10px 0;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gradient-main);
+  color: var(--bg-deep);
+  font-weight: 900;
+  font-size: 0.85em;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  gap: 4px;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content p {
+  margin: 0;
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.7em;
+  font-weight: 600;
+}
+
+.tag-cyan { background: rgba(0,212,255,0.15); color: var(--accent-cyan); }
+.tag-teal { background: rgba(15,240,179,0.15); color: var(--accent-teal); }
+.tag-red { background: rgba(255,51,102,0.15); color: var(--accent-red); }
+.tag-amber { background: rgba(255,170,0,0.15); color: var(--accent-amber); }
+.tag-purple { background: rgba(168,85,247,0.15); color: var(--accent-purple); }
+
+.flow-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.flow-node {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glow);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  white-space: nowrap;
+}
+
+.flow-arrow {
+  color: var(--text-dim);
+  font-size: 0.8em;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.three-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.metric-big {
+  font-size: 2.2em;
+  font-weight: 900;
+  background: var(--gradient-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.1;
+}
+
+.metric-label {
+  font-size: 0.7em;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.section-number {
+  font-size: 4em;
+  font-weight: 900;
+  background: linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(15,240,179,0.15) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  position: absolute;
+  top: 20px;
+  right: 40px;
+  line-height: 1;
+}
+
+/* Cover slide */
+.cover-subtitle {
+  font-size: 1.1em;
+  color: var(--text-secondary);
+  margin-top: 20px;
+  font-weight: 300;
+}
+
+.cover-tech {
+  margin-top: 30px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cover-tech .tag {
+  font-size: 0.8em;
+  padding: 4px 14px;
+}
+
+/* Progress bar */
+.reveal .progress { color: var(--accent-cyan); height: 3px; }
+
+/* Controls */
+.reveal .controls { color: var(--accent-cyan); }
+
+/* Fragment animations */
+.reveal .fragment.fade-up { transform: translateY(20px); }
+
+/* Small text */
+.small { font-size: 0.7em !important; }
+.tiny { font-size: 0.6em !important; }
+
+.mt-1 { margin-top: 8px; }
+.mt-2 { margin-top: 16px; }
+.mt-3 { margin-top: 24px; }
+.mb-1 { margin-bottom: 8px; }
+.mb-2 { margin-bottom: 16px; }
+
+.text-cyan { color: var(--accent-cyan) !important; }
+.text-teal { color: var(--accent-teal) !important; }
+.text-red { color: var(--accent-red) !important; }
+.text-amber { color: var(--accent-amber) !important; }
+.text-purple { color: var(--accent-purple) !important; }
+.text-dim { color: var(--text-dim) !important; }
+.text-bold { font-weight: 700 !important; }
+
+.bg-pattern {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(0,212,255,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(15,240,179,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(168,85,247,0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.reveal .slides > section { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<div class="bg-pattern"></div>
+<div class="reveal">
+<div class="slides">
+
+<!-- ==================== COVER ==================== -->
+<section>
+  <h1 style="font-size:2.4em; margin-top:15%;">保险营销内容<br>智能审核系统</h1>
+  <p class="cover-subtitle">基于 RAG + AI Agent 的金融合规审核</p>
+  <div class="cover-tech">
+    <span class="tag tag-cyan">RAG</span>
+    <span class="tag tag-teal">AI Agent</span>
+    <span class="tag tag-purple">Workflow</span>
+    <span class="tag tag-amber">Rule+LLM</span>
+  </div>
+  <p class="small text-dim" style="margin-top:40px;">面试演示 · 2026</p>
+</section>
+
+<!-- ==================== AGENDA ==================== -->
+<section>
+  <h2>议程</h2>
+  <div class="three-col">
+    <div class="card">
+      <div class="card-title"><span class="tag tag-cyan">01</span> 项目背景</div>
+      <p>痛点与挑战</p>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="tag tag-cyan">02</span> 架构总览</div>
+      <p>六层解耦 + 三约束</p>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="tag tag-teal">03</span> 10步管线</div>
+      <p>核心审核流程</p>
+    </div>
+  </div>
+  <div class="three-col mt-2">
+    <div class="card">
+      <div class="card-title"><span class="tag tag-purple">04</span> 韧性 & 安全</div>
+      <p>熔断降级 + 7层防御</p>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="tag tag-amber">05</span> 数据管理</div>
+      <p>法规入库 + Few-Shot</p>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="tag tag-red">06</span> Demo & 演进</div>
+      <p>现场演示 + 生产路线</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SECTION 1: BACKGROUND ==================== -->
+<section>
+  <span class="section-number">01</span>
+  <h2>项目背景</h2>
+  <div class="two-col">
+    <div>
+      <h3>监管要求严格</h3>
+      <ul>
+        <li>《保险销售行为管理办法》</li>
+        <li>《互联网保险业务监管办法》</li>
+        <li>《金融产品网络营销管理办法》</li>
+      </ul>
+      <p class="mt-2">禁止<strong>绝对化用语</strong>、<strong>承诺收益</strong>、<strong>夸大收益</strong>、<strong>无资质代言</strong>……</p>
+    </div>
+    <div>
+      <h3>人工审核困境</h3>
+      <div class="danger-box">
+        <p>❌ 效率低 — 日均数百条，逐条人工审</p>
+        <p>❌ 标准不统一 — 同一内容不同审核员结论不同</p>
+        <p>❌ 易漏审 — 语义隐含违规肉眼难发现</p>
+        <p>❌ 法规更新 — 新规出台后标准需同步</p>
+      </div>
+    </div>
+  </div>
+  <div class="glow-box mt-2">
+    <p><strong>目标</strong>：自动判断营销内容是否违规 → 违规类型 + 法规依据 + 风险评分</p>
+  </div>
+</section>
+
+<!-- ==================== SECTION 2: ARCHITECTURE ==================== -->
+<section>
+  <span class="section-number">02</span>
+  <h2>三个核心设计约束</h2>
+  <div class="three-col">
+    <div class="card">
+      <div class="card-title"><span class="text-red text-bold">约束1</span> 零漏判</div>
+      <p>一条违规漏过去 = 监管处罚</p>
+      <p class="mt-1 text-dim small">宁可误报不可漏报，但误报太多人工复核成本爆炸</p>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="text-amber text-bold">约束2</span> 法规有隐含逻辑</div>
+      <p>"禁止 + 例外" 向量检索无法捕捉</p>
+      <p class="mt-1 text-dim small">传统 RAG 只做语义检索会断章取义</p>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="text-purple text-bold">约束3</span> Demo/生产双场景</div>
+      <p>同一套代码：30秒启动 vs 99.9%可用性</p>
+      <p class="mt-1 text-dim small">接口隔离，换实现不改逻辑</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="section-number">02</span>
+  <h2>六层解耦架构</h2>
+  <div class="two-col">
+    <div>
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-title">L6 展示层</div>
+        <p>FastAPI + 纯 HTML SPA</p>
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-title">L5 网关层</div>
+        <p>认证 / 限流 / 安全校验 / CORS</p>
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-title">L4 业务层</div>
+        <p>ReviewAgent 编排调度 + 异步队列</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-title">L3 AI 能力层</div>
+        <p>RAG + LLM Gateway + 规则引擎 + Reranker + Risk Engine</p>
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-title">L2 数据处理层</div>
+        <p>多格式解析 / 4种分块策略 / 向量化</p>
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-title">L1 基础设施层</div>
+        <p>SQLite + ChromaDB + 熔断器 + 审计日志</p>
+      </div>
+    </div>
+  </div>
+  <div class="glow-box mt-2">
+    <p>层间抽象接口：<code>ReviewStorage</code> <code>VectorStore</code> <code>LLMProvider</code> <code>DocumentParser</code></p>
+    <p class="small text-dim mt-1">Demo 用 SQLite → 生产切 PostgreSQL，业务代码零改动</p>
+  </div>
+</section>
+
+<!-- ==================== SECTION 3: 10-STEP PIPELINE ==================== -->
+<section>
+  <span class="section-number">03</span>
+  <h2>10步审核管线 — 总览</h2>
+  <div class="flow-line">
+    <span class="flow-node">输入</span><span class="flow-arrow">→</span>
+    <span class="flow-node">①Extract</span><span class="flow-arrow">→</span>
+    <span class="flow-node">②RuleCheck</span><span class="flow-arrow">→</span>
+    <span class="flow-node">③RAG检索</span><span class="flow-arrow">→</span>
+    <span class="flow-node">④Rerank</span><span class="flow-arrow">→</span>
+    <span class="flow-node">⑤Expand</span>
+  </div>
+  <div class="flow-line">
+    <span class="flow-node">⑥LLM推理</span><span class="flow-arrow">→</span>
+    <span class="flow-node">⑦Format</span><span class="flow-arrow">→</span>
+    <span class="flow-node">⑧Validate</span><span class="flow-arrow">→</span>
+    <span class="flow-node">⑨CrossCheck</span><span class="flow-arrow">→</span>
+    <span class="flow-node">⑩RiskAssess</span><span class="flow-arrow">→</span>
+    <span class="flow-node" style="border-color:var(--accent-teal);color:var(--accent-teal);">结论</span>
+  </div>
+  <div class="danger-box mt-3">
+    <p><strong>贯穿案例</strong>：<em>"买保险就选 XX，稳赚不赔，年化收益 5%！"</em></p>
+  </div>
+</section>
+
+<!-- Step 1 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>① 信息提取 Extract</h2>
+  <div class="glow-box">
+    <p>轻量模型从文案中提取关键要素：</p>
+  </div>
+  <div class="three-col mt-2">
+    <div class="card">
+      <p><strong>"稳赚不赔"</strong></p>
+      <p><span class="tag tag-red">绝对化声明</span></p>
+    </div>
+    <div class="card">
+      <p><strong>"年化收益5%"</strong></p>
+      <p><span class="tag tag-amber">收益相关声明</span></p>
+    </div>
+    <div class="card">
+      <p><strong>无风险披露</strong></p>
+      <p><span class="tag tag-purple">缺失检测</span></p>
+    </div>
+  </div>
+  <div class="purple-box mt-2">
+    <p>🖼️ <strong>图片输入</strong>：自动转JPG + 3倍放大 → 多模态模型提取文字和描述 → 与文本走相同管线</p>
+  </div>
+</section>
+
+<!-- Step 2 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>② 规则预检 Rule Check</h2>
+  <div class="glow-box">
+    <p><strong>Rule + LLM 协同</strong> — 系统第一个亮点</p>
+  </div>
+  <div class="two-col mt-2">
+    <div>
+      <p>关键词库快速预筛查：</p>
+      <ul>
+        <li><strong>"稳赚不赔"</strong> → 命中 绝对化用语</li>
+        <li><strong>"年化收益"</strong> → 命中 夸大收益</li>
+      </ul>
+    </div>
+    <div class="danger-box">
+      <p><strong>关键决策：规则命中 ≠ 跳过LLM</strong></p>
+      <p class="mt-1">规则命中后，结果<strong>注入 LLM Prompt</strong></p>
+      <p class="mt-1 small text-dim">"已发现关键词违规，请继续检查更深层问题"</p>
+    </div>
+  </div>
+  <div class="card mt-2">
+    <p>为什么不跳过？<em>"未来稳稳的幸福"</em> — 没触发任何关键词，但保险语境下构成对确定性的暗示</p>
+  </div>
+</section>
+
+<!-- Step 3+4 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>③ RAG 检索 + ④ 重排序</h2>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">③ RAG 检索</div>
+      <ul>
+        <li>ChromaDB 向量检索，HNSW 索引</li>
+        <li>嵌入：text-embedding-v3，1024维</li>
+        <li>召回 <strong>Top-20</strong> 条相关法规</li>
+      </ul>
+      <p class="small text-dim mt-1">🏗️ 生产：向量 + BM25 多路召回 + Query Rewriting</p>
+    </div>
+    <div class="card">
+      <div class="card-title">④ 重排序 Rerank</div>
+      <ul>
+        <li>有Key：qwen3-rerank Cross-Encoder → Top-5</li>
+        <li>无Key：降级规则重排（字符重叠+关键词加权）</li>
+        <li><strong>相邻条文召回</strong>：Top-5每条自动召回前后条文，0.7折扣</li>
+      </ul>
+      <p class="small text-dim mt-1">为什么？一条条文的意思可能依赖上下文定义条款</p>
+    </div>
+  </div>
+</section>
+
+<!-- Step 5 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>⑤ 条款关联扩展</h2>
+  <p class="mb-2"><strong>系统创新点</strong> — 解决传统 RAG 断章取义问题</p>
+  <div class="two-col">
+    <div>
+      <p>法规条文间 <strong>9 种关系类型</strong>：</p>
+      <table>
+        <tr><th>关系</th><th>示例</th></tr>
+        <tr><td><span class="tag tag-cyan">引用</span></td><td>"依照第X条"</td></tr>
+        <tr><td><span class="tag tag-red">例外</span></td><td>"除……外"</td></tr>
+        <tr><td><span class="tag tag-teal">补充</span></td><td>"前款所称……是指"</td></tr>
+        <tr><td><span class="tag tag-purple">定义</span></td><td>"本法下列用语的含义"</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="danger-box">
+        <p><strong>案例</strong>：第十九条"调整价格应公告"</p>
+        <p>+ 但书"费率浮动区间内除外"</p>
+        <p class="mt-1 text-red">→ 不追踪例外 = 所有调价都判违规</p>
+      </div>
+      <div class="glow-box mt-2">
+        <p>Demo：正则自动提取 + 49条预标注</p>
+        <p>生产：LLM 驱动法规知识图谱</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Step 6 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>⑥ LLM 深度推理</h2>
+  <p>把所有上下文拼装成 Prompt，CoT 推理：</p>
+  <div class="flow-line mt-2">
+    <span class="flow-node">原始文案</span>
+    <span class="flow-node">RAG条文</span>
+    <span class="flow-node">关联条文</span>
+    <span class="flow-node">规则预检</span>
+    <span class="flow-node">Few-Shot</span>
+  </div>
+  <div class="two-col mt-2">
+    <div class="card">
+      <div class="card-title">模型选择</div>
+      <table>
+        <tr><th>场景</th><th>模型</th></tr>
+        <tr><td>主推理</td><td><strong>qwen3.6-plus</strong></td></tr>
+        <tr><td>后备</td><td>qwen3.6-flash</td></tr>
+        <tr><td>无Key</td><td>降级规则引擎</td></tr>
+      </table>
+    </div>
+    <div class="glow-box">
+      <p>选 Qwen 的理由：</p>
+      <ul>
+        <li>金融合规要求数据不出境</li>
+        <li>中文法规语义理解最优</li>
+        <li>"保本保息""稳赚不赔"隐含违规理解最准确</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Step 7+8 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>⑦ Format + ⑧ Validate</h2>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">⑦ 结构化归一化</div>
+      <ul>
+        <li>归一化：各种格式 → 标准 violations 数组</li>
+        <li>规则参考注入：LLM未提 → reasoning前缀 <code>[规则引擎参考命中]</code></li>
+        <li>降级兜底：LLM失败+规则命中 → 规则引擎结果</li>
+        <li>数据清洗：compliant→yes/no, confidence→0~1</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">⑧ 幻觉检测</div>
+      <p>LLM 可能编造不存在的法规条文</p>
+      <div class="danger-box mt-1" style="margin:8px 0 0 0;">
+        <p class="small">找到 → 保留</p>
+        <p class="small">找不到 + 规则有命中 → 降级规则条文，置信度≤0.7</p>
+        <p class="small">找不到 + 规则也没命中 → 违规降级"未知"，置信度≤0.4</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Step 9 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>⑨ 交叉复核 CrossCheck</h2>
+  <div class="two-col">
+    <div>
+      <p>独立轻量模型对审核结论做复核：</p>
+      <ul>
+        <li>引用条文与输入内容的<strong>语义相关性</strong></li>
+        <li>推理逻辑的<strong>自洽性</strong></li>
+        <li>输出：passed / issues / confidence_adjustment(±0.1)</li>
+      </ul>
+    </div>
+    <div>
+      <p><strong>冲突裁决机制</strong>：</p>
+      <table>
+        <tr><th>主模型</th><th>复核</th><th>决策</th></tr>
+        <tr><td>违规</td><td>合规</td><td>保留主模型，降低置信度</td></tr>
+        <tr><td>合规</td><td>违规</td><td>降级为人工复核</td></tr>
+      </table>
+      <div class="glow-box mt-2">
+        <p>成本仅增 <strong>20%</strong>，降低约 <strong>30%</strong> 漏判</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Step 10 -->
+<section>
+  <span class="section-number">03</span>
+  <h2>⑩ 风险评估 Risk Assess</h2>
+  <div class="glow-box">
+    <p><strong>公式</strong>：<code>severity×0.5 + article_count×0.1(max0.3) + rule_hit×0.15 + confidence_adj</code></p>
+  </div>
+  <div class="three-col mt-2">
+    <div class="card" style="text-align:center;">
+      <div class="metric-big" style="background:linear-gradient(135deg,#10b981,#0ff0b3);-webkit-background-clip:text;">&lt; 0.15</div>
+      <p><span class="tag tag-teal">低风险</span></p>
+      <p class="small">auto_pass</p>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="metric-big" style="background:linear-gradient(135deg,#ffaa00,#ff6600);-webkit-background-clip:text;">0.15~0.70</div>
+      <p><span class="tag tag-amber">中风险</span></p>
+      <p class="small">human_review</p>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="metric-big" style="background:linear-gradient(135deg,#ff3366,#ff0044);-webkit-background-clip:text;">≥ 0.70</div>
+      <p><span class="tag tag-red">高/严重</span></p>
+      <p class="small">auto_block</p>
+    </div>
+  </div>
+  <div class="danger-box mt-2">
+    <p><strong>案例结果</strong>："稳赚不赔，年化5%" → 风险分 <strong>1.0</strong>，Critical，auto_block</p>
+    <p class="small">违规：收益承诺 + 绝对化用语 + 隐瞒信息 + 诱导销售</p>
+  </div>
+</section>
+
+<!-- ==================== SECTION 4: RESILIENCE ==================== -->
+<section>
+  <span class="section-number">04</span>
+  <h2>韧性设计</h2>
+  <div class="three-col">
+    <div class="card">
+      <div class="card-title">熔断器</div>
+      <p>LLM / Embedding 独立熔断</p>
+      <p class="mt-1">连续失败5次 → 打开 → 快速失败</p>
+      <p class="small text-dim mt-1">半开 → 试探 → 成功则恢复</p>
+    </div>
+    <div class="card">
+      <div class="card-title">重试机制</div>
+      <p>可恢复错误（超时、限流）</p>
+      <p class="mt-1">指数退避 + 随机抖动</p>
+      <p class="small text-dim mt-1">最大重试次数、退避系数可配置</p>
+    </div>
+    <div class="card">
+      <div class="card-title">多级降级</div>
+      <p>向量检索失败 → 关键词匹配</p>
+      <p>LLM API 失败 → 规则引擎</p>
+      <p>重排序失败 → 规则重排</p>
+    </div>
+  </div>
+  <div class="glow-box mt-2">
+    <p>LLM 降级链：<strong>qwen3.6-plus</strong> → <strong>qwen3.6-flash</strong> → <strong>rule-engine</strong>（永不失败）</p>
+  </div>
+</section>
+
+<!-- ==================== SECTION 5: SECURITY ==================== -->
+<section>
+  <span class="section-number">05</span>
+  <h2>7 层纵深防御</h2>
+  <div class="card">
+    <table>
+      <tr><th>层</th><th>职责</th><th>实现</th></tr>
+      <tr><td>L1</td><td>网络层</td><td>🏗️ WAF + CDN + DDoS</td></tr>
+      <tr><td>L2</td><td>API 网关</td><td>滑动窗口限流 60/min</td></tr>
+      <tr><td>L3</td><td>认证</td><td>PBKDF2-SHA256 + API Key</td></tr>
+      <tr><td>L4</td><td>输入校验</td><td>XSS(5种) + SQL注入(3种)</td></tr>
+      <tr><td>L5</td><td>Prompt注入检测</td><td><strong>25种注入模式</strong>（中英文）</td></tr>
+      <tr><td>L6</td><td>LLM安全Prompt</td><td>角色约束 + JSON Schema</td></tr>
+      <tr><td>L7</td><td>输出校验</td><td>JSON Schema + 幻觉检测</td></tr>
+    </table>
+  </div>
+  <p class="small text-dim mt-2">审计日志：HMAC-SHA256 签名防篡改，每日轮转，90天清理</p>
+</section>
+
+<!-- ==================== SECTION 6: DATA ==================== -->
+<section>
+  <span class="section-number">06</span>
+  <h2>数据与知识管理</h2>
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <div class="card-title">法规入库流程</div>
+        <p>上传 → 格式识别 → 解析提取 → 按条款拆分 → LLM辅助标注 → 管理员审批 → 向量化 → ChromaDB索引</p>
+      </div>
+      <div class="card mt-2">
+        <div class="card-title">违规类型体系</div>
+        <p><strong>5个L1大类 × 11个L2子类</strong></p>
+        <p class="mt-1">每个类型：关键词 + 严重度 + 修改建议 → 映射法规条文 → <strong>209条映射</strong></p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-title">Few-Shot 回流传导</div>
+        <p>人工override → 自动生成Few-Shot样本 → 样本库 → 下次同类审核注入Prompt</p>
+        <p class="mt-1 small text-dim">质量管理：每类最多10条，全局100条，低分淘汰</p>
+      </div>
+      <div class="card mt-2">
+        <div class="card-title">四条数据流</div>
+        <p>📚 法规管理流</p>
+        <p>🔍 审核主流程</p>
+        <p>🔄 反馈学习流</p>
+        <p>🏷️ 违规类型流</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SECTION 7: DEMO ==================== -->
+<section>
+  <span class="section-number">07</span>
+  <h2>现场演示</h2>
+  <div class="two-col">
+    <div class="danger-box">
+      <p class="text-bold">违规案例</p>
+      <p class="mt-1"><em>"买保险就选 XX，稳赚不赔，年化收益 5%！"</em></p>
+      <p class="mt-1">预期：风险分 1.0，Critical，auto_block</p>
+    </div>
+    <div class="glow-box">
+      <p class="text-bold">合规案例</p>
+      <p class="mt-1"><em>"本产品为分红型保险，过往分红水平不代表未来收益，投资须谨慎。"</em></p>
+      <p class="mt-1">预期：合规，包含完整风险提示</p>
+    </div>
+  </div>
+  <div class="card mt-3" style="text-align:center;">
+    <p style="font-size:1em;">🖥️ 系统地址：<code>http://localhost:7861</code></p>
+    <p class="small text-dim">欢迎现场输入任意营销文案测试</p>
+  </div>
+</section>
+
+<!-- ==================== SECTION 8: TECH STACK ==================== -->
+<section>
+  <span class="section-number">08</span>
+  <h2>技术栈</h2>
+  <div class="three-col">
+    <div class="card">
+      <div class="card-title">AI 层</div>
+      <p>大模型：通义千问 Qwen 系列</p>
+      <p>嵌入：text-embedding-v3</p>
+      <p>向量库：ChromaDB + HNSW</p>
+      <p>重排：qwen3-rerank</p>
+    </div>
+    <div class="card">
+      <div class="card-title">后端</div>
+      <p>框架：FastAPI</p>
+      <p>数据库：SQLite (WAL)</p>
+      <p>可观测：Prometheus</p>
+      <p>安全：7层纵深防御</p>
+    </div>
+    <div class="card">
+      <div class="card-title">前端</div>
+      <p>纯 HTML/CSS/JS SPA</p>
+      <p>实时审核进度</p>
+      <p>置信度来源追踪</p>
+      <p>风险评分分解</p>
+    </div>
+  </div>
+</section>
+
+<!-- Key decisions -->
+<section>
+  <span class="section-number">08</span>
+  <h2>五个关键设计决策</h2>
+  <div class="step-row">
+    <span class="step-num">1</span>
+    <div class="step-content">
+      <p><strong>Rule + LLM 协同</strong>，而非 Rule-First 跳过 LLM</p>
+      <p class="small text-dim">纯规则无法检测语义隐含违规，纯LLM丢掉关键词确定性优势</p>
+    </div>
+  </div>
+  <div class="step-row">
+    <span class="step-num">2</span>
+    <div class="step-content">
+      <p><strong>10 步流水线</strong>，而非一个大 Prompt 端到端</p>
+      <p class="small text-dim">端到端出了问题无法定位，无法局部降级；流水线每步可观测、可调试、可独立优化</p>
+    </div>
+  </div>
+  <div class="step-row">
+    <span class="step-num">3</span>
+    <div class="step-content">
+      <p><strong>轻量模型做 CrossCheck</strong></p>
+      <p class="small text-dim">成本仅增20%，降低30%漏判；金融场景一次漏判代价 >> 20% API费用</p>
+    </div>
+  </div>
+  <div class="step-row">
+    <span class="step-num">4</span>
+    <div class="step-content">
+      <p><strong>条款关系图</strong>，解决"禁止+例外"逻辑</p>
+      <p class="small text-dim">向量相似度再高，也理解不了"但……除外"是对前半句的否定</p>
+    </div>
+  </div>
+  <div class="step-row">
+    <span class="step-num">5</span>
+    <div class="step-content">
+      <p><strong>Demo/生产分离，接口隔离</strong></p>
+      <p class="small text-dim">四个核心接口，换实现不改逻辑；Demo 30秒启动，生产99.9%可用</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SECTION 9: EVOLUTION ==================== -->
+<section>
+  <span class="section-number">09</span>
+  <h2>Demo → 生产演进</h2>
+  <div class="card">
+    <table>
+      <tr><th>维度</th><th>Demo</th><th>生产</th></tr>
+      <tr><td>数据库</td><td>SQLite</td><td>PostgreSQL 主从 + 连接池</td></tr>
+      <tr><td>向量库</td><td>ChromaDB 本地</td><td>Milvus 分布式集群</td></tr>
+      <tr><td>检索</td><td>向量单路召回</td><td>向量 + BM25 多路 + RRF</td></tr>
+      <tr><td>条款关联</td><td>正则 + 预标注</td><td>LLM 驱动法规知识图谱</td></tr>
+      <tr><td>多模态</td><td>OCR 提取文字</td><td>VLM 图片独立审核</td></tr>
+      <tr><td>LLM容灾</td><td>单 Key 直连</td><td>多 Key 轮转 + 熔断切换</td></tr>
+      <tr><td>安全</td><td>内存限流</td><td>WAF + Redis + KMS + HTTPS</td></tr>
+      <tr><td>部署</td><td>单进程</td><td>K8s + HPA + 蓝绿部署</td></tr>
+    </table>
+  </div>
+  <p class="mt-2 small text-dim">SLA：99.9% 可用性 | RPO 1h | RTO 15min | P95 < 3s</p>
+</section>
+
+<!-- ==================== CLOSING ==================== -->
+<section style="text-align:center;">
+  <h1 style="font-size:2.4em; margin-top:15%;">架构随约束演进</h1>
+  <p style="font-size:1em; color:var(--text-secondary); max-width:700px; margin:30px auto;">
+    Demo 的每一个简化都不是偷懒，而是<strong>有意识地用最小成本验证核心假设</strong>
+  </p>
+  <div class="three-col mt-3" style="max-width:700px; margin-left:auto; margin-right:auto;">
+    <div class="glow-box">
+      <p class="small">Rule+LLM 协同<br>真的比纯规则好吗？</p>
+    </div>
+    <div class="glow-box">
+      <p class="small">条款关系扩展<br>真的减少断章取义吗？</p>
+    </div>
+    <div class="glow-box">
+      <p class="small">CrossCheck<br>真的降低漏判吗？</p>
+    </div>
+  </div>
+  <p class="mt-3" style="font-size:1.2em; color:var(--accent-teal);"><strong>假设验证通过 → 生产升级才有信心</strong></p>
+  <p class="mt-3" style="font-size:1.5em;">谢谢！Q & A</p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.min.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  transition: 'slide',
+  transitionSpeed: 'default',
+  backgroundTransition: 'fade',
+  width: 1200,
+  height: 700,
+  margin: 0.04,
+  controls: true,
+  progress: true,
+  center: false,
+  keyboard: true,
+  overview: true,
+  touch: true,
+  loop: false,
+  rtl: false,
+  shuffle: false,
+  fragments: true,
+  help: true,
+  showNotes: false,
+  autoPlayMedia: null,
+  preloadIframes: null,
+});
+</script>
+</body>
+</html>

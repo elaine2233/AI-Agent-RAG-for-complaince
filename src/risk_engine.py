@@ -119,14 +119,18 @@ class RiskEngine:
         }
 
         if compliant == "yes":
-            base_score = 0.1
-            step = f"合规内容: 基础分 = 0.1"
+            base_score = 0.05
+            step = f"合规内容: 基础分 = 0.05"
             if confidence < 0.7:
-                adj = (1.0 - confidence) * 0.3
+                adj = (1.0 - confidence) * 0.15
                 base_score += adj
-                step += f" + 低置信度调整({1.0 - confidence:.2f}×0.3 = {adj:.4f})"
-            breakdown["components"]["base"] = 0.1
-            breakdown["components"]["confidence_penalty"] = base_score - 0.1 if confidence < 0.7 else 0.0
+                step += f" + 低置信度调整({1.0 - confidence:.2f}×0.15 = {adj:.4f})"
+            if rule_hit:
+                base_score += 0.05
+                step += " + 规则引擎命中(但LLM判合规,降权): +0.05"
+            breakdown["components"]["base"] = 0.05
+            breakdown["components"]["confidence_penalty"] = base_score - 0.05 - (0.05 if rule_hit else 0.0)
+            breakdown["components"]["rule_hit_override"] = 0.05 if rule_hit else 0.0
             breakdown["calculation_steps"].append(step)
             breakdown["calculation_steps"].append(f"最终风险分 = {min(base_score, 1.0):.4f}")
             return min(base_score, 1.0), breakdown
@@ -193,9 +197,11 @@ class RiskEngine:
         rule_hit: bool,
     ) -> float:
         if compliant == "yes":
-            base_score = 0.1
+            base_score = 0.05
             if confidence < 0.7:
-                base_score += (1.0 - confidence) * 0.3
+                base_score += (1.0 - confidence) * 0.15
+            if rule_hit:
+                base_score += 0.05
             return min(base_score, 1.0)
 
         if compliant == "unknown":

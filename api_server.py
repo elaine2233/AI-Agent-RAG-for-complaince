@@ -222,21 +222,11 @@ async def lifespan(app: FastAPI):
     if PROMETHEUS_AVAILABLE and TASK_QUEUE_SIZE:
         TASK_QUEUE_SIZE.set(0)
 
-    loop = asyncio.get_event_loop()
-
-    def _signal_handler(signum, frame):
-        logger.info(f"收到信号 {signum}，开始优雅关闭...")
-        _shutdown_event.set()
-        import threading
-        threading.Thread(target=lambda: loop.call_soon_threadsafe(loop.stop), daemon=True).start()
-
-    signal.signal(signal.SIGTERM, _signal_handler)
-    signal.signal(signal.SIGINT, _signal_handler)
-
     logger.info("系统初始化完成")
 
     yield
 
+    _shutdown_event.set()
     logger.info("正在关闭系统...")
     task_queue.shutdown(wait=False)
     database = _ensure_db()
@@ -879,6 +869,7 @@ async def submit_feedback(
 
 
 class EvaluateResponse(BaseModel):
+    mode: str = "standard"
     precision: float
     recall: float
     f1: float
@@ -890,59 +881,78 @@ class EvaluateResponse(BaseModel):
     false_negatives: int
     avg_latency: float
     test_cases: list = []
+    errors: list = []
 
 
-@app.post("/api/v1/evaluate", response_model=EvaluateResponse, tags=["评估"])
-async def run_evaluation(
-    mode: str = Query("standard", pattern="^(standard|extreme)$"),
-    user: dict = Depends(get_current_user),
-):
-    eval_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval")
-    cases_file = os.path.join(eval_dir, "extreme_test_cases.json" if mode == "extreme" else "test_cases.json")
+_eval_tasks: Dict[str, dict] = {}
 
-    if not os.path.exists(cases_file):
-        raise HTTPException(status_code=404, detail=f"测试用例文件不存在: {cases_file}")
 
-    with open(cases_file, "r", encoding="utf-8") as f:
-        test_cases = json.load(f)
-
+def _run_eval_sync(task_id: str, mode: str, test_cases: list, agent, username: str) -> dict:
     tp = tn = fp = fn = 0
     total_latency = 0.0
     case_results = []
+    error_list = []
+    consecutive_failures = 0
 
-    for tc in test_cases:
-        tc_id = tc.get("id", "?")
+    for idx, tc in enumerate(test_cases):
+        tc_id = tc.get("id", f"TC{idx+1}")
         content = tc.get("content", "")
         expected_compliant = tc.get("expected_compliant", "unknown")
-        expected_violation_types = tc.get("expected_violation_types", [])
-        description = tc.get("description", "")
+
+        if idx > 0:
+            base_wait = 3 if consecutive_failures == 0 else 15
+            time.sleep(base_wait)
 
         start = time.time()
-        try:
-            result = _ensure_agent().review(
-                content=content,
-                client_id=user.get("username", "anonymous"),
-            )
-        except Exception as e:
-            logger.warning(f"评估用例 {tc_id} 执行失败: {e}")
+        max_retries = 3
+        result = None
+        for attempt in range(max_retries + 1):
+            try:
+                result = agent.review(
+                    content=content,
+                    client_id=f"eval_{username}",
+                    skip_cache=True,
+                )
+            except Exception as e:
+                consecutive_failures += 1
+                if attempt < max_retries:
+                    wait = 10 * (attempt + 1)
+                    logger.info(f"用例 {tc_id} 第{attempt+1}次异常，{wait}秒后重试: {e}")
+                    time.sleep(wait)
+                    result = None
+                    continue
+                else:
+                    error_list.append({"id": tc_id, "error": str(e)})
+                    result = ReviewResult(
+                        compliant="unknown", violation_type="",
+                        violated_articles=[], confidence=0.0,
+                        reasoning=f"执行失败: {e}", suggestions="",
+                    )
+
+            if result and result.compliant == "unknown" and attempt < max_retries:
+                consecutive_failures += 1
+                wait = 15 * (attempt + 1)
+                logger.info(f"用例 {tc_id} 返回unknown(可能API限流)，{wait}秒后重试")
+                time.sleep(wait)
+                result = None
+                continue
+
+            if result and result.compliant != "unknown":
+                consecutive_failures = 0
+            break
+
+        if result is None:
             result = ReviewResult(
-                compliant="unknown",
-                violation_type="",
-                violated_articles=[],
-                confidence=0.0,
-                reasoning=f"执行失败: {e}",
-                suggestions="",
+                compliant="unknown", violation_type="",
+                violated_articles=[], confidence=0.0,
+                reasoning="重试耗尽", suggestions="",
             )
+            error_list.append({"id": tc_id, "error": "重试耗尽，API可能限流"})
+
         latency = (time.time() - start) * 1000
         total_latency += latency
 
         actual_compliant = result.compliant
-        actual_violation_types = []
-        if result.violation_types:
-            actual_violation_types = [vt.get("violation_type_name", "") for vt in result.violation_types]
-        elif result.violation_type and result.violation_type != "无":
-            actual_violation_types = [v.strip() for v in result.violation_type.split("、") if v.strip()]
-
         expected_label = "违规" if expected_compliant == "no" else "合规" if expected_compliant == "yes" else "未知"
         actual_label = "违规" if actual_compliant == "no" else "合规" if actual_compliant == "yes" else "未知"
 
@@ -961,13 +971,13 @@ async def run_evaluation(
             pass_status = actual_compliant != "no"
 
         case_results.append({
-            "id": tc_id,
-            "content": content[:100],
-            "expected": expected_label,
-            "actual": actual_label,
-            "pass": pass_status,
-            "latency_ms": round(latency, 0),
+            "id": tc_id, "content": content[:100],
+            "expected": expected_label, "actual": actual_label,
+            "pass": pass_status, "latency_ms": round(latency, 0),
         })
+
+        progress = idx + 1
+        _eval_tasks[task_id]["progress"] = progress
 
     total = len(test_cases)
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
@@ -976,19 +986,80 @@ async def run_evaluation(
     accuracy = (tp + tn) / total if total > 0 else 0.0
     avg_latency = round(total_latency / total, 0) if total > 0 else 0.0
 
-    return EvaluateResponse(
-        precision=round(precision, 4),
-        recall=round(recall, 4),
-        f1=round(f1, 4),
-        accuracy=round(accuracy, 4),
-        total=total,
-        true_positives=tp,
-        true_negatives=tn,
-        false_positives=fp,
-        false_negatives=fn,
-        avg_latency=avg_latency,
-        test_cases=case_results,
-    )
+    return {
+        "mode": mode,
+        "precision": round(precision, 4), "recall": round(recall, 4),
+        "f1": round(f1, 4), "accuracy": round(accuracy, 4),
+        "total": total,
+        "true_positives": tp, "true_negatives": tn,
+        "false_positives": fp, "false_negatives": fn,
+        "avg_latency": avg_latency,
+        "test_cases": case_results, "errors": error_list,
+    }
+
+
+@app.post("/api/v1/evaluate", tags=["评估"])
+async def run_evaluation(
+    mode: str = Query("standard", pattern="^(standard|extreme)$"),
+    x_model: Optional[str] = Header(None, alias="X-Model"),
+    user: dict = Depends(get_current_user),
+):
+    eval_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval")
+    cases_file = os.path.join(eval_dir, "extreme_test_cases.json" if mode == "extreme" else "test_cases.json")
+
+    if not os.path.exists(cases_file):
+        raise HTTPException(status_code=404, detail=f"测试用例文件不存在: {cases_file}")
+
+    try:
+        with open(cases_file, "r", encoding="utf-8") as f:
+            test_cases = json.load(f)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"测试用例文件格式错误: {e}")
+
+    if not test_cases:
+        raise HTTPException(status_code=400, detail="测试用例文件为空")
+
+    agent = _ensure_agent()
+    if agent is None:
+        raise HTTPException(status_code=503, detail="审核引擎未初始化，请检查 API Key 配置")
+
+    if x_model and x_model.strip():
+        agent.extract_model = x_model.strip()
+        agent.reason_model = x_model.strip()
+        agent.crosscheck_model = x_model.strip()
+
+    task_id = f"eval_{mode}_{int(time.time())}"
+
+    _eval_tasks[task_id] = {
+        "status": "running",
+        "mode": mode,
+        "progress": 0,
+        "total": len(test_cases),
+        "result": None,
+    }
+
+    def _run():
+        try:
+            result = _run_eval_sync(task_id, mode, test_cases, agent, user.get("username", "anonymous"))
+            _eval_tasks[task_id]["status"] = "completed"
+            _eval_tasks[task_id]["result"] = result
+        except Exception as e:
+            _eval_tasks[task_id]["status"] = "failed"
+            _eval_tasks[task_id]["result"] = {"error": str(e)}
+
+    import threading
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+    return {"task_id": task_id, "status": "running", "mode": mode, "total": len(test_cases)}
+
+
+@app.get("/api/v1/evaluate/{task_id}", tags=["评估"])
+async def get_eval_status(task_id: str, user: dict = Depends(get_current_user)):
+    task = _eval_tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="评估任务不存在")
+    return task
 
 
 @app.get("/api/v1/review/pending", tags=["人工复核"])

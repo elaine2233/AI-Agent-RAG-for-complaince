@@ -209,7 +209,7 @@ _DEFAULT_L2_TYPES = [
         "parent_id": "sales_misconduct",
         "severity": 1.0,
         "description": "以额外利益诱导购买保险产品",
-        "keywords": ["赠送", "送礼", "大礼包", "返现", "返利", "红包", "额外赠送", "旅游基金"],
+        "keywords": ["赠送", "送礼", "大礼包", "返现", "返利", "红包", "额外赠送", "旅游基金", "限时", "仅剩", "名额", "涨价", "最后机会", "错过", "抢购", "秒杀", "立减"],
         "suggestions": "不得以额外利益诱导购买",
         "is_system": True,
         "status": "active",
