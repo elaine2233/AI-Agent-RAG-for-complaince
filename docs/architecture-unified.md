@@ -1,6 +1,6 @@
 # 保险营销内容智能审核系统 — 统一架构文档
 
-> 版本: v1.1 | 更新日期: 2026-05-18 | 受众: 架构师、技术负责人、新成员 onboarding
+> 版本: v1.1 | 更新日期: 2026-05-18
 
 ---
 
@@ -26,7 +26,7 @@ graph TB
 | 层 | 生产 | Demo 简化 |
 |----|------|-----------|
 | **展示层** | React SPA + CDN 分发 | FastAPI + 纯 HTML |
-| **网关层** | Kong/Nginx：JWT+RBAC、滑动窗口限流、CORS、WAF、熔断 | SecurityMiddleware：内存限流(60次/60s)、33种安全检测(25注入+5XSS+3SQLi)、无 WAF |
+| **网关层** | Kong/Nginx：JWT+RBAC、滑动窗口限流、CORS、WAF、熔断 + 应用层安全检测 | 应用层 SecurityMiddleware：内存限流(60次/60s)、33种安全检测(25注入+5XSS+3SQLi)；无独立网关、无 WAF |
 | **业务服务层** | 5 个微服务(Review/Regulation/User/Analytics/Notification) + Celery 异步 | 单进程 FastAPI，同步阻塞 |
 | **AI 能力层** | WorkflowEngine + LLM Gateway(多模型路由+熔断) + RAG(BM25+向量混合) + Cross-Encoder Reranker + Risk Engine | 同架构但：单模型直连、CrossCheck 可跳过 |
 | **数据处理层** | DocParserReg + InputProcChn + ChunkStrat(4策略) | 相同，但无长文本分段审核、无复杂表格处理 |

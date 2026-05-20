@@ -1,0 +1,144 @@
+{
+  "total_cases": 10,
+  "compliant_accuracy": 1.0,
+  "violation_type_accuracy": 1.0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1_score": 1.0,
+  "avg_confidence": 0.87,
+  "details": [
+    {
+      "test_case_id": "TC001",
+      "predicted_compliant": "no",
+      "expected_compliant": "no",
+      "compliant_correct": true,
+      "predicted_violation_types": "绝对化用语、夸大收益、诱导销售",
+      "expected_violation_types": [
+        "绝对化用语",
+        "收益承诺",
+        "夸大收益",
+        "诱导销售"
+      ],
+      "violation_type_match": true,
+      "confidence": 0.85,
+      "reasoning": "经审核，该营销内容存在以下违规问题：\n违反《保险销售行为管理办法》第二十一条：使用'稳赚不赔'、'保本保息'、'无风险'等绝对化用语（匹配关键词: 稳赚不赔、保本保息、零风险）\n违反《金融产品网络营销管理办法》第九条：使用绝对化用语进行宣传（匹配关键词: 稳赚不赔、保本保息、零风险）\n违反《互联网保险业务监管办法》第十六条：使用绝对化用语进行保险营销（匹配关键词: 稳赚不赔、保本保息、零风险）\n违反《保险销售行为管理办法》第十二条：夸大保险产品收益（匹配关键词: 年化收益、收益率高达）\n违反《保险销售行为管理办法》第六条：以给予或者承诺给予保险合同约定以外的利益诱导购买（匹配关键词: 大礼包）\n违反《金融产品网络营销管理办法》第十四条：以返利、红包等方式诱导转发、分享营销内容（匹配关键词: 大礼包）\n违反《金融产品网络营销管理办法》第二十三条：以赠送保险以外的礼品或者利益诱导购买（匹配关键词: 大礼包）"
+    },
+    {
+      "test_case_id": "TC002",
+      "predicted_compliant": "yes",
+      "expected_compliant": "yes",
+      "compliant_correct": true,
+      "predicted_violation_types": "无",
+      "expected_violation_types": [],
+      "violation_type_match": true,
+      "confidence": 0.9,
+      "reasoning": "经审核，该营销内容未发现违规问题。内容包含适当的风险提示和产品信息，用语合规，未使用绝对化用语或承诺保证收益。"
+    },
+    {
+      "test_case_id": "TC003",
+      "predicted_compliant": "no",
+      "expected_compliant": "no",
+      "compliant_correct": true,
+      "predicted_violation_types": "收益承诺、产品混淆",
+      "expected_violation_types": [
+        "产品混淆",
+        "收益承诺",
+        "夸大收益"
+      ],
+      "violation_type_match": true,
+      "confidence": 0.85,
+      "reasoning": "经审核，该营销内容存在以下违规问题：\n违反《保险销售行为管理办法》第十二条：对保险产品的不确定利益承诺保证收益（匹配关键词: 收益确定）\n违反《保险销售行为管理办法》第二十一条：将保险产品的不确定利益表述为确定利益（匹配关键词: 收益确定）\n违反《金融产品网络营销管理办法》第九条：对收益作出保证性承诺（匹配关键词: 收益确定）\n违反《保险销售行为管理办法》第十三条：将保险产品与其他金融产品混淆（匹配关键词: 存款、存钱、理财、基金、比银行）\n违反《互联网保险业务监管办法》第十六条：以非保险产品的名义销售保险产品（匹配关键词: 存款、存钱、理财、基金、比银行）\n违反《金融产品网络营销管理办法》第二十三条：将保险产品与存款、银行理财、基金等其他金融产品混淆（匹配关键词: 存款、存钱、理财、基金、比银行）"
+    },
+    {
+      "test_case_id": "TC004",
+      "predicted_compliant": "no",
+      "expected_compliant": "no",
+      "compliant_correct": true,
+      "predicted_violation_types": "无资质代言",
+      "expected_violation_types": [
+        "无资质代言"
+      ],
+      "violation_type_match": true,
+      "confidence": 0.85,
+      "reasoning": "经审核，该营销内容存在以下违规问题：\n违反《金融产品网络营销管理办法》第二十条：利用演艺人员、网络主播等公众人物进行代言或推荐（匹配关键词: 明星、影星、推荐、倾情推荐）\n违反《金融产品网络营销管理办法》第十三条：利用专业人士的名义作推荐、证明（匹配关键词: 明星、影星、推荐、倾情推荐）"
+    },
+    {
+      "test_case_id": "TC005",
+      "predicted_compliant": "yes",
+      "expected_compliant": "yes",
+      "compliant_correct": true,
+      "predicted_violation_types": "无",
+      "expected_violation_types": [],
+      "violation_type_match": true,
+      "confidence": 0.9,
+      "reasoning": "经审核，该营销内容未发现违规问题。内容包含适当的风险提示和产品信息，用语合规，未使用绝对化用语或承诺保证收益。"
+    },
+    {
+      "test_case_id": "TC006",
+      "predicted_compliant": "no",
+      "expected_compliant": "no",
+      "compliant_correct": true,
+      "predicted_violation_types": "产品混淆、诱导销售",
+      "expected_violation_types": [
+        "诱导销售"
+      ],
+      "violation_type_match": true,
+      "confidence": 0.85,
+      "reasoning": "经审核，该营销内容存在以下违规问题：\n违反《保险销售行为管理办法》第十三条：将保险产品与其他金融产品混淆（匹配关键词: 基金）\n违反《保险销售行为管理办法》第二十一条：以存款、理财、基金等非保险产品的名义宣传保险产品（匹配关键词: 基金）\n违反《互联网保险业务监管办法》第十六条：以非保险产品的名义销售保险产品（匹配关键词: 基金）\n违反《金融产品网络营销管理办法》第二十三条：将保险产品与存款、银行理财、基金等其他金融产品混淆（匹配关键词: 基金）\n违反《保险销售行为管理办法》第六条：以给予或者承诺给予保险合同约定以外的利益诱导购买（匹配关键词: 赠送、额外赠送、立减、旅游基金、体检套餐）\n违反《保险销售行为管理办法》第十二条：给予或者承诺给予保险合同约定以外的利益（匹配关键词: 赠送、额外赠送、立减、旅游基金、体检套餐）\n违反《金融产品网络营销管理办法》第十四条：以返利、红包等方式诱导转发、分享营销内容（匹配关键词: 赠送、额外赠送、立减、旅游基金、体检套餐）"
+    },
+    {
+      "test_case_id": "TC007",
+      "predicted_compliant": "yes",
+      "expected_compliant": "yes",
+      "compliant_correct": true,
+      "predicted_violation_types": "无",
+      "expected_violation_types": [],
+      "violation_type_match": true,
+      "confidence": 0.9,
+      "reasoning": "经审核，该营销内容未发现违规问题。内容包含适当的风险提示和产品信息，用语合规，未使用绝对化用语或承诺保证收益。"
+    },
+    {
+      "test_case_id": "TC008",
+      "predicted_compliant": "no",
+      "expected_compliant": "no",
+      "compliant_correct": true,
+      "predicted_violation_types": "绝对化用语、夸大收益、产品混淆",
+      "expected_violation_types": [
+        "绝对化用语",
+        "收益承诺",
+        "产品混淆",
+        "夸大收益"
+      ],
+      "violation_type_match": true,
+      "confidence": 0.85,
+      "reasoning": "经审核，该营销内容存在以下违规问题：\n违反《保险销售行为管理办法》第二十一条：使用'稳赚不赔'、'保本保息'、'无风险'等绝对化用语（匹配关键词: 无风险、绝对安全、100%保本）\n违反《金融产品网络营销管理办法》第九条：使用绝对化用语进行宣传（匹配关键词: 无风险、绝对安全、100%保本）\n违反《互联网保险业务监管办法》第十六条：使用绝对化用语进行保险营销（匹配关键词: 无风险、绝对安全、100%保本）\n违反《保险销售行为管理办法》第十二条：夸大保险产品收益（匹配关键词: 年化收益）\n违反《保险销售行为管理办法》第十三条：将保险产品与其他金融产品混淆（匹配关键词: 存款）\n违反《金融产品网络营销管理办法》第二十三条：将保险产品与存款、银行理财、基金等其他金融产品混淆（匹配关键词: 存款）"
+    },
+    {
+      "test_case_id": "TC009",
+      "predicted_compliant": "yes",
+      "expected_compliant": "yes",
+      "compliant_correct": true,
+      "predicted_violation_types": "无",
+      "expected_violation_types": [],
+      "violation_type_match": true,
+      "confidence": 0.9,
+      "reasoning": "经审核，该营销内容未发现违规问题。内容包含适当的风险提示和产品信息，用语合规，未使用绝对化用语或承诺保证收益。"
+    },
+    {
+      "test_case_id": "TC010",
+      "predicted_compliant": "no",
+      "expected_compliant": "no",
+      "compliant_correct": true,
+      "predicted_violation_types": "收益承诺、无资质代言、诱导销售",
+      "expected_violation_types": [
+        "无资质代言",
+        "收益承诺",
+        "诱导销售",
+        "夸大收益"
+      ],
+      "violation_type_match": true,
+      "confidence": 0.85,
+      "reasoning": "经审核，该营销内容存在以下违规问题：\n违反《保险销售行为管理办法》第十二条：对保险产品的不确定利益承诺保证收益（匹配关键词: 保证赚钱）\n违反《保险销售行为管理办法》第二十一条：将保险产品的不确定利益表述为确定利益（匹配关键词: 保证赚钱）\n违反《金融产品网络营销管理办法》第九条：对收益作出保证性承诺（匹配关键词: 保证赚钱）\n违反《金融产品网络营销管理办法》第二十条：利用演艺人员、网络主播等公众人物进行代言或推荐（匹配关键词: 网红、主播、带你买）\n违反《金融产品网络营销管理办法》第十三条：利用专业人士的名义作推荐、证明（匹配关键词: 网红、主播、带你买）\n违反《保险销售行为管理办法》第六条：以给予或者承诺给予保险合同约定以外的利益诱导购买（匹配关键词: 返现、红包）\n违反《互联网保险业务监管办法》第十六条：以赠送保险以外的礼品或者利益诱导购买（匹配关键词: 返现、红包）\n违反《金融产品网络营销管理办法》第十四条：以返利、红包等方式诱导转发、分享营销内容（匹配关键词: 返现、红包）\n违反《金融产品网络营销管理办法》第二十三条：以赠送保险以外的礼品或者利益诱导购买（匹配关键词: 返现、红包）"
+    }
+  ]
+}

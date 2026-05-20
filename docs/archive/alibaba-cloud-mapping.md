@@ -139,12 +139,6 @@ Extract → RuleCheck → RAGRetrieve → Rerank → LLMReason → Format → Va
 
 我们的系统当前是**单流水线架构**，不使用多Agent。`review_agent.py` 实现了完整的10步审核流程，步骤间是线性依赖关系。
 
-DeepSeek BA文档建议的多Agent架构：
-- **Classifier Agent**：内容分类
-- **Retriever Agent**：法规检索
-- **Auditor Agent**：合规审核
-- **Summarizer Agent**：结果汇总
-
 #### 百炼Agent 2.0提供
 
 - 自主规划和调度：Agent根据任务自主决定执行步骤
